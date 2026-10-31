@@ -1,7 +1,7 @@
 (function () {
   function getStoredTheme() {
     try {
-      return localStorage.getItem('vmp-theme');
+      return localStorage.getItem('voicer-pro-theme');
     } catch {
       return null;
     }
@@ -9,7 +9,7 @@
 
   function storeTheme(theme) {
     try {
-      localStorage.setItem('vmp-theme', theme);
+      localStorage.setItem('voicer-pro-theme', theme);
     } catch {
       /* ignore quota / private mode */
     }
@@ -17,7 +17,7 @@
 
   function getStoredDevice() {
     try {
-      return localStorage.getItem('vmp-device');
+      return localStorage.getItem('voicer-pro-device');
     } catch {
       return null;
     }
@@ -25,7 +25,7 @@
 
   function storeDevice(device) {
     try {
-      localStorage.setItem('vmp-device', device);
+      localStorage.setItem('voicer-pro-device', device);
     } catch {
       /* ignore quota / private mode */
     }
