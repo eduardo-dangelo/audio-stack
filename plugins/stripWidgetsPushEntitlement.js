@@ -25,7 +25,7 @@ module.exports = withStripWidgetsPushEntitlement;
 /**
  * Post-prebuild fallback when entitlements are materialized to disk.
  */
-function stripPushEntitlementFile(iosProjectRoot, projectName = 'VoiceMemosPlus') {
+function stripPushEntitlementFile(iosProjectRoot, projectName = 'VoicerPro') {
   const entitlementsPath = path.join(iosProjectRoot, projectName, `${projectName}.entitlements`);
 
   if (!fs.existsSync(entitlementsPath)) {

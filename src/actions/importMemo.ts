@@ -63,7 +63,7 @@ async function importFromUri(
   }
 }
 
-/** Import a `.vmp` already readable by the app (picker cache or copied URL). Overlay is the caller's job. */
+/** Import a `.vcr` / `.vmp` already readable by the app (picker cache or copied URL). Overlay is the caller's job. */
 export async function importProjectFromCachedUri(
   uri: string,
   options?: Pick<ImportMemoOptions, 'folderId'>
@@ -72,7 +72,7 @@ export async function importProjectFromCachedUri(
   return importFromUri(cachedUri, options);
 }
 
-/** Import a Voice Memos Plus project from a file URI (Files / Mail / AirDrop). */
+/** Import a Voicer Pro project from a file URI (Files / Mail / AirDrop). */
 export async function importMemoFromUri(
   uri: string,
   options?: ImportMemoOptions
@@ -87,7 +87,7 @@ export async function importMemoFromUri(
 }
 
 /**
- * Opens the document picker and imports a Voice Memos Plus project (`.vmp`).
+ * Opens the document picker and imports a Voicer Pro project (`.vcr` / `.vmp`).
  * Returns `canceled` when the user dismisses the picker.
  */
 export async function importMemoFromPicker(
@@ -101,7 +101,7 @@ export async function importMemoFromPicker(
     }
 
     if (!isProjectFileName(result.name)) {
-      throw new Error('Please select a Voice Memos Plus project (.vmp) file.');
+      throw new Error('Please select a Voicer Pro project (.vcr) file.');
     }
 
     options?.onImportStarted?.();

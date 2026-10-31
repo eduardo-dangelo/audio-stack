@@ -268,7 +268,7 @@ export default function FoldersHomeScreen() {
           });
         }}
       />
-      <GroupedListScreen largeTitle="Voice Memos">
+      <GroupedListScreen largeTitle="Voicer Pro">
         <GroupedListSection>
           <GroupedListRow
             count={counts.allCount}

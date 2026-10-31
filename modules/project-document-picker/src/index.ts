@@ -47,19 +47,19 @@ function requireAvailableModule(): ProjectDocumentPickerNativeModule {
 }
 
 /**
- * Opens a document picker that only enables Voice Memos Plus `.vmp` project files.
+ * Opens a document picker that only enables Voicer Pro `.vcr` / `.vmp` project files.
  * Requires a native rebuild after adding this module.
  */
 export async function pickProjectAsync(): Promise<PickProjectResult> {
   return requireAvailableModule().pickProjectAsync();
 }
 
-/** Copy a Files / Mail / AirDrop `.vmp` URL into caches, including security-scoped URLs. */
+/** Copy a Files / Mail / AirDrop `.vcr` / `.vmp` URL into caches, including security-scoped URLs. */
 export async function copyIncomingProjectAsync(uri: string): Promise<string> {
   return requireAvailableModule().copyIncomingProjectAsync(uri);
 }
 
-/** Stamp a local `.vmp` file with the project UTI so Files / AirDrop keep the type. */
+/** Stamp a local `.vcr` / `.vmp` file with the project UTI so Files / AirDrop keep the type. */
 export async function stampProjectTypeAsync(uri: string): Promise<void> {
   await requireAvailableModule().stampProjectTypeAsync(uri);
 }

@@ -4,6 +4,7 @@ import { File, Paths } from 'expo-file-system';
 import { sanitizeExportFileName } from '@/src/utils/format';
 
 import {
+  PROJECT_FILE_EXTENSION,
   PROJECT_MANIFEST_PATH,
   PROJECT_PACKAGE_META_PATH,
   buildExportableManifest,
@@ -21,12 +22,15 @@ import { hasRecording } from './types';
 
 export {
   PROJECT_FORMAT_ID,
+  LEGACY_PROJECT_FORMAT_IDS,
   PROJECT_SCHEMA_VERSION,
   PROJECT_PACKAGE_META_PATH,
   PROJECT_MANIFEST_PATH,
   PROJECT_MEDIA_PREFIX,
   PROJECT_FILE_EXTENSION,
+  LEGACY_PROJECT_FILE_EXTENSIONS,
   PROJECT_MIME_TYPE,
+  LEGACY_PROJECT_MIME_TYPE,
   PROJECT_UTI,
   isProjectFileName,
   buildExportableManifest,
@@ -80,7 +84,7 @@ export function writeImportedMemoFiles(
   manifestFile.write(JSON.stringify(memo, null, 2));
 }
 
-/** Pack a memo into a `.vmp` project file in the cache directory. */
+/** Pack a memo into a `.vcr` project file in the cache directory. */
 export async function packMemoToProjectFile(
   memo: Memo,
   options?: { appVersion?: string }
@@ -118,7 +122,7 @@ export async function packMemoToProjectFile(
 
   const zipped = zipProjectFiles(archiveFiles);
   const baseName = sanitizeExportFileName(memo.title);
-  const output = new File(Paths.cache, `${baseName}.vmp`);
+  const output = new File(Paths.cache, `${baseName}.${PROJECT_FILE_EXTENSION}`);
   if (output.exists) {
     output.delete();
   }

@@ -12,24 +12,46 @@ import {
   normalizePrecountMode,
 } from './types';
 
-export const PROJECT_FORMAT_ID = 'voice-memos-plus-project';
+export const PROJECT_FORMAT_ID = 'voicer-pro-project';
+/** Older exports still open; new packages write `PROJECT_FORMAT_ID` only. */
+export const LEGACY_PROJECT_FORMAT_IDS = ['voice-memos-plus-project'] as const;
 export const PROJECT_SCHEMA_VERSION = 1;
 export const PROJECT_PACKAGE_META_PATH = 'package.json';
 export const PROJECT_MANIFEST_PATH = 'manifest.json';
 export const PROJECT_MEDIA_PREFIX = 'media/';
 /** File extension for portable project packages (without dot). */
-export const PROJECT_FILE_EXTENSION = 'vmp';
-/** MIME type registered for `.vmp` (used by share + document picker). */
-export const PROJECT_MIME_TYPE = 'application/vnd.voice-memos-plus.project';
-/** iOS UTI for `.vmp` project packages. */
+export const PROJECT_FILE_EXTENSION = 'vcr';
+/** Older shared projects used `.vmp`; still accepted on import. */
+export const LEGACY_PROJECT_FILE_EXTENSIONS = ['vmp'] as const;
+/** MIME type registered for `.vcr` (used by share + document picker). */
+export const PROJECT_MIME_TYPE = 'application/vnd.voicer-pro.project';
+/** Legacy MIME for `.vmp` packages. */
+export const LEGACY_PROJECT_MIME_TYPE = 'application/vnd.voice-memos-plus.project';
+/** iOS UTI for project packages (unchanged for Files / AirDrop continuity). */
 export const PROJECT_UTI = 'com.eduardodangelo.voicememosplus.project';
 
+const ACCEPTED_PROJECT_EXTENSIONS = [
+  PROJECT_FILE_EXTENSION,
+  ...LEGACY_PROJECT_FILE_EXTENSIONS,
+] as const;
+
 export function isProjectFileName(name: string): boolean {
-  return name.trim().toLowerCase().endsWith(`.${PROJECT_FILE_EXTENSION}`);
+  const lower = name.trim().toLowerCase();
+  return ACCEPTED_PROJECT_EXTENSIONS.some((ext) => lower.endsWith(`.${ext}`));
+}
+
+function isAcceptedProjectFormatId(format: unknown): format is string {
+  if (format === PROJECT_FORMAT_ID) {
+    return true;
+  }
+  return (
+    typeof format === 'string' &&
+    (LEGACY_PROJECT_FORMAT_IDS as readonly string[]).includes(format)
+  );
 }
 
 export type MemoProjectPackageMeta = {
-  format: typeof PROJECT_FORMAT_ID;
+  format: string;
   schemaVersion: number;
   exportedAt: string;
   appVersion?: string;
@@ -146,8 +168,8 @@ function parsePackageMeta(raw: unknown): MemoProjectPackageMeta {
     throw new Error('Invalid project package metadata.');
   }
   const value = raw as Record<string, unknown>;
-  if (value.format !== PROJECT_FORMAT_ID) {
-    throw new Error('This file is not a Voice Memos Plus project.');
+  if (!isAcceptedProjectFormatId(value.format)) {
+    throw new Error('This file is not a Voicer Pro project.');
   }
   if (typeof value.schemaVersion !== 'number' || !Number.isFinite(value.schemaVersion)) {
     throw new Error('Project package is missing a schema version.');
@@ -164,7 +186,7 @@ function parsePackageMeta(raw: unknown): MemoProjectPackageMeta {
     throw new Error('Project package is missing an export timestamp.');
   }
   return {
-    format: PROJECT_FORMAT_ID,
+    format: value.format,
     schemaVersion: value.schemaVersion,
     exportedAt: value.exportedAt,
     ...(typeof value.appVersion === 'string' ? { appVersion: value.appVersion } : {}),

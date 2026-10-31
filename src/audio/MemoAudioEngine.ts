@@ -3973,7 +3973,7 @@ export class MemoAudioEngine {
       format: FileFormat.Wav,
       preset: RECORDING_FILE_PRESET,
       directory: RECORDING_FILE_DIRECTORY,
-      subDirectory: 'voice-memos-plus',
+      subDirectory: 'voicer-pro',
       fileNamePrefix: 'recording',
       channelCount: 1,
     });

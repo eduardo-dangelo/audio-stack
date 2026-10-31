@@ -27,7 +27,10 @@ import {
   isImportDecodeTooLarge,
 } from '@/src/audio/importAudioFileLogic';
 import { writeMonoPcm16Wav } from '@/src/audio/wavUtils';
-import { PROJECT_MIME_TYPE } from '@/src/storage/memoPackage';
+import {
+  LEGACY_PROJECT_MIME_TYPE,
+  PROJECT_MIME_TYPE,
+} from '@/src/storage/memoPackage';
 import { randomId } from '@/src/utils/id';
 
 export {
@@ -102,11 +105,11 @@ export async function pickAudioFile(): Promise<
   return pickDocument('audio/*');
 }
 
-/** List import: audio files and Voice Memos Plus `.vmp` projects. */
+/** List import: audio files and Voicer Pro `.vcr` / `.vmp` projects. */
 export async function pickImportableFile(): Promise<
   { canceled: true } | ({ canceled: false } & PickedAudioFile)
 > {
-  return pickDocument(['audio/*', PROJECT_MIME_TYPE]);
+  return pickDocument(['audio/*', PROJECT_MIME_TYPE, LEGACY_PROJECT_MIME_TYPE]);
 }
 
 export async function convertPickedAudioToMonoWav(

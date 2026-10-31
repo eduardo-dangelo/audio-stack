@@ -9,7 +9,7 @@ function fileNameFromPathname(pathname: string): string {
   }
 }
 
-/** Normalize a system open-URL into a `file://` URI when it points at a `.vmp` project. */
+/** Normalize a system open-URL into a `file://` URI when it points at a `.vcr` / `.vmp` project. */
 export function projectFileUrlFromOpenPath(path: string): string | null {
   const trimmed = path.trim();
   if (!trimmed) {

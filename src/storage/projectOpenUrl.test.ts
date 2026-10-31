@@ -7,12 +7,21 @@ import {
 } from './projectOpenUrl';
 
 describe('projectFileUrlFromOpenPath', () => {
-  it('accepts file URLs with a .vmp name', () => {
+  it('accepts file URLs with a .vcr name', () => {
+    const url = 'file:///var/mobile/Containers/Data/Inbox/Session%20A.vcr';
+    assert.equal(projectFileUrlFromOpenPath(url), url);
+  });
+
+  it('accepts file URLs with a legacy .vmp name', () => {
     const url = 'file:///var/mobile/Containers/Data/Inbox/Session%20A.vmp';
     assert.equal(projectFileUrlFromOpenPath(url), url);
   });
 
   it('accepts bare sandbox paths', () => {
+    assert.equal(
+      projectFileUrlFromOpenPath('/tmp/Inbox/demo.vcr'),
+      'file:///tmp/Inbox/demo.vcr'
+    );
     assert.equal(
       projectFileUrlFromOpenPath('/tmp/Inbox/demo.vmp'),
       'file:///tmp/Inbox/demo.vmp'
@@ -26,7 +35,15 @@ describe('projectFileUrlFromOpenPath', () => {
 });
 
 describe('rewriteIncomingProjectPath', () => {
-  it('rewrites .vmp file URLs to the import route', () => {
+  it('rewrites .vcr file URLs to the import route', () => {
+    const url = 'file:///tmp/Inbox/Session%20A.vcr';
+    assert.equal(
+      rewriteIncomingProjectPath(url),
+      `/import-project?uri=${encodeURIComponent(url)}`
+    );
+  });
+
+  it('rewrites legacy .vmp file URLs to the import route', () => {
     const url = 'file:///tmp/Inbox/Session%20A.vmp';
     assert.equal(
       rewriteIncomingProjectPath(url),
@@ -40,7 +57,7 @@ describe('rewriteIncomingProjectPath', () => {
   });
 
   it('does not double-rewrite the import route', () => {
-    const path = '/import-project?uri=file%3A%2F%2F%2Ftmp%2Fa.vmp';
+    const path = '/import-project?uri=file%3A%2F%2F%2Ftmp%2Fa.vcr';
     assert.equal(rewriteIncomingProjectPath(path), path);
   });
 });

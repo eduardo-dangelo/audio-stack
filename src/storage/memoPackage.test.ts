@@ -138,7 +138,9 @@ function buildArchiveFiles(memo: Memo = makeMemo()): Record<string, Uint8Array> 
 }
 
 describe('isProjectFileName', () => {
-  it('accepts .vmp and rejects other extensions', () => {
+  it('accepts .vcr and legacy .vmp and rejects other extensions', () => {
+    assert.equal(isProjectFileName('Session A.vcr'), true);
+    assert.equal(isProjectFileName('Session A.VCR'), true);
     assert.equal(isProjectFileName('Session A.vmp'), true);
     assert.equal(isProjectFileName('Session A.VMP'), true);
     assert.equal(isProjectFileName('Session A.zip'), false);
@@ -220,7 +222,20 @@ describe('validateProjectArchive', () => {
         exportedAt: '2026-08-01T12:00:00.000Z',
       })
     );
-    assert.throws(() => validateProjectArchive(files), /not a Voice Memos Plus project/);
+    assert.throws(() => validateProjectArchive(files), /not a Voicer Pro project/);
+  });
+
+  it('accepts legacy voice-memos-plus-project format id', () => {
+    const files = buildArchiveFiles();
+    files[PROJECT_PACKAGE_META_PATH] = strToU8(
+      JSON.stringify({
+        format: 'voice-memos-plus-project',
+        schemaVersion: 1,
+        exportedAt: '2026-08-01T12:00:00.000Z',
+      })
+    );
+    const validated = validateProjectArchive(files);
+    assert.equal(validated.meta.format, 'voice-memos-plus-project');
   });
 
   it('rejects a future schemaVersion', () => {

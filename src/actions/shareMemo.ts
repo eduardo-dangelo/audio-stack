@@ -19,24 +19,24 @@ export type ShareMemoOptions = {
 };
 
 const AUDIO_FORMATS = ['m4a', 'wav'] as const;
-const PROJECT_FORMAT_LABEL = 'Project (.vmp)';
+const PROJECT_FORMAT_LABEL = 'Project (.vcr)';
 
 function getShareMimeType(format: ExportFormat): string {
-  if (format === 'vmp') {
+  if (format === 'vcr') {
     return PROJECT_MIME_TYPE;
   }
   return format === 'm4a' ? 'audio/mp4' : 'audio/wav';
 }
 
 function getShareUti(format: ExportFormat): string {
-  if (format === 'vmp') {
+  if (format === 'vcr') {
     return PROJECT_UTI;
   }
   return format === 'm4a' ? 'public.mpeg-4-audio' : 'com.microsoft.waveform-audio';
 }
 
 async function stampProjectFileIfNeeded(uri: string, format: ExportFormat): Promise<void> {
-  if (format !== 'vmp') {
+  if (format !== 'vcr') {
     return;
   }
   await stampProjectTypeAsync(uri);
@@ -47,7 +47,7 @@ function resolveFormatSelection(label: string): ExportFormat | null {
     return label;
   }
   if (label === PROJECT_FORMAT_LABEL) {
-    return 'vmp';
+    return 'vcr';
   }
   return null;
 }
@@ -150,7 +150,7 @@ function runExport(
   format: ExportFormat,
   options?: ShareMemoOptions
 ): void {
-  if (format === 'vmp' && options?.layerId) {
+  if (format === 'vcr' && options?.layerId) {
     Alert.alert('Export failed', 'Project export is only available for the full memo.');
     return;
   }
@@ -164,7 +164,7 @@ export function shareMemo(memo: Memo, options?: ShareMemoOptions): void {
     return;
   }
 
-  if (options?.format === 'm4a' || options?.format === 'wav' || options?.format === 'vmp') {
+  if (options?.format === 'm4a' || options?.format === 'wav' || options?.format === 'vcr') {
     runExport([memo], options.format, options);
     return;
   }
@@ -181,7 +181,7 @@ export function shareMemos(memos: Memo[], options?: ShareMemoOptions): void {
     return;
   }
 
-  if (options?.format === 'm4a' || options?.format === 'wav' || options?.format === 'vmp') {
+  if (options?.format === 'm4a' || options?.format === 'wav' || options?.format === 'vcr') {
     runExport(exportable, options.format, options);
     return;
   }

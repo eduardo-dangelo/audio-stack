@@ -8,13 +8,13 @@ Pod::Spec.new do |s|
   s.summary        = package['description']
   s.description    = package['description']
   s.license        = 'MIT'
-  s.author         = 'Voice Memos Plus'
-  s.homepage       = 'https://github.com/voicememosplus/voice-memos-plus'
+  s.author         = 'Voicer Pro'
+  s.homepage       = 'https://github.com/eduardo-dangelo/voicer-pro'
   s.platforms      = {
     :ios => '16.4'
   }
   s.swift_version  = '5.9'
-  s.source         = { git: 'https://github.com/voicememosplus/voice-memos-plus.git' }
+  s.source         = { git: 'https://github.com/eduardo-dangelo/voicer-pro.git' }
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Voice Memos Plus",
-    "slug": "voice-memos-plus",
+    "name": "Voicer Pro",
+    "slug": "voicer-pro",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
@@ -14,12 +14,12 @@
       "icon": "./assets/AppIcon.icon",
       "supportsTablet": true,
       "bundleIdentifier": "com.eduardodangelo.voicememosplus",
-      "buildNumber": "24",
+      "buildNumber": "25",
       "userInterfaceStyle": "automatic",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Voice Memos Plus needs microphone access to record audio.",
-        "NSLocationWhenInUseUsageDescription": "Voice Memos Plus uses your location to name new recordings, like Apple Voice Memos.",
-        "NSLocalNetworkUsageDescription": "Voice Memos Plus uses the local network to load the JavaScript bundle from your computer during development.",
+        "NSMicrophoneUsageDescription": "Voicer Pro needs microphone access to record audio.",
+        "NSLocationWhenInUseUsageDescription": "Voicer Pro uses your location to name new recordings after the current place.",
+        "NSLocalNetworkUsageDescription": "Voicer Pro uses the local network to load the JavaScript bundle from your computer during development.",
         "NSBonjourServices": [
           "_http._tcp",
           "_expo._tcp",
@@ -42,16 +42,18 @@
         "UTExportedTypeDeclarations": [
           {
             "UTTypeIdentifier": "com.eduardodangelo.voicememosplus.project",
-            "UTTypeDescription": "Voice Memos Plus Project",
+            "UTTypeDescription": "Voicer Pro Project",
             "UTTypeConformsTo": [
               "public.data",
               "public.content"
             ],
             "UTTypeTagSpecification": {
               "public.filename-extension": [
+                "vcr",
                 "vmp"
               ],
               "public.mime-type": [
+                "application/vnd.voicer-pro.project",
                 "application/vnd.voice-memos-plus.project"
               ]
             }
@@ -59,10 +61,11 @@
         ],
         "CFBundleDocumentTypes": [
           {
-            "CFBundleTypeName": "Voice Memos Plus Project",
+            "CFBundleTypeName": "Voicer Pro Project",
             "CFBundleTypeRole": "Editor",
             "LSHandlerRank": "Owner",
             "CFBundleTypeExtensions": [
+              "vcr",
               "vmp"
             ],
             "LSItemContentTypes": [
@@ -79,13 +82,13 @@
         "react-native-audio-api",
         {
           "iosBackgroundMode": true,
-          "iosMicrophonePermission": "Voice Memos Plus needs microphone access to record audio."
+          "iosMicrophonePermission": "Voicer Pro needs microphone access to record audio."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Voice Memos Plus uses your location to name new recordings, like Apple Voice Memos."
+          "locationWhenInUsePermission": "Voicer Pro uses your location to name new recordings after the current place."
         }
       ],
       [

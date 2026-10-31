@@ -118,7 +118,7 @@ async function createMemoFromConverted(
   }
 }
 
-/** Opens a picker for audio or `.vmp` and creates a new memo. */
+/** Opens a picker for audio or `.vcr` / `.vmp` and creates a new memo. */
 export async function importFileAsNewMemo(
   options?: ImportAudioOptions
 ): Promise<ImportAudioResult> {
@@ -196,7 +196,7 @@ export function promptImportAudio(
     });
 }
 
-/** List import: one picker for audio files and `.vmp` projects. */
+/** List import: one picker for audio files and `.vcr` / `.vmp` projects. */
 export function promptImportFile(
   options?: ImportAudioOptions & {
     onImported?: (memo: Memo) => void;

@@ -3,7 +3,7 @@ import * as Linking from 'expo-linking';
 import { Alert } from 'react-native';
 
 const FEEDBACK_EMAIL = 'appcenter.support@gmail.com';
-const FEEDBACK_SUBJECT = 'Voice Memos Plus Feedback';
+const FEEDBACK_SUBJECT = 'Voicer Pro Feedback';
 
 function buildFeedbackBody(): string {
   const version = Constants.expoConfig?.version ?? 'unknown';

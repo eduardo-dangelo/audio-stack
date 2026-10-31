@@ -1,13 +1,13 @@
-# Voice Memos Plus
+# Voicer Pro
 
 <p align="center">
-  <img src="landing/assets/screenshots/iphone/light/hero.png" width="220" alt="Voice Memos Plus editor on iPhone" />
-  <!-- <img src="landing/assets/screenshots/ipad/light/hero.png" width="480" alt="Voice Memos Plus editor on iPad" /> -->
+  <img src="landing/assets/screenshots/iphone/light/hero.png" width="220" alt="Voicer Pro editor on iPhone" />
+  <!-- <img src="landing/assets/screenshots/ipad/light/hero.png" width="480" alt="Voicer Pro editor on iPad" /> -->
 </p>
 
-Voice Memos Plus is a multi-track voice recorder that keeps the familiar Voice Memos flow and adds the tools to build richer takes: stack layers, edit waveforms, add effects, loop regions, and keep time with a metronome and grid. Recordings stay on your device.
+Voicer Pro is a multi-track voice recorder with tools to build richer takes: stack layers, edit waveforms, add effects, loop regions, and keep time with a metronome and grid. Recordings stay on your device.
 
-**[Product site](https://eduardo-dangelo.github.io/voice-memos-plus/)** · **[Privacy](https://eduardo-dangelo.github.io/voice-memos-plus/privacy.html)**
+**[Product site](https://eduardo-dangelo.github.io/voicer-pro/)** · **[Privacy](https://eduardo-dangelo.github.io/voicer-pro/privacy.html)**
 
 iOS app built with Expo SDK 56 and `react-native-audio-api`.
 
@@ -44,7 +44,7 @@ node node_modules/react-native-audio-api/scripts/download-prebuilt-binaries.sh i
 npx expo run:ios
 ```
 
-If you see a sandbox error like `deny(1) file-write-create .../resources-to-copy-VoiceMemosPlus.txt`, Xcode's User Script Sandboxing is blocking CocoaPods. The project's `ios/Podfile` already disables this in `post_install`. If it returns after `expo prebuild`, run:
+If you see a sandbox error like `deny(1) file-write-create .../resources-to-copy-VoicerPro.txt`, Xcode's User Script Sandboxing is blocking CocoaPods. The project's `ios/Podfile` already disables this in `post_install`. If it returns after `expo prebuild`, run:
 
 ```bash
 cd ios && pod install && cd ..
