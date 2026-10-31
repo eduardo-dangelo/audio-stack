@@ -14,23 +14,22 @@
         try {
           var storedTheme = localStorage.getItem('voicer-pro-theme');
           var theme =
-            storedTheme ||
-            (window.matchMedia('(prefers-color-scheme: dark)').matches
-              ? 'dark'
-              : 'light');
+            storedTheme === 'light' || storedTheme === 'dark'
+              ? storedTheme
+              : 'dark';
           document.documentElement.setAttribute('data-theme', theme);
         } catch (e) {
-          document.documentElement.setAttribute('data-theme', 'light');
+          document.documentElement.setAttribute('data-theme', 'dark');
         }
         try {
           var storedDevice = localStorage.getItem('voicer-pro-device');
           var device =
             storedDevice === 'ipad' || storedDevice === 'iphone'
               ? storedDevice
-              : 'iphone';
+              : 'ipad';
           document.documentElement.setAttribute('data-device', device);
         } catch (e) {
-          document.documentElement.setAttribute('data-device', 'iphone');
+          document.documentElement.setAttribute('data-device', 'ipad');
         }
       })();
     </script>
@@ -65,9 +64,9 @@
             type="button"
             class="theme-toggle"
             data-device-toggle
-            data-tooltip="Switch to iPad"
-            aria-label="Switch to iPad"
-            aria-pressed="false"
+            data-tooltip="Switch to iPhone"
+            aria-label="Switch to iPhone"
+            aria-pressed="true"
           >
             <span class="theme-toggle-icon theme-toggle-icon--phone" aria-hidden="true">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
@@ -84,9 +83,9 @@
             type="button"
             class="theme-toggle"
             data-theme-toggle
-            data-tooltip="Switch to dark mode"
-            aria-label="Switch to dark mode"
-            aria-pressed="false"
+            data-tooltip="Switch to light mode"
+            aria-label="Switch to light mode"
+            aria-pressed="true"
           >
             <span class="theme-toggle-icon theme-toggle-icon--moon" aria-hidden="true">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
@@ -162,7 +161,7 @@
                 <div class="ipad-frame__screen">
                   <img
                     class="theme-shot"
-                    src="./assets/screenshots/ipad/light/hero.png"
+                    src="./assets/screenshots/ipad/dark/hero.png"
                     data-iphone-light-src="./assets/screenshots/iphone/light/hero.png"
                     data-iphone-dark-src="./assets/screenshots/iphone/dark/hero.png"
                     data-ipad-light-src="./assets/screenshots/ipad/light/hero.png"

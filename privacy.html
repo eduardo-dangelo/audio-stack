@@ -14,23 +14,22 @@
         try {
           var storedTheme = localStorage.getItem('voicer-pro-theme');
           var theme =
-            storedTheme ||
-            (window.matchMedia('(prefers-color-scheme: dark)').matches
-              ? 'dark'
-              : 'light');
+            storedTheme === 'light' || storedTheme === 'dark'
+              ? storedTheme
+              : 'dark';
           document.documentElement.setAttribute('data-theme', theme);
         } catch (e) {
-          document.documentElement.setAttribute('data-theme', 'light');
+          document.documentElement.setAttribute('data-theme', 'dark');
         }
         try {
           var storedDevice = localStorage.getItem('voicer-pro-device');
           var device =
             storedDevice === 'ipad' || storedDevice === 'iphone'
               ? storedDevice
-              : 'iphone';
+              : 'ipad';
           document.documentElement.setAttribute('data-device', device);
         } catch (e) {
-          document.documentElement.setAttribute('data-device', 'iphone');
+          document.documentElement.setAttribute('data-device', 'ipad');
         }
       })();
     </script>
