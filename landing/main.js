@@ -34,14 +34,13 @@
   function resolveTheme() {
     const stored = getStoredTheme();
     if (stored === 'light' || stored === 'dark') return stored;
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
-    return 'light';
+    return 'dark';
   }
 
   function resolveDevice() {
     const stored = getStoredDevice();
     if (stored === 'iphone' || stored === 'ipad') return stored;
-    return 'iphone';
+    return 'ipad';
   }
 
   function shotAttr(device, theme) {
