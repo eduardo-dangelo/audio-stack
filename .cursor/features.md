@@ -6,6 +6,20 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### iPhone Duo scene lifecycle
+- Status: evolving
+- What: iPhone Duo launches through one UIScene; the side column stays a safe-area inset, not a second scene.
+- Paths: `plugins/withIosSceneLifecycle.js`, `app.json`
+- Invariants: One application scene; React Native starts from `UIWindow(windowScene:)`; cold-start and later URLs still reach Linking.
+- Updated: 2026-11-02
+
+### iOS pod deployment target
+- Status: evolving
+- What: Pod targets below iOS 15 are raised to the app deployment target during prebuild.
+- Paths: `plugins/withIosPodDeploymentTarget.js`, `app.json`
+- Invariants: Targets already at 15.1 or higher stay unchanged; the floor is the Podfile deployment target (default 16.4).
+- Updated: 2026-11-02
+
 ### Lite / Plus / Pro billing
 - Status: evolving
 - What: StoreKit tiers via expo-iap with Lite free limits, Plus lifetime, Pro monthly; hard gates + upgrade prompts open a 3-column paywall.

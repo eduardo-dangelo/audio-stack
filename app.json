@@ -13,6 +13,7 @@
     "ios": {
       "icon": "./assets/AppIcon.icon",
       "supportsTablet": true,
+      "appleTeamId": "JD2R9CV986",
       "bundleIdentifier": "com.eduardodangelo.voicememosplus",
       "buildNumber": "25",
       "userInterfaceStyle": "automatic",
@@ -117,6 +118,8 @@
       "./plugins/stripWidgetsPushEntitlement.js",
       "./plugins/stripAppIconAppiconset.js",
       "./plugins/withEndLiveActivitiesOnTerminate.js",
+      "./plugins/withIosPodDeploymentTarget.js",
+      "./plugins/withIosSceneLifecycle.js",
       "expo-iap"
     ],
     "experiments": {
