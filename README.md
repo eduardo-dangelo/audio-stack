@@ -1,8 +1,7 @@
 # Audio Stack
 
 <p align="center">
-  <img src="landing/assets/screenshots/iphone/light/hero.png" width="220" alt="Audio Stack editor on iPhone" />
-  <!-- <img src="landing/assets/screenshots/ipad/light/hero.png" width="480" alt="Audio Stack editor on iPad" /> -->
+  <img src="landing/assets/screenshots/ipad/dark/hero.png" width="640" alt="Audio Stack editor on iPad" />
 </p>
 
 Audio Stack is a multi-track voice recorder with tools to build richer takes: stack layers, edit waveforms, add effects, loop regions, and keep time with a metronome and grid. Recordings stay on your device.
