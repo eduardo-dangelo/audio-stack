@@ -1,7 +1,7 @@
 (function () {
   function getStoredTheme() {
     try {
-      return localStorage.getItem('voicer-pro-theme');
+      return localStorage.getItem('audio-stack-theme');
     } catch {
       return null;
     }
@@ -9,7 +9,7 @@
 
   function storeTheme(theme) {
     try {
-      localStorage.setItem('voicer-pro-theme', theme);
+      localStorage.setItem('audio-stack-theme', theme);
     } catch {
       /* ignore quota / private mode */
     }
@@ -17,7 +17,7 @@
 
   function getStoredDevice() {
     try {
-      return localStorage.getItem('voicer-pro-device');
+      return localStorage.getItem('audio-stack-device');
     } catch {
       return null;
     }
@@ -25,7 +25,7 @@
 
   function storeDevice(device) {
     try {
-      localStorage.setItem('voicer-pro-device', device);
+      localStorage.setItem('audio-stack-device', device);
     } catch {
       /* ignore quota / private mode */
     }
