@@ -24,8 +24,8 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: StoreKit tiers via expo-iap with Lite free limits, Plus lifetime, Pro monthly; hard gates + upgrade prompts open a 3-column paywall.
 - Paths: `src/billing/`, `src/components/PaywallModal.tsx`, `src/components/UpgradePromptHost.tsx`, `app/paywall.tsx`, `app/_layout.tsx`
-- Invariants: Effective tier is Pro > Plus > Lite; Lite caps 10 recordings / 5 playable layers and blocks custom effects, folders, merge, loop, import, export; Plus exports m4a only (wav/.vcr → Pro); Lite Export opens paywall before format picker; gated actions open paywall directly with a reason subtitle; paywall uses in-editor Modal when MemoEditor is open else `/paywall` `containedTransparentModal`; comparison is a row-aligned opaque table (no Restore on sheet — Settings keeps Restore); `__DEV__` Dev Tier override only.
-- Updated: 2026-11-01
+- Invariants: Effective tier is Pro > Plus > Lite; Lite caps 10 recordings / 5 playable layers and blocks custom effects, folders, merge, loop, import, export; Plus exports m4a only (wav/.vcr → Pro); Lite Export opens paywall before format picker; gated actions open paywall directly with a reason subtitle; paywall uses in-editor Modal when MemoEditor is open else `/paywall` `containedTransparentModal`; comparison is a row-aligned opaque table (no Restore on sheet — Settings keeps Restore); a closed Duo rail shortens the sheet, keeps it full width, and squeezes the table to fit with no scroll; an open Duo, other iPhones, and iPad stay content-height; `__DEV__` Dev Tier override only.
+- Updated: 2026-11-02
 
 ### Audio Stack rename
 - Status: evolving

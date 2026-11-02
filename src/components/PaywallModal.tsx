@@ -5,6 +5,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,7 +19,12 @@ import {
   paywallSubtitle,
 } from '@/src/billing/capabilities';
 import type { TierId, UpgradeReason } from '@/src/billing/types';
+import { useDuoSideColumn } from '@/src/hooks/useDuoSideColumn';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
+
+/** Closed Duo rail: leave the status cluster on the dimmed editor, sheet full width over the rail. */
+const CLOSED_RAIL_TOP_CLEARANCE = 160;
+const CLOSED_RAIL_MIN_SHEET = 360;
 
 const HEADER_HEIGHT = 52;
 const ROW_HEIGHT = 32;
@@ -156,6 +162,13 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
   const colorScheme = useColorScheme();
   const styles = useStyles(colors, colorScheme);
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const sideColumn = useDuoSideColumn();
+  const closedRail = sideColumn.edge != null;
+  const closedRailMaxHeight = Math.max(
+    CLOSED_RAIL_MIN_SHEET,
+    windowHeight - insets.top - CLOSED_RAIL_TOP_CLEARANCE
+  );
   const {
     effectiveTier,
     plusPriceLabel,
@@ -243,26 +256,11 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
     tierMeta[tier].recommended ? styles.tierColRecommended : null,
   ];
 
-  const body: ReactNode = (
-    <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-      <View style={styles.header}>
-        <View style={styles.headerCopy}>
-          <Text style={styles.title}>Choose a plan</Text>
-          {reason ? <Text style={styles.reason}>{paywallSubtitle(reason)}</Text> : null}
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-          onPress={onClose}
-          hitSlop={12}
-          style={styles.closeButton}>
-          <SymbolView name={{ ios: 'xmark' }} size={16} tintColor={colors.secondaryText} />
-        </Pressable>
-      </View>
-
-      <View style={styles.table}>
+  const comparison: ReactNode = (
+    <>
+      <View style={[styles.table, closedRail ? styles.closedRailTable : null]}>
         {/* Header: titles + prices — padding lives on cells so column bg fills the row */}
-        <View style={[styles.row, styles.headerRow]}>
+        <View style={[styles.row, styles.headerRow, closedRail ? styles.closedRailTightRow : null]}>
           <View style={[styles.labelCol, styles.headerCellPad]} />
           {TIERS.map((tier) => (
             <View key={tier} style={[...columnTone(tier), styles.headerCellPad]}>
@@ -292,7 +290,7 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
               key={feature.label}
               style={[
                 styles.row,
-                styles.featureRow,
+                closedRail ? styles.closedRailFeatureRow : styles.featureRow,
                 index < FEATURES.length - 1 ? styles.featureRowBorder : null,
               ]}>
               <View style={styles.labelCol}>
@@ -319,7 +317,7 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
         })}
 
         {/* CTA row — padding on cells so column bg fills the row */}
-        <View style={[styles.row, styles.ctaRow]}>
+        <View style={[styles.row, styles.ctaRow, closedRail ? styles.closedRailTightRow : null]}>
           <View style={[styles.labelCol, styles.ctaCellPad]} />
           {TIERS.map((tier) => {
             const cta = ctaFor(tier);
@@ -364,13 +362,45 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
           <Text style={styles.manageLinkText}>Manage Subscription</Text>
         </Pressable>
       ) : null}
+    </>
+  );
+
+  const body: ReactNode = (
+    <View
+      style={[
+        styles.sheet,
+        { paddingBottom: Math.max(insets.bottom, 16) },
+        closedRail ? { height: closedRailMaxHeight } : null,
+      ]}>
+      <View style={styles.header}>
+        <View style={styles.headerCopy}>
+          <Text style={styles.title}>Choose a plan</Text>
+          {reason ? <Text style={styles.reason}>{paywallSubtitle(reason)}</Text> : null}
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          onPress={onClose}
+          hitSlop={12}
+          style={styles.closeButton}>
+          <SymbolView name={{ ios: 'xmark' }} size={16} tintColor={colors.secondaryText} />
+        </Pressable>
+      </View>
+
+      {comparison}
     </View>
   );
 
   return (
     <View style={styles.screen}>
       <Pressable style={styles.dismissArea} onPress={onClose} />
-      <View style={styles.sheetChrome}>{body}</View>
+      <View
+        style={[
+          styles.sheetChrome,
+          closedRail ? { maxHeight: closedRailMaxHeight } : null,
+        ]}>
+        {body}
+      </View>
     </View>
   );
 }
@@ -414,6 +444,20 @@ function useStyles(
           paddingHorizontal: 14,
           paddingTop: 16,
           gap: 14,
+        },
+        closedRailTable: {
+          flex: 1,
+          minHeight: 0,
+        },
+        closedRailFeatureRow: {
+          flexGrow: 1,
+          flexShrink: 1,
+          minHeight: 0,
+        },
+        closedRailTightRow: {
+          flexGrow: 0,
+          flexShrink: 1,
+          minHeight: 0,
         },
         header: {
           flexDirection: 'row',
