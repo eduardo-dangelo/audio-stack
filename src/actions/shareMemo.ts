@@ -3,6 +3,12 @@ import { stampProjectTypeAsync } from 'project-document-picker';
 import { ActionSheetIOS, Alert } from 'react-native';
 import { shareFilesAsync } from 'share-files';
 
+import {
+  canExportAnything,
+  canExportFormat,
+  getEffectiveTierSync,
+  requestUpgrade,
+} from '@/src/billing';
 import { PROJECT_MIME_TYPE, PROJECT_UTI } from '@/src/storage/memoPackage';
 import {
   exportMemoToFile,
@@ -56,6 +62,13 @@ function showFormatPicker(
   includeProject: boolean,
   onFormat: (format: ExportFormat) => void
 ): void {
+  const tier = getEffectiveTierSync();
+  if (!canExportAnything(tier)) {
+    requestUpgrade('export');
+    return;
+  }
+
+  // Plus and Pro both pick a format; Plus wav/vcr is gated in the callback.
   const sheetOptions = includeProject
     ? ([...AUDIO_FORMATS, PROJECT_FORMAT_LABEL, 'Cancel'] as const)
     : ([...AUDIO_FORMATS, 'Cancel'] as const);
@@ -76,6 +89,10 @@ function showFormatPicker(
       if (!format) {
         return;
       }
+      if (!canExportFormat(tier, format)) {
+        requestUpgrade(tier === 'lite' ? 'export' : 'exportFormat');
+        return;
+      }
       onFormat(format);
     }
   );
@@ -86,6 +103,12 @@ async function exportAndShare(
   format: ExportFormat,
   options?: ShareMemoOptions
 ): Promise<void> {
+  const tier = getEffectiveTierSync();
+  if (!canExportFormat(tier, format)) {
+    requestUpgrade(tier === 'lite' ? 'export' : 'exportFormat');
+    return;
+  }
+
   options?.onExportStarted?.();
 
   try {
@@ -116,6 +139,12 @@ async function exportAndShareMany(
 ): Promise<void> {
   if (memos.length === 1) {
     await exportAndShare(memos[0]!, format, options);
+    return;
+  }
+
+  const tier = getEffectiveTierSync();
+  if (!canExportFormat(tier, format)) {
+    requestUpgrade(tier === 'lite' ? 'export' : 'exportFormat');
     return;
   }
 
@@ -164,6 +193,11 @@ export function shareMemo(memo: Memo, options?: ShareMemoOptions): void {
     return;
   }
 
+  if (!canExportAnything(getEffectiveTierSync())) {
+    requestUpgrade('export');
+    return;
+  }
+
   if (options?.format === 'm4a' || options?.format === 'wav' || options?.format === 'vcr') {
     runExport([memo], options.format, options);
     return;
@@ -178,6 +212,11 @@ export function shareMemos(memos: Memo[], options?: ShareMemoOptions): void {
   const exportable = memos.filter(hasRecording);
   if (exportable.length === 0) {
     Alert.alert('Nothing to export', 'Selected recordings have no recorded audio yet.');
+    return;
+  }
+
+  if (!canExportAnything(getEffectiveTierSync())) {
+    requestUpgrade('export');
     return;
   }
 

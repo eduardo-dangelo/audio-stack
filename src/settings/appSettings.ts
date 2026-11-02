@@ -10,6 +10,9 @@ import {
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
+/** Dev-only billing override. Ignored outside `__DEV__`. */
+export type DevTierOverride = 'lite' | 'plus' | 'pro' | null;
+
 export type RecordingDefaults = {
   precount: PrecountMode;
   metronomeEnabled: boolean;
@@ -26,6 +29,8 @@ export type AppSettings = {
   recordingDefaults: RecordingDefaults;
   hideMergeLayersPerformanceTip: boolean;
   hideCollapseTracksPerformanceTip: boolean;
+  /** Only applied in `__DEV__` builds. */
+  devTierOverride: DevTierOverride;
 };
 
 const THEME_PREFERENCES: readonly ThemePreference[] = ['system', 'light', 'dark'];
@@ -46,7 +51,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   recordingDefaults: DEFAULT_RECORDING_DEFAULTS,
   hideMergeLayersPerformanceTip: false,
   hideCollapseTracksPerformanceTip: false,
+  devTierOverride: null,
 };
+
+function isDevTierOverride(value: unknown): value is Exclude<DevTierOverride, null> {
+  return value === 'lite' || value === 'plus' || value === 'pro';
+}
 
 function isThemePreference(value: unknown): value is ThemePreference {
   return typeof value === 'string' && THEME_PREFERENCES.includes(value as ThemePreference);
@@ -101,6 +111,9 @@ function readSettings(): AppSettings {
         typeof parsed.hideCollapseTracksPerformanceTip === 'boolean'
           ? parsed.hideCollapseTracksPerformanceTip
           : DEFAULT_SETTINGS.hideCollapseTracksPerformanceTip,
+      devTierOverride: isDevTierOverride(parsed.devTierOverride)
+        ? parsed.devTierOverride
+        : null,
     };
   } catch {
     return {
@@ -170,6 +183,21 @@ export async function setHideCollapseTracksPerformanceTip(
   hide: boolean
 ): Promise<AppSettings> {
   const next = { ...readSettings(), hideCollapseTracksPerformanceTip: hide };
+  writeSettings(next);
+  return next;
+}
+
+export function getDevTierOverrideSync(): DevTierOverride {
+  return readSettings().devTierOverride;
+}
+
+export async function setDevTierOverride(
+  override: DevTierOverride
+): Promise<AppSettings> {
+  const next = {
+    ...readSettings(),
+    devTierOverride: override === null || isDevTierOverride(override) ? override : null,
+  };
   writeSettings(next);
   return next;
 }

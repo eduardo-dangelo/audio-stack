@@ -19,6 +19,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { promptImportFile } from '@/src/actions/importAudio';
 import { shareMemos } from '@/src/actions/shareMemo';
 import { useAudioEngineSelector } from '@/src/audio/AudioEngineContext';
+import { isBillingLimitError, requestUpgrade } from '@/src/billing';
 import { memoAudioEngine } from '@/src/audio/MemoAudioEngine';
 import {
   FloatingHeaderButton,
@@ -236,7 +237,17 @@ export function RecordingsList({
     if (selectedIds.size === 0) {
       return;
     }
-    void Promise.all([...selectedIds].map((id) => recoverMemo(id))).then(() => {
+    void Promise.all(
+      [...selectedIds].map((id) =>
+        recoverMemo(id).catch((error) => {
+          if (isBillingLimitError(error)) {
+            requestUpgrade(error.reason);
+            throw error;
+          }
+          throw error;
+        })
+      )
+    ).then(() => {
       memoAudioEngine.unload();
       clearSelection();
       refresh();
@@ -287,7 +298,10 @@ export function RecordingsList({
         pathname: '/memo/[id]',
         params: { id: memo.id, record: '1', backTitle },
       });
-    } catch {
+    } catch (error) {
+      if (isBillingLimitError(error)) {
+        requestUpgrade(error.reason);
+      }
       clearStartingRecord();
     }
   };

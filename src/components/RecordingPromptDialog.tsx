@@ -18,11 +18,16 @@ export type RecordingPromptDismissOptions = {
 export type RecordingPromptDialogProps = {
   visible: boolean;
   title: string;
-  heroIcon: string;
+  /** Large hero icon under the title. Omit to hide. */
+  heroIcon?: string | null;
   message: string;
   compact?: boolean;
   titleIcon?: RecordingPromptTitleIcon;
   actions?: 'ok' | 'confirm' | 'continue';
+  /** Override dismiss button label (default Cancel / OK). */
+  dismissLabel?: string;
+  /** Override continue button label (default Continue). */
+  continueLabel?: string;
   /** Shows a "Don't show this message again" checkbox above the actions. */
   showDontShowAgain?: boolean;
   onDismiss: (options?: RecordingPromptDismissOptions) => void;
@@ -39,6 +44,8 @@ export function RecordingPromptDialog({
   compact = false,
   titleIcon = 'warning',
   actions = 'confirm',
+  dismissLabel,
+  continueLabel,
   showDontShowAgain = false,
   onDismiss,
   onContinue,
@@ -86,13 +93,15 @@ export function RecordingPromptDialog({
             ) : null}
             <Text style={styles.title}>{title}</Text>
           </View>
-          <View style={styles.iconWrap}>
-            <SymbolView
-              name={{ ios: heroIcon as SFSymbol }}
-              size={compact ? 44 : 56}
-              tintColor={colors.text}
-            />
-          </View>
+          {heroIcon ? (
+            <View style={styles.iconWrap}>
+              <SymbolView
+                name={{ ios: heroIcon as SFSymbol }}
+                size={compact ? 44 : 56}
+                tintColor={colors.text}
+              />
+            </View>
+          ) : null}
           <Text style={styles.message}>{message}</Text>
           {showDontShowAgain ? (
             <Pressable
@@ -122,14 +131,16 @@ export function RecordingPromptDialog({
                   hitSlop={8}
                   style={styles.actionButton}
                   onPress={() => onDismiss(dismissOptions())}>
-                  <Text style={styles.cancelText}>Cancel</Text>
+                  <Text style={styles.cancelText}>{dismissLabel ?? 'Cancel'}</Text>
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
                   hitSlop={8}
                   style={styles.actionButton}
                   onPress={() => onContinue?.(dismissOptions())}>
-                  <Text style={styles.continueText}>Continue</Text>
+                  <Text style={styles.continueText}>
+                    {continueLabel ?? 'Continue'}
+                  </Text>
                 </Pressable>
               </>
             ) : actions === 'continue' ? (
@@ -138,7 +149,9 @@ export function RecordingPromptDialog({
                 hitSlop={8}
                 style={styles.actionButton}
                 onPress={() => onContinue?.(dismissOptions())}>
-                <Text style={styles.continueText}>Continue</Text>
+                <Text style={styles.continueText}>
+                  {continueLabel ?? 'Continue'}
+                </Text>
               </Pressable>
             ) : (
               <Pressable
@@ -146,7 +159,7 @@ export function RecordingPromptDialog({
                 hitSlop={8}
                 style={styles.actionButton}
                 onPress={() => onDismiss(dismissOptions())}>
-                <Text style={styles.continueText}>OK</Text>
+                <Text style={styles.continueText}>{dismissLabel ?? 'OK'}</Text>
               </Pressable>
             )}
           </View>

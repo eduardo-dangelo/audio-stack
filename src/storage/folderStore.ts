@@ -1,3 +1,8 @@
+import {
+  BillingLimitError,
+  canCreateFolder,
+  getEffectiveTierSync,
+} from '@/src/billing';
 import { getFoldersFile } from '@/src/storage/paths';
 import type { Folder } from '@/src/storage/types';
 import { randomId } from '@/src/utils/id';
@@ -30,6 +35,9 @@ export async function getFolder(folderId: string): Promise<Folder | null> {
 }
 
 export async function createFolder(name: string): Promise<Folder> {
+  if (!canCreateFolder(getEffectiveTierSync())) {
+    throw new BillingLimitError('folders');
+  }
   const folders = readFolders();
   const folder: Folder = {
     id: randomId(),

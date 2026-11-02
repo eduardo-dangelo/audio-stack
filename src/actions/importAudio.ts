@@ -1,5 +1,13 @@
 import { Alert } from 'react-native';
 
+import { importProjectFromCachedUri } from '@/src/actions/importMemo';
+import {
+  BillingLimitError,
+  canImport,
+  getEffectiveTierSync,
+  isBillingLimitError,
+  requestUpgrade,
+} from '@/src/billing';
 import {
   convertPickedAudioToMonoWav,
   deleteImportedTempFile,
@@ -7,12 +15,17 @@ import {
   pickImportableFile,
   type ConvertedImportAudio,
 } from '@/src/audio/importAudioFile';
-import { importProjectFromCachedUri } from '@/src/actions/importMemo';
 import { showImportSuccess } from '@/src/components/ImportSuccessDialog';
 import { isProjectFileName } from '@/src/storage/memoPackage';
 import { addImportedAudioLayer, createMemo } from '@/src/storage/memoStore';
 import { getMemoDir } from '@/src/storage/paths';
 import type { Memo } from '@/src/storage/types';
+
+function assertImportAllowed(): void {
+  if (!canImport(getEffectiveTierSync())) {
+    throw new BillingLimitError('import');
+  }
+}
 
 export type ImportFileKind = 'project' | 'audio';
 
@@ -122,6 +135,7 @@ async function createMemoFromConverted(
 export async function importFileAsNewMemo(
   options?: ImportAudioOptions
 ): Promise<ImportAudioResult> {
+  assertImportAllowed();
   try {
     const picked = await pickImportableFile();
     if (picked.canceled) {
@@ -159,6 +173,7 @@ export async function importAudioAsLayer(
   memoId: string,
   options?: ImportAudioOptions
 ): Promise<ImportAudioLayerResult> {
+  assertImportAllowed();
   const picked = await pickAudioFile();
   if (picked.canceled) {
     options?.onImportFinished?.();
@@ -189,6 +204,10 @@ export function promptImportAudio(
       showImportSuccess({ title: result.memo.title });
     })
     .catch((error) => {
+      if (isBillingLimitError(error)) {
+        requestUpgrade(error.reason);
+        return;
+      }
       Alert.alert(
         'Import failed',
         error instanceof Error ? error.message : 'Unknown error'
@@ -202,6 +221,10 @@ export function promptImportFile(
     onImported?: (memo: Memo) => void;
   }
 ): void {
+  if (!canImport(getEffectiveTierSync())) {
+    requestUpgrade('import');
+    return;
+  }
   void importFileAsNewMemo(options)
     .then((result) => {
       if (result.status === 'canceled') {
@@ -211,6 +234,10 @@ export function promptImportFile(
       showImportSuccess({ title: result.memo.title });
     })
     .catch((error) => {
+      if (isBillingLimitError(error)) {
+        requestUpgrade(error.reason);
+        return;
+      }
       Alert.alert(
         'Import failed',
         error instanceof Error ? error.message : 'Unknown error'

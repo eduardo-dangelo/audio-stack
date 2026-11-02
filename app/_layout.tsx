@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 import { useColorScheme } from '@/components/useColorScheme';
 import type { VoiceMemosColorScheme } from '@/constants/VoiceMemosColors';
 import { AudioEngineProvider } from '@/src/audio/AudioEngineContext';
+import { BillingProvider } from '@/src/billing';
 import { memoAudioEngine } from '@/src/audio/MemoAudioEngine';
 import { ImportSuccessHost } from '@/src/components/ImportSuccessDialog';
 import { LowBatteryWarningHost } from '@/src/components/LowBatteryWarningHost';
@@ -121,6 +122,14 @@ function RootNavigator() {
             animation: 'none',
           }}
         />
+        <Stack.Screen
+          name="paywall"
+          options={{
+            presentation: 'containedTransparentModal',
+            headerShown: false,
+            contentStyle: { backgroundColor: 'transparent' },
+          }}
+        />
       </Stack>
     </>
   );
@@ -197,10 +206,12 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AppFrame onCanvasColor={setCanvasColor}>
           <AudioEngineProvider>
-            {/* Host before navigator so its layout effect registers before route effects. */}
-            <ImportSuccessHost />
-            <LowBatteryWarningHost />
-            <RootNavigator />
+            <BillingProvider>
+              {/* Host before navigator so its layout effect registers before route effects. */}
+              <ImportSuccessHost />
+              <LowBatteryWarningHost />
+              <RootNavigator />
+            </BillingProvider>
           </AudioEngineProvider>
         </AppFrame>
       </SafeAreaProvider>

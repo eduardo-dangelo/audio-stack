@@ -115,7 +115,8 @@
       ],
       "./plugins/stripWidgetsPushEntitlement.js",
       "./plugins/stripAppIconAppiconset.js",
-      "./plugins/withEndLiveActivitiesOnTerminate.js"
+      "./plugins/withEndLiveActivitiesOnTerminate.js",
+      "expo-iap"
     ],
     "experiments": {
       "typedRoutes": true

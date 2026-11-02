@@ -22,6 +22,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DEFAULT_TRACK_COLOR, pickRandomTrackColor } from '@/constants/VoiceMemosColors';
 import { shareMemo } from '@/src/actions/shareMemo';
 import {
+  canAddPlayableLayer,
+  canExportAnything,
+  canImport,
+  canUseLoop,
+  canUseMerge,
+  getEffectiveTierSync,
+  isBillingLimitError,
+  registerSheetPaywall,
+  requestUpgrade,
+  type UpgradeReason,
+} from '@/src/billing';
+import { PaywallScreen } from '@/src/components/PaywallModal';
+import {
   ACCORDION_AUTO_ENABLE_PRE_RECORD_MESSAGE,
   applyAccordionAutoEnableForMemo,
   maybeAutoEnableAccordionAfterRecordingSave,
@@ -685,8 +698,22 @@ function MemoEditorInner({
   const [mergeLayersTipVisible, setMergeLayersTipVisible] = useState(false);
   const [collapseTracksTipVisible, setCollapseTracksTipVisible] = useState(false);
   const [collapseWarningVisible, setCollapseWarningVisible] = useState(false);
+  const [sheetPaywall, setSheetPaywall] = useState<{
+    visible: boolean;
+    reason: UpgradeReason | null;
+  }>({ visible: false, reason: null });
   const [cueOutputRoute, setCueOutputRoute] =
     useState<CueOutputRoute>('wired');
+
+  // Paywall as in-sheet Modal — Stack /paywall resizes the form sheet and hides tools.
+  useLayoutEffect(() => {
+    registerSheetPaywall({
+      open: (reason) => setSheetPaywall({ visible: true, reason }),
+      close: () => setSheetPaywall({ visible: false, reason: null }),
+    });
+    return () => registerSheetPaywall(null);
+  }, []);
+
   const [monitorPath, setMonitorPath] = useState<MonitorPath>('headphones');
   const [loopSettingsVisible, setLoopSettingsVisible] = useState(false);
   const [loopDialogLayerId, setLoopDialogLayerId] = useState<string | null>(null);
@@ -2161,6 +2188,10 @@ function MemoEditorInner({
         setActiveEditor(null);
         await loadMemoIntoEngine(engine, updated, seekTime);
       } catch (error) {
+        if (isBillingLimitError(error)) {
+          requestUpgrade(error.reason);
+          return;
+        }
         Alert.alert(
           'Duplicate failed',
           error instanceof Error ? error.message : 'Unknown error'
@@ -2180,6 +2211,11 @@ function MemoEditorInner({
       isPersistingTake ||
       isExporting
     ) {
+      return;
+    }
+
+    if (!canImport(getEffectiveTierSync())) {
+      requestUpgrade('import');
       return;
     }
 
@@ -2251,10 +2287,14 @@ function MemoEditorInner({
       } catch (error) {
         setIsExporting(false);
         if (generation === loadGenerationRef.current) {
-          Alert.alert(
-            'Import failed',
-            error instanceof Error ? error.message : 'Unknown error'
-          );
+          if (isBillingLimitError(error)) {
+            requestUpgrade(error.reason);
+          } else {
+            Alert.alert(
+              'Import failed',
+              error instanceof Error ? error.message : 'Unknown error'
+            );
+          }
         }
       } finally {
         deleteImportedTempFile(pickedUri);
@@ -2368,6 +2408,10 @@ function MemoEditorInner({
 
   const handleMergeAllLayers = useCallback(() => {
     if (!memo || !canMergeLayers(memo.layers) || engineState.isRecording) {
+      return;
+    }
+    if (!canUseMerge(getEffectiveTierSync())) {
+      requestUpgrade('merge');
       return;
     }
     setTrackMenuLayerId(null);
@@ -2647,6 +2691,12 @@ function MemoEditorInner({
           if (isLayerLocked(effects)) {
             break;
           }
+          if (!canExportAnything(getEffectiveTierSync())) {
+            setTrackMenuLayerId(null);
+            setTrackMenuFormatPicker(false);
+            requestUpgrade('export');
+            break;
+          }
           setTrackMenuMergePicker(false);
           setTrackMenuFormatPicker(true);
           break;
@@ -2717,6 +2767,11 @@ function MemoEditorInner({
           if (engineState.isPlaying || engineState.isRecording) {
             break;
           }
+          if (!canUseLoop(getEffectiveTierSync())) {
+            setTrackMenuLayerId(null);
+            requestUpgrade('loop');
+            break;
+          }
           selectLayerIfNeeded();
           setLoopDialogLayerId(layerId);
           break;
@@ -2741,6 +2796,11 @@ function MemoEditorInner({
           break;
         case 'merge':
           if (isLayerLocked(effects)) {
+            break;
+          }
+          if (!canUseMerge(getEffectiveTierSync())) {
+            setTrackMenuLayerId(null);
+            requestUpgrade('merge');
             break;
           }
           if (canMergeLayers(memo.layers)) {
@@ -4162,12 +4222,23 @@ function MemoEditorInner({
     if (!ok) {
       return;
     }
-    const duplicated = await duplicateMemo(memo.id);
-    engine.unload();
-    if (onMemoIdChange) {
-      onMemoIdChange(duplicated.id);
-    } else {
-      router.replace({ pathname: '/memo/[id]', params: { id: duplicated.id } });
+    try {
+      const duplicated = await duplicateMemo(memo.id);
+      engine.unload();
+      if (onMemoIdChange) {
+        onMemoIdChange(duplicated.id);
+      } else {
+        router.replace({ pathname: '/memo/[id]', params: { id: duplicated.id } });
+      }
+    } catch (error) {
+      if (isBillingLimitError(error)) {
+        requestUpgrade(error.reason);
+        return;
+      }
+      Alert.alert(
+        'Duplicate failed',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
     }
   }, [engine, flushEditorState, memo, onMemoIdChange]);
 
@@ -5049,7 +5120,16 @@ function MemoEditorInner({
   };
 
   const handleReplace = () => void beginRecording('replace');
-  const handleStack = () => void beginRecording('stack');
+  const handleStack = () => {
+    if (!memo) {
+      return;
+    }
+    if (!canAddPlayableLayer(getEffectiveTierSync(), getPlayableLayers(memo).length)) {
+      requestUpgrade('layers');
+      return;
+    }
+    void beginRecording('stack');
+  };
 
   const handlePlayPause = useCallback(async () => {
     if (isPersistingTakeRef.current) {
@@ -5764,7 +5844,13 @@ function MemoEditorInner({
       loopEnabled: memo.loopEnabled ?? false,
       duration: waveformDuration,
       onChange: handleLoopChange,
-      onOpenSettings: () => setLoopSettingsVisible(true),
+      onOpenSettings: () => {
+        if (!canUseLoop(getEffectiveTierSync())) {
+          requestUpgrade('loop');
+          return;
+        }
+        setLoopSettingsVisible(true);
+      },
       holdExpanded: loopSettingsVisible,
       snapIntervalSec: snapEnabled ? timelineSnapIntervalSec : null,
     };
@@ -5783,6 +5869,10 @@ function MemoEditorInner({
       }
       const layer = memo?.layers.find((entry) => entry.id === layerId);
       if (layer && isLayerLocked(getLayerEffects(layer))) {
+        return;
+      }
+      if (!canUseLoop(getEffectiveTierSync())) {
+        requestUpgrade('loop');
         return;
       }
       setLoopDialogLayerId(layerId);
@@ -6031,6 +6121,16 @@ function MemoEditorInner({
           }
         }}
       />
+      <Modal
+        transparent
+        animationType="slide"
+        visible={sheetPaywall.visible}
+        onRequestClose={() => setSheetPaywall({ visible: false, reason: null })}>
+        <PaywallScreen
+          reason={sheetPaywall.reason}
+          onClose={() => setSheetPaywall({ visible: false, reason: null })}
+        />
+      </Modal>
       <RecordingPromptDialog
         visible={performanceWarningMessage != null}
         title="Performance may be reduced"

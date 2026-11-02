@@ -14,6 +14,15 @@ import {
   GroupedListSectionHeader,
 } from '@/src/components/GroupedList';
 import { NamePromptDialog } from '@/src/components/NamePromptDialog';
+import {
+  canCreateFolder,
+  getEffectiveTierSync,
+  isBillingLimitError,
+  requestUpgrade,
+  useBilling,
+  tierDisplayName,
+  type TierId,
+} from '@/src/billing';
 import { sendFeedbackEmail } from '@/src/feedback/sendFeedback';
 import { sideColumnIconItem, useDuoSideColumn } from '@/src/hooks/useDuoSideColumn';
 import { useFolders } from '@/src/hooks/useFolders';
@@ -42,6 +51,13 @@ export default function FoldersHomeScreen() {
   const [newFolderVisible, setNewFolderVisible] = useState(false);
   const [locationBasedNaming, setLocationBasedNamingEnabled] = useState(true);
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>('system');
+  const {
+    effectiveTier,
+    openPaywall,
+    restore,
+    setDevTierOverride,
+    devTierOverride,
+  } = useBilling();
 
   const refresh = () => {
     refreshFolders();
@@ -119,6 +135,10 @@ export default function FoldersHomeScreen() {
   };
 
   const handleNewFolder = useCallback(() => {
+    if (!canCreateFolder(getEffectiveTierSync())) {
+      requestUpgrade('folders');
+      return;
+    }
     setNewFolderVisible(true);
   }, []);
 
@@ -262,10 +282,21 @@ export default function FoldersHomeScreen() {
         onCancel={() => setNewFolderVisible(false)}
         onSave={(value) => {
           setNewFolderVisible(false);
-          void createFolder(value.trim() || 'New Folder').then(() => {
-            refreshFolders();
-            refreshCounts();
-          });
+          void createFolder(value.trim() || 'New Folder')
+            .then(() => {
+              refreshFolders();
+              refreshCounts();
+            })
+            .catch((error) => {
+              if (isBillingLimitError(error)) {
+                requestUpgrade(error.reason);
+                return;
+              }
+              Alert.alert(
+                'Could not create folder',
+                error instanceof Error ? error.message : 'Unknown error'
+              );
+            });
         }}
       />
       <GroupedListScreen largeTitle="Voicer Pro">
@@ -416,6 +447,98 @@ export default function FoldersHomeScreen() {
               </View>
               <Pressable
                 accessibilityRole="button"
+                onPress={() => openPaywall(null)}
+                style={({ pressed }) => [
+                  styles.settingsRow,
+                  styles.settingsRowBorder,
+                  pressed ? styles.settingsRowPressed : null,
+                ]}>
+                <SymbolView
+                  name={{ ios: 'crown.fill' }}
+                  size={20}
+                  tintColor={colors.accent}
+                />
+                <View style={styles.settingsCopy}>
+                  <Text style={styles.settingsTitle}>Plan</Text>
+                  <Text style={styles.settingsSubtitle}>
+                    Current: {tierDisplayName(effectiveTier)}
+                  </Text>
+                </View>
+                <SymbolView
+                  name={{ ios: 'chevron.right' }}
+                  size={14}
+                  tintColor={colors.secondaryText}
+                />
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  void restore();
+                }}
+                style={({ pressed }) => [
+                  styles.settingsRow,
+                  styles.settingsRowBorder,
+                  pressed ? styles.settingsRowPressed : null,
+                ]}>
+                <SymbolView
+                  name={{ ios: 'arrow.clockwise' }}
+                  size={20}
+                  tintColor={colors.accent}
+                />
+                <View style={styles.settingsCopy}>
+                  <Text style={styles.settingsTitle}>Restore Purchases</Text>
+                  <Text style={styles.settingsSubtitle}>
+                    Restore Plus or Pro on this device
+                  </Text>
+                </View>
+              </Pressable>
+              {__DEV__ ? (
+                <View style={[styles.settingsRow, styles.settingsRowBorder]}>
+                  <SymbolView
+                    name={{ ios: 'hammer.fill' }}
+                    size={20}
+                    tintColor={colors.accent}
+                  />
+                  <View style={styles.settingsCopy}>
+                    <Text style={styles.settingsTitle}>Dev Tier</Text>
+                    <Text style={styles.settingsSubtitle}>
+                      Override StoreKit for local testing
+                    </Text>
+                    <View style={styles.devTierRow}>
+                      {(['store', 'lite', 'plus', 'pro'] as const).map((option) => {
+                        const selected =
+                          option === 'store'
+                            ? devTierOverride === null
+                            : devTierOverride === option;
+                        return (
+                          <Pressable
+                            key={option}
+                            accessibilityRole="button"
+                            onPress={() => {
+                              void setDevTierOverride(
+                                option === 'store' ? null : (option as TierId)
+                              );
+                            }}
+                            style={[
+                              styles.devTierChip,
+                              selected ? styles.devTierChipSelected : null,
+                            ]}>
+                            <Text
+                              style={[
+                                styles.devTierChipLabel,
+                                selected ? styles.devTierChipLabelSelected : null,
+                              ]}>
+                              {option === 'store' ? 'Store' : tierDisplayName(option)}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+              <Pressable
+                accessibilityRole="button"
                 onPress={() => {
                   void sendFeedbackEmail();
                 }}
@@ -517,7 +640,32 @@ function useStyles(
           color: colors.secondaryText,
           fontSize: 13,
         },
+        devTierRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+          marginTop: 8,
+        },
+        devTierChip: {
+          borderRadius: 8,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.separator,
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+        },
+        devTierChipSelected: {
+          borderColor: colors.accent,
+          backgroundColor: colors.accent,
+        },
+        devTierChipLabel: {
+          fontSize: 13,
+          color: colors.text,
+          fontWeight: '600',
+        },
+        devTierChipLabelSelected: {
+          color: '#fff',
+        },
       }),
-    [nestedSurface, colors.secondaryText, colors.separator, colors.text]
+    [nestedSurface, colors.accent, colors.secondaryText, colors.separator, colors.text]
   );
 }

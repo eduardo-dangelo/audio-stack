@@ -35,6 +35,13 @@ import {
   isTrackColorAllowed,
   pickRandomTrackColor,
 } from '@/constants/VoiceMemosColors';
+import {
+  BillingLimitError,
+  canAddPlayableLayer,
+  canCreateRecording,
+  canExportFormat,
+  getEffectiveTierSync,
+} from '@/src/billing';
 import { notifyMemoUpdate } from '@/src/recording/memoUpdateEvents';
 import { createDefaultTitle, sanitizeExportFileName } from '@/src/utils/format';
 import { randomId } from '@/src/utils/id';
@@ -306,6 +313,10 @@ export type CreateMemoOptions = {
 };
 
 export async function createMemo(options?: CreateMemoOptions | string): Promise<Memo> {
+  const activeCount = (await listAllActiveMemos()).length;
+  if (!canCreateRecording(getEffectiveTierSync(), activeCount)) {
+    throw new BillingLimitError('recordings');
+  }
   const normalized =
     typeof options === 'string' ? { title: options } : (options ?? {});
   const now = new Date().toISOString();
@@ -847,6 +858,10 @@ export async function addStackedLayer(
     throw new Error('Memo not found');
   }
 
+  if (!canAddPlayableLayer(getEffectiveTierSync(), getPlayableLayers(memo).length)) {
+    throw new BillingLimitError('layers');
+  }
+
   const order = nextLayerOrder(memo);
   const usedColors = memo.layers.map(
     (entry) => entry.color ?? DEFAULT_TRACK_COLOR
@@ -934,6 +949,12 @@ export async function addImportedAudioLayer(
   }
 
   const playable = getPlayableLayers(memo);
+  if (
+    playable.length > 0 &&
+    !canAddPlayableLayer(getEffectiveTierSync(), playable.length)
+  ) {
+    throw new BillingLimitError('layers');
+  }
   const usedColors = memo.layers.map(
     (entry) => entry.color ?? DEFAULT_TRACK_COLOR
   );
@@ -1161,6 +1182,10 @@ export async function deleteMemo(memoId: string): Promise<void> {
 }
 
 export async function recoverMemo(memoId: string): Promise<void> {
+  const activeCount = (await listAllActiveMemos()).length;
+  if (!canCreateRecording(getEffectiveTierSync(), activeCount)) {
+    throw new BillingLimitError('recordings');
+  }
   const source = getTrashMemoDir(memoId);
   if (!source.exists) {
     return;
@@ -1253,6 +1278,10 @@ export async function duplicateLayer(
   const source = memo.layers.find((entry) => entry.id === layerId);
   if (!source || source.duration <= 0) {
     throw new Error('Layer not found');
+  }
+
+  if (!canAddPlayableLayer(getEffectiveTierSync(), getPlayableLayers(memo).length)) {
+    throw new BillingLimitError('layers');
   }
 
   const sourceFile = requireLayerFile(memoId, source.fileName);
@@ -1428,6 +1457,12 @@ export async function exportMemoToFile(
 ): Promise<File> {
   if (!hasRecording(memo)) {
     throw new Error('This memo has no recorded audio.');
+  }
+
+  if (!canExportFormat(getEffectiveTierSync(), format)) {
+    throw new BillingLimitError(
+      getEffectiveTierSync() === 'lite' ? 'export' : 'exportFormat'
+    );
   }
 
   if (format === 'vcr') {

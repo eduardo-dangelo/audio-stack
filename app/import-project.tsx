@@ -3,6 +3,12 @@ import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 
 import { importMemoFromUri } from '@/src/actions/importMemo';
+import {
+  canImport,
+  getEffectiveTierSync,
+  isBillingLimitError,
+  requestUpgrade,
+} from '@/src/billing';
 import { showImportSuccess } from '@/src/components/ImportSuccessDialog';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
@@ -51,6 +57,12 @@ export default function ImportProjectScreen() {
       return;
     }
 
+    if (!canImport(getEffectiveTierSync())) {
+      requestUpgrade('import');
+      dismissToHome();
+      return;
+    }
+
     void importMemoFromUri(fileUri)
       .then((memo) => {
         // Leave the loading screen immediately. The success dialog must not gate
@@ -59,6 +71,11 @@ export default function ImportProjectScreen() {
         showImportSuccess({ title: memo.title });
       })
       .catch((error) => {
+        if (isBillingLimitError(error)) {
+          requestUpgrade(error.reason);
+          dismissToHome();
+          return;
+        }
         Alert.alert(
           'Import failed',
           error instanceof Error ? error.message : 'Unknown error'

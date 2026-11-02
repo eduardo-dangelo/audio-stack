@@ -15,27 +15,6 @@
       }
     }
   },
-  "fill-specializations" : [
-    {
-      "appearance" : "dark",
-      "value" : {
-        "linear-gradient" : [
-          "srgb:0.18,0.18,0.18,1.00000",
-          "srgb:0.05,0.05,0.05,1.00000"
-        ],
-        "orientation" : {
-          "start" : {
-            "x" : 0.5,
-            "y" : 0
-          },
-          "stop" : {
-            "x" : 0.5,
-            "y" : 0.7
-          }
-        }
-      }
-    }
-  ],
   "groups" : [
     {
       "layers" : [
@@ -89,7 +68,7 @@
         {
           "blend-mode" : "normal",
           "fill" : {
-            "solid" : "srgb:0.00000,0.32852,0.57488,1.00000"
+            "solid" : "display-p3:0.13164,0.32312,0.55676,1.00000"
           },
           "glass" : false,
           "image-name" : "Union (1).svg",
@@ -97,8 +76,40 @@
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
+              -0.35450000000003,
+              172.88243749999992
+            ]
+          }
+        },
+        {
+          "blend-mode" : "normal",
+          "fill" : {
+            "solid" : "srgb:1.00000,0.14913,0.00000,1.00000"
+          },
+          "image-name" : "Rectangle 22.svg",
+          "name" : "Rectangle 22",
+          "opacity" : 0.4,
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
               0,
-              166
+              -181.10937500000023
+            ]
+          }
+        },
+        {
+          "blend-mode" : "normal",
+          "fill" : {
+            "solid" : "srgb:1.00000,0.14913,0.00000,1.00000"
+          },
+          "image-name" : "Rectangle 22.svg",
+          "name" : "Rectangle 22",
+          "opacity" : 0.4,
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              0,
+              -181.10937500000023
             ]
           }
         }

@@ -11,6 +11,7 @@ import { NamePromptDialog } from '@/src/components/NamePromptDialog';
 import { shareMemo } from '@/src/actions/shareMemo';
 import { showMoveToFolderActionSheet } from '@/src/actions/showMoveToFolderActionSheet';
 import { useAudioEngine, useAudioEngineSelector } from '@/src/audio/AudioEngineContext';
+import { isBillingLimitError, requestUpgrade } from '@/src/billing';
 import { useIsRegularWidth } from '@/src/hooks/useIsRegularWidth';
 import {
   deleteMemo,
@@ -260,7 +261,10 @@ function RecordingRowComponent({
       engine.unload();
     }
     onDeleted(memo.id);
-    void recoverMemo(memo.id).catch(() => {
+    void recoverMemo(memo.id).catch((error) => {
+      if (isBillingLimitError(error)) {
+        requestUpgrade(error.reason);
+      }
       onDeleteFailed();
     });
   };
@@ -379,7 +383,20 @@ function RecordingRowComponent({
                 onMoveToFolder={() =>
                   void showMoveToFolderActionSheet(memo.id, memo.folderId, onUpdated)
                 }
-                onDuplicate={() => void duplicateMemo(memo.id).then(onUpdated)}
+                onDuplicate={() =>
+                  void duplicateMemo(memo.id)
+                    .then(onUpdated)
+                    .catch((error) => {
+                      if (isBillingLimitError(error)) {
+                        requestUpgrade(error.reason);
+                        return;
+                      }
+                      Alert.alert(
+                        'Duplicate failed',
+                        error instanceof Error ? error.message : 'Unknown error'
+                      );
+                    })
+                }
                 onDelete={confirmDelete}>
                 <View style={styles.moreButton}>
                   <SymbolView name={{ ios: 'ellipsis' }} size={22} tintColor={colors.secondaryText} />

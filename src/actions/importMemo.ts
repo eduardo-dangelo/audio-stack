@@ -1,6 +1,13 @@
 import { copyIncomingProjectAsync, pickProjectAsync } from 'project-document-picker';
 import { Alert } from 'react-native';
 
+import {
+  BillingLimitError,
+  canImport,
+  getEffectiveTierSync,
+  isBillingLimitError,
+  requestUpgrade,
+} from '@/src/billing';
 import { showImportSuccess } from '@/src/components/ImportSuccessDialog';
 import {
   isProjectFileName,
@@ -11,6 +18,12 @@ import {
 import { createMemo, ensureWaveformPeaks } from '@/src/storage/memoStore';
 import { getMemoDir } from '@/src/storage/paths';
 import type { Memo } from '@/src/storage/types';
+
+function assertImportAllowed(): void {
+  if (!canImport(getEffectiveTierSync())) {
+    throw new BillingLimitError('import');
+  }
+}
 
 export type ImportMemoOptions = {
   folderId?: string;
@@ -26,6 +39,7 @@ async function importFromUri(
   uri: string,
   options?: ImportMemoOptions
 ): Promise<Memo> {
+  assertImportAllowed();
   const validated = await readProjectArchiveFromUri(uri);
   const shell = await createMemo({
     title: validated.manifest.title?.trim() || 'Imported Recording',
@@ -127,6 +141,10 @@ export function promptImportMemo(
       showImportSuccess({ title: result.memo.title });
     })
     .catch((error) => {
+      if (isBillingLimitError(error)) {
+        requestUpgrade(error.reason);
+        return;
+      }
       Alert.alert(
         'Import failed',
         error instanceof Error ? error.message : 'Unknown error'

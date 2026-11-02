@@ -1,0 +1,365 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { Alert, Platform } from 'react-native';
+import { router } from 'expo-router';
+import {
+  deepLinkToSubscriptions,
+  finishTransaction,
+  isUserCancelledError,
+  useIAP,
+  type Product,
+  type ProductSubscription,
+  type Purchase,
+} from 'expo-iap';
+
+import {
+  getDevTierOverrideSync,
+  setDevTierOverride as persistDevTierOverride,
+  type DevTierOverride,
+} from '@/src/settings/appSettings';
+
+import { tierDisplayName } from './capabilities';
+import {
+  getEffectiveTierSync,
+  notifyBillingListeners,
+  setStoreEntitlements,
+  subscribeBilling,
+} from './effectiveTierStore';
+import { entitlementsFromPurchases } from './entitlements';
+import { PLUS_PRODUCT_ID, PRO_MONTHLY_PRODUCT_ID } from './productIds';
+import {
+  closePaywallPreferred,
+  openPaywallPreferred,
+  registerPaywallOpener,
+} from './upgradeBridge';
+import type { TierId, UpgradeReason } from './types';
+
+type BillingContextValue = {
+  connected: boolean;
+  effectiveTier: TierId;
+  hasPlus: boolean;
+  hasPro: boolean;
+  plusProduct: Product | null;
+  proProduct: ProductSubscription | null;
+  plusPriceLabel: string;
+  proPriceLabel: string;
+  purchasing: boolean;
+  openPaywall: (reason?: UpgradeReason | null) => void;
+  closePaywall: () => void;
+  purchasePlus: () => Promise<void>;
+  purchasePro: () => Promise<void>;
+  restore: () => Promise<void>;
+  manageSubscriptions: () => Promise<void>;
+  devTierOverride: DevTierOverride;
+  setDevTierOverride: (override: DevTierOverride) => Promise<void>;
+  refreshEntitlements: () => Promise<void>;
+};
+
+const BillingContext = createContext<BillingContextValue | null>(null);
+
+const FALLBACK_PLUS_PRICE = '£9.99';
+
+function productPriceLabel(
+  product: { displayPrice?: string } | null | undefined,
+  fallback: string
+): string {
+  const price = product?.displayPrice?.trim();
+  return price || fallback;
+}
+
+function applyPurchasesToStore(purchases: Purchase[], activePro: boolean): void {
+  const fromPurchases = entitlementsFromPurchases(purchases);
+  setStoreEntitlements({
+    hasPlus: fromPurchases.hasPlus,
+    hasPro: activePro || fromPurchases.hasPro,
+  });
+}
+
+function dismissPaywallRoute(): void {
+  if (router.canGoBack()) {
+    router.back();
+    return;
+  }
+  router.replace('/');
+}
+
+export function BillingProvider({ children }: { children: ReactNode }) {
+  const [purchasing, setPurchasing] = useState(false);
+  const [devTierOverride, setDevTierOverrideState] = useState<DevTierOverride>(
+    () => (__DEV__ ? getDevTierOverrideSync() : null)
+  );
+  const [tierTick, setTierTick] = useState(0);
+  const closePaywallRef = useRef<() => void>(() => {});
+
+  const {
+    connected,
+    products,
+    subscriptions,
+    availablePurchases,
+    activeSubscriptions,
+    fetchProducts,
+    getAvailablePurchases,
+    getActiveSubscriptions,
+    requestPurchase,
+    restorePurchases,
+  } = useIAP({
+    onPurchaseSuccess: (purchase) => {
+      void (async () => {
+        try {
+          await finishTransaction({ purchase, isConsumable: false });
+        } catch {
+          // Still refresh; StoreKit may retry unfinished transactions later.
+        }
+        setPurchasing(false);
+        closePaywallRef.current();
+        await refreshEntitlementsRef.current?.();
+      })();
+    },
+    onPurchaseError: (error) => {
+      setPurchasing(false);
+      if (isUserCancelledError(error)) {
+        return;
+      }
+      Alert.alert(
+        'Purchase Failed',
+        error.message || 'Something went wrong. Please try again.'
+      );
+    },
+  });
+
+  const refreshEntitlementsRef = useRef<(() => Promise<void>) | null>(null);
+
+  const refreshEntitlements = useCallback(async () => {
+    if (Platform.OS !== 'ios' || !connected) {
+      applyPurchasesToStore([], false);
+      return;
+    }
+    try {
+      await getAvailablePurchases();
+      await getActiveSubscriptions([PRO_MONTHLY_PRODUCT_ID]);
+    } catch {
+      // Keep last known entitlements on transient store errors.
+    }
+  }, [connected, getActiveSubscriptions, getAvailablePurchases]);
+
+  refreshEntitlementsRef.current = refreshEntitlements;
+
+  useEffect(() => {
+    const hasPro = activeSubscriptions.some(
+      (sub) => sub.productId === PRO_MONTHLY_PRODUCT_ID
+    );
+    applyPurchasesToStore(availablePurchases, hasPro);
+  }, [activeSubscriptions, availablePurchases]);
+
+  useEffect(() => {
+    return subscribeBilling(() => setTierTick((n) => n + 1));
+  }, []);
+
+  useEffect(() => {
+    if (!connected || Platform.OS !== 'ios') {
+      return;
+    }
+    void (async () => {
+      try {
+        await fetchProducts({ skus: [PLUS_PRODUCT_ID], type: 'in-app' });
+        await fetchProducts({ skus: [PRO_MONTHLY_PRODUCT_ID], type: 'subs' });
+        await refreshEntitlements();
+      } catch {
+        // Products may be missing until ASC is configured.
+      }
+    })();
+  }, [connected, fetchProducts, refreshEntitlements]);
+
+  const plusProduct =
+    products.find((product) => product.id === PLUS_PRODUCT_ID) ?? null;
+  const proProduct =
+    subscriptions.find((product) => product.id === PRO_MONTHLY_PRODUCT_ID) ??
+    null;
+
+  const effectiveTier = useMemo(() => {
+    void tierTick;
+    return getEffectiveTierSync();
+  }, [tierTick, availablePurchases, activeSubscriptions, devTierOverride]);
+
+  const openPaywallRoute = useCallback((reason: UpgradeReason | null = null) => {
+    router.push({
+      pathname: '/paywall',
+      params: reason ? { reason } : {},
+    });
+  }, []);
+
+  useEffect(() => {
+    registerPaywallOpener(openPaywallRoute);
+    return () => registerPaywallOpener(null);
+  }, [openPaywallRoute]);
+
+  const openPaywall = useCallback((reason: UpgradeReason | null = null) => {
+    openPaywallPreferred(reason);
+  }, []);
+
+  const closePaywall = useCallback(() => {
+    closePaywallPreferred(dismissPaywallRoute);
+  }, []);
+
+  closePaywallRef.current = closePaywall;
+
+  const purchasePlus = useCallback(async () => {
+    if (Platform.OS !== 'ios') {
+      Alert.alert('Unavailable', 'Purchases are only available on iOS.');
+      return;
+    }
+    setPurchasing(true);
+    try {
+      await requestPurchase({
+        request: { apple: { sku: PLUS_PRODUCT_ID } },
+        type: 'in-app',
+      });
+    } catch (error) {
+      setPurchasing(false);
+      const message =
+        error instanceof Error ? error.message : 'Could not start purchase.';
+      Alert.alert('Purchase Failed', message);
+    }
+  }, [requestPurchase]);
+
+  const purchasePro = useCallback(async () => {
+    if (Platform.OS !== 'ios') {
+      Alert.alert('Unavailable', 'Purchases are only available on iOS.');
+      return;
+    }
+    setPurchasing(true);
+    try {
+      await requestPurchase({
+        request: { apple: { sku: PRO_MONTHLY_PRODUCT_ID } },
+        type: 'subs',
+      });
+    } catch (error) {
+      setPurchasing(false);
+      const message =
+        error instanceof Error ? error.message : 'Could not start purchase.';
+      Alert.alert('Purchase Failed', message);
+    }
+  }, [requestPurchase]);
+
+  const restore = useCallback(async () => {
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+    try {
+      await restorePurchases();
+      await refreshEntitlements();
+      const tier = getEffectiveTierSync();
+      Alert.alert(
+        'Purchases Restored',
+        tier === 'lite'
+          ? 'No previous purchases were found for this Apple ID.'
+          : `Your plan is ${tierDisplayName(tier)}.`
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not restore purchases.';
+      Alert.alert('Restore Failed', message);
+    }
+  }, [refreshEntitlements, restorePurchases]);
+
+  const manageSubscriptions = useCallback(async () => {
+    try {
+      await deepLinkToSubscriptions({});
+    } catch {
+      Alert.alert(
+        'Subscriptions',
+        'Open Settings → Apple ID → Subscriptions to manage your plan.'
+      );
+    }
+  }, []);
+
+  const setDevTierOverride = useCallback(async (override: DevTierOverride) => {
+    if (!__DEV__) {
+      return;
+    }
+    await persistDevTierOverride(override);
+    setDevTierOverrideState(override);
+    notifyBillingListeners();
+  }, []);
+
+  const storeFlags = useMemo(() => {
+    void tierTick;
+    const hasPro = activeSubscriptions.some(
+      (sub) => sub.productId === PRO_MONTHLY_PRODUCT_ID
+    );
+    const fromPurchases = entitlementsFromPurchases(availablePurchases);
+    return {
+      hasPlus: fromPurchases.hasPlus,
+      hasPro: hasPro || fromPurchases.hasPro,
+    };
+  }, [tierTick, activeSubscriptions, availablePurchases]);
+
+  const plusPriceLabel = productPriceLabel(plusProduct, FALLBACK_PLUS_PRICE);
+  const proBasePrice = productPriceLabel(proProduct, '£9.99');
+  const proPriceLabel = /mo|month/i.test(proBasePrice)
+    ? proBasePrice
+    : `${proBasePrice}/mo`;
+
+  const value = useMemo<BillingContextValue>(
+    () => ({
+      connected,
+      effectiveTier,
+      hasPlus: storeFlags.hasPlus,
+      hasPro: storeFlags.hasPro,
+      plusProduct,
+      proProduct,
+      plusPriceLabel,
+      proPriceLabel,
+      purchasing,
+      openPaywall,
+      closePaywall,
+      purchasePlus,
+      purchasePro,
+      restore,
+      manageSubscriptions,
+      devTierOverride,
+      setDevTierOverride,
+      refreshEntitlements,
+    }),
+    [
+      closePaywall,
+      connected,
+      devTierOverride,
+      effectiveTier,
+      manageSubscriptions,
+      openPaywall,
+      plusPriceLabel,
+      plusProduct,
+      proPriceLabel,
+      proProduct,
+      purchasePlus,
+      purchasePro,
+      purchasing,
+      refreshEntitlements,
+      restore,
+      setDevTierOverride,
+      storeFlags.hasPlus,
+      storeFlags.hasPro,
+    ]
+  );
+
+  return (
+    <BillingContext.Provider value={value}>{children}</BillingContext.Provider>
+  );
+}
+
+export function useBilling(): BillingContextValue {
+  const value = useContext(BillingContext);
+  if (!value) {
+    throw new Error('useBilling must be used within BillingProvider');
+  }
+  return value;
+}
