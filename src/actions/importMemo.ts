@@ -86,7 +86,7 @@ export async function importProjectFromCachedUri(
   return importFromUri(cachedUri, options);
 }
 
-/** Import a Voicer Pro project from a file URI (Files / Mail / AirDrop). */
+/** Import an Audio Stack project from a file URI (Files / Mail / AirDrop). */
 export async function importMemoFromUri(
   uri: string,
   options?: ImportMemoOptions
@@ -101,7 +101,7 @@ export async function importMemoFromUri(
 }
 
 /**
- * Opens the document picker and imports a Voicer Pro project (`.vcr` / `.vmp`).
+ * Opens the document picker and imports an Audio Stack project (`.vcr` / `.vmp`).
  * Returns `canceled` when the user dismisses the picker.
  */
 export async function importMemoFromPicker(
@@ -115,7 +115,7 @@ export async function importMemoFromPicker(
     }
 
     if (!isProjectFileName(result.name)) {
-      throw new Error('Please select a Voicer Pro project (.vcr) file.');
+      throw new Error('Please select an Audio Stack project (.vcr) file.');
     }
 
     options?.onImportStarted?.();

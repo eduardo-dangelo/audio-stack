@@ -222,7 +222,20 @@ describe('validateProjectArchive', () => {
         exportedAt: '2026-08-01T12:00:00.000Z',
       })
     );
-    assert.throws(() => validateProjectArchive(files), /not a Voicer Pro project/);
+    assert.throws(() => validateProjectArchive(files), /not an Audio Stack project/);
+  });
+
+  it('accepts legacy voicer-pro-project format id', () => {
+    const files = buildArchiveFiles();
+    files[PROJECT_PACKAGE_META_PATH] = strToU8(
+      JSON.stringify({
+        format: 'voicer-pro-project',
+        schemaVersion: 1,
+        exportedAt: '2026-08-01T12:00:00.000Z',
+      })
+    );
+    const validated = validateProjectArchive(files);
+    assert.equal(validated.meta.format, 'voicer-pro-project');
   });
 
   it('accepts legacy voice-memos-plus-project format id', () => {

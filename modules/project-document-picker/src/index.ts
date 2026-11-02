@@ -47,7 +47,7 @@ function requireAvailableModule(): ProjectDocumentPickerNativeModule {
 }
 
 /**
- * Opens a document picker that only enables Voicer Pro `.vcr` / `.vmp` project files.
+ * Opens a document picker that only enables Audio Stack `.vcr` / `.vmp` project files.
  * Requires a native rebuild after adding this module.
  */
 export async function pickProjectAsync(): Promise<PickProjectResult> {

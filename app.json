@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Voicer Pro",
-    "slug": "voicer-pro",
+    "name": "Audio Stack",
+    "slug": "audio-stack",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
@@ -17,9 +17,9 @@
       "buildNumber": "25",
       "userInterfaceStyle": "automatic",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Voicer Pro needs microphone access to record audio.",
-        "NSLocationWhenInUseUsageDescription": "Voicer Pro uses your location to name new recordings after the current place.",
-        "NSLocalNetworkUsageDescription": "Voicer Pro uses the local network to load the JavaScript bundle from your computer during development.",
+        "NSMicrophoneUsageDescription": "Audio Stack needs microphone access to record audio.",
+        "NSLocationWhenInUseUsageDescription": "Audio Stack uses your location to name new recordings after the current place.",
+        "NSLocalNetworkUsageDescription": "Audio Stack uses the local network to load the JavaScript bundle from your computer during development.",
         "NSBonjourServices": [
           "_http._tcp",
           "_expo._tcp",
@@ -42,7 +42,7 @@
         "UTExportedTypeDeclarations": [
           {
             "UTTypeIdentifier": "com.eduardodangelo.voicememosplus.project",
-            "UTTypeDescription": "Voicer Pro Project",
+            "UTTypeDescription": "Audio Stack Project",
             "UTTypeConformsTo": [
               "public.data",
               "public.content"
@@ -53,6 +53,7 @@
                 "vmp"
               ],
               "public.mime-type": [
+                "application/vnd.audio-stack.project",
                 "application/vnd.voicer-pro.project",
                 "application/vnd.voice-memos-plus.project"
               ]
@@ -61,7 +62,7 @@
         ],
         "CFBundleDocumentTypes": [
           {
-            "CFBundleTypeName": "Voicer Pro Project",
+            "CFBundleTypeName": "Audio Stack Project",
             "CFBundleTypeRole": "Editor",
             "LSHandlerRank": "Owner",
             "CFBundleTypeExtensions": [
@@ -82,13 +83,13 @@
         "react-native-audio-api",
         {
           "iosBackgroundMode": true,
-          "iosMicrophonePermission": "Voicer Pro needs microphone access to record audio."
+          "iosMicrophonePermission": "Audio Stack needs microphone access to record audio."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Voicer Pro uses your location to name new recordings after the current place."
+          "locationWhenInUsePermission": "Audio Stack uses your location to name new recordings after the current place."
         }
       ],
       [

@@ -12,9 +12,12 @@ import {
   normalizePrecountMode,
 } from './types';
 
-export const PROJECT_FORMAT_ID = 'voicer-pro-project';
+export const PROJECT_FORMAT_ID = 'audio-stack-project';
 /** Older exports still open; new packages write `PROJECT_FORMAT_ID` only. */
-export const LEGACY_PROJECT_FORMAT_IDS = ['voice-memos-plus-project'] as const;
+export const LEGACY_PROJECT_FORMAT_IDS = [
+  'voicer-pro-project',
+  'voice-memos-plus-project',
+] as const;
 export const PROJECT_SCHEMA_VERSION = 1;
 export const PROJECT_PACKAGE_META_PATH = 'package.json';
 export const PROJECT_MANIFEST_PATH = 'manifest.json';
@@ -24,9 +27,14 @@ export const PROJECT_FILE_EXTENSION = 'vcr';
 /** Older shared projects used `.vmp`; still accepted on import. */
 export const LEGACY_PROJECT_FILE_EXTENSIONS = ['vmp'] as const;
 /** MIME type registered for `.vcr` (used by share + document picker). */
-export const PROJECT_MIME_TYPE = 'application/vnd.voicer-pro.project';
+export const PROJECT_MIME_TYPE = 'application/vnd.audio-stack.project';
+/** Legacy MIME types still accepted by the document picker. */
+export const LEGACY_PROJECT_MIME_TYPES = [
+  'application/vnd.voicer-pro.project',
+  'application/vnd.voice-memos-plus.project',
+] as const;
 /** Legacy MIME for `.vmp` packages. */
-export const LEGACY_PROJECT_MIME_TYPE = 'application/vnd.voice-memos-plus.project';
+export const LEGACY_PROJECT_MIME_TYPE = LEGACY_PROJECT_MIME_TYPES[1];
 /** iOS UTI for project packages (unchanged for Files / AirDrop continuity). */
 export const PROJECT_UTI = 'com.eduardodangelo.voicememosplus.project';
 
@@ -169,7 +177,7 @@ function parsePackageMeta(raw: unknown): MemoProjectPackageMeta {
   }
   const value = raw as Record<string, unknown>;
   if (!isAcceptedProjectFormatId(value.format)) {
-    throw new Error('This file is not a Voicer Pro project.');
+    throw new Error('This file is not an Audio Stack project.');
   }
   if (typeof value.schemaVersion !== 'number' || !Number.isFinite(value.schemaVersion)) {
     throw new Error('Project package is missing a schema version.');

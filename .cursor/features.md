@@ -13,12 +13,12 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Invariants: Effective tier is Pro > Plus > Lite; Lite caps 10 recordings / 5 playable layers and blocks custom effects, folders, merge, loop, import, export; Plus exports m4a only (wav/.vcr → Pro); Lite Export opens paywall before format picker; gated actions open paywall directly with a reason subtitle; paywall uses in-editor Modal when MemoEditor is open else `/paywall` `containedTransparentModal`; comparison is a row-aligned opaque table (no Restore on sheet — Settings keeps Restore); `__DEV__` Dev Tier override only.
 - Updated: 2026-11-01
 
-### Voicer Pro rename
+### Audio Stack rename
 - Status: evolving
-- What: Product rebranded to Voicer Pro; project packages export as `.vcr` and still import legacy `.vmp`.
+- What: Product rebranded to Audio Stack; project packages export as `.vcr` and still import legacy `.vmp`.
 - Paths: `app.json`, `src/storage/memoPackageFormat.ts`, `src/actions/shareMemo.ts`, `landing/index.html`, `landing/privacy.html`
-- Invariants: Bundle ID / scheme / UTI stay `voicememosplus`; new packages use format `voicer-pro-project`; legacy `voice-memos-plus-project` and `.vmp` still open; capture temps use `Documents/voicer-pro`.
-- Updated: 2026-10-31
+- Invariants: Bundle ID / scheme / UTI stay `voicememosplus`; new packages use format `audio-stack-project`; legacy `voicer-pro-project`, `voice-memos-plus-project`, and `.vmp` still open; capture temps use `Documents/audio-stack`.
+- Updated: 2026-11-02
 
 ### iPhone Duo side column
 - Status: evolving

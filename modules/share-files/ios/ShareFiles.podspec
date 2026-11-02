@@ -8,13 +8,13 @@ Pod::Spec.new do |s|
   s.summary        = package['description']
   s.description    = package['description']
   s.license        = 'MIT'
-  s.author         = 'Voicer Pro'
-  s.homepage       = 'https://github.com/eduardo-dangelo/voicer-pro'
+  s.author         = 'Audio Stack'
+  s.homepage       = 'https://github.com/eduardo-dangelo/audio-stack'
   s.platforms      = {
     :ios => '16.4'
   }
   s.swift_version  = '5.9'
-  s.source         = { git: 'https://github.com/eduardo-dangelo/voicer-pro.git' }
+  s.source         = { git: 'https://github.com/eduardo-dangelo/audio-stack.git' }
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'

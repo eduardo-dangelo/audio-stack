@@ -15,7 +15,7 @@ Create these products before TestFlight purchase testing. Product IDs must match
 |---|---|
 | Type | **Non-Consumable** |
 | Product ID | `com.eduardodangelo.voicememosplus.plus` |
-| Reference name | Voicer Pro Plus |
+| Reference name | Audio Stack Plus |
 | Price | £9.99 (or matching price tier) |
 | Availability | All territories you ship to |
 
@@ -29,7 +29,7 @@ Localization example:
 | Field | Value |
 |---|---|
 | Type | **Auto-Renewable Subscription** |
-| Subscription group | e.g. `voicer_pro_access` (create if needed) |
+| Subscription group | e.g. `audio_stack_access` (create if needed) |
 | Product ID | `com.eduardodangelo.voicememosplus.pro.monthly` |
 | Duration | 1 month |
 | Price | £9.99 / month |

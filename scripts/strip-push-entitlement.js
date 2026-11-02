@@ -8,5 +8,5 @@ const iosRoot = path.join(__dirname, '..', 'ios');
 const changed = stripPushEntitlementFile(iosRoot);
 
 if (changed) {
-  console.log('Removed aps-environment from VoicerPro.entitlements');
+  console.log('Removed aps-environment from AudioStack.entitlements');
 }
