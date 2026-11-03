@@ -18,9 +18,15 @@ type GroupedListProps = {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   largeTitle?: string;
+  largeTitleTrailing?: React.ReactNode;
 };
 
-export function GroupedListScreen({ children, style, largeTitle }: GroupedListProps) {
+export function GroupedListScreen({
+  children,
+  style,
+  largeTitle,
+  largeTitleTrailing,
+}: GroupedListProps) {
   const colors = useVoiceMemosColors();
   const colorScheme = useColorScheme();
   const sideColumn = useDuoSideColumn();
@@ -36,7 +42,18 @@ export function GroupedListScreen({ children, style, largeTitle }: GroupedListPr
       contentContainerStyle={contentContainerStyle}
       keyboardShouldPersistTaps="handled"
       style={[styles.screen, style]}>
-      {largeTitle ? <Text style={styles.largeTitle}>{largeTitle}</Text> : null}
+      {largeTitle ? (
+        <View style={styles.largeTitleRow}>
+          <Text
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
+            numberOfLines={1}
+            style={styles.largeTitle}>
+            {largeTitle}
+          </Text>
+          {largeTitleTrailing}
+        </View>
+      ) : null}
       {children}
     </ScrollView>
   );
@@ -142,13 +159,19 @@ function useStyles(
         scrollContent: {
           paddingBottom: 32,
         },
-        largeTitle: {
-          fontSize: 34,
-          fontWeight: '700',
-          color: colors.text,
+        largeTitleRow: {
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          gap: 8,
           paddingHorizontal: 20,
           paddingTop: 4,
           paddingBottom: 10,
+        },
+        largeTitle: {
+          flexShrink: 1,
+          fontSize: 34,
+          fontWeight: '700',
+          color: colors.text,
         },
         section: {
           marginHorizontal: 16,

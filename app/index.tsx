@@ -3,6 +3,7 @@ import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Svg, { Defs, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { memoAudioEngine } from '@/src/audio/MemoAudioEngine';
@@ -37,6 +38,37 @@ import { createFolder, deleteFolder, reorderFolders } from '@/src/storage/folder
 import { applyThemePreference } from '@/src/theme/applyThemePreference';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 import { endIdlePlaybackLiveActivities } from '@/src/widgets/recordingLiveActivityController';
+
+const PRO_STAR_PATH =
+  'M7.50 0.30L9.29 5.03L14.35 5.28L10.40 8.44L11.73 13.32L7.50 10.55L3.27 13.32L4.60 8.44L0.65 5.28L5.71 5.03Z';
+
+/** Home-title Pro mark: a diagonal sheen of blue tones. */
+function ProTierMark() {
+  const width = 52;
+  const height = 16;
+  return (
+    <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <Defs>
+        <LinearGradient
+          id="homeProMetal"
+          x1="0"
+          y1="0"
+          x2={width}
+          y2={height}
+          gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#6AABFF" />
+          <Stop offset="0.4" stopColor="#2B7FFF" />
+          <Stop offset="0.7" stopColor="#1A66E0" />
+          <Stop offset="1" stopColor="#4C96FF" />
+        </LinearGradient>
+      </Defs>
+      <Path d={PRO_STAR_PATH} fill="url(#homeProMetal)" transform="translate(0 1.2)" />
+      <SvgText fill="url(#homeProMetal)" fontSize={15} fontWeight="600" x={19} y={13.2}>
+        Pro
+      </SvgText>
+    </Svg>
+  );
+}
 
 export default function FoldersHomeScreen() {
   const colors = useVoiceMemosColors();
@@ -299,7 +331,26 @@ export default function FoldersHomeScreen() {
             });
         }}
       />
-      <GroupedListScreen largeTitle="Audio Stack">
+      <GroupedListScreen
+        largeTitle="Audio Stack"
+        largeTitleTrailing={
+          effectiveTier === 'lite' ? null : (
+            <View style={styles.tierMark}>
+              {effectiveTier === 'pro' ? (
+                <ProTierMark />
+              ) : (
+                <>
+                  <SymbolView
+                    name={{ ios: 'sparkles' }}
+                    size={15}
+                    tintColor={colors.accent}
+                  />
+                  <Text style={[styles.tierMarkLabel, { color: colors.accent }]}>Plus</Text>
+                </>
+              )}
+            </View>
+          )
+        }>
         <GroupedListSection>
           <GroupedListRow
             count={counts.allCount}
@@ -594,6 +645,17 @@ function useStyles(
   return useMemo(
     () =>
       StyleSheet.create({
+        tierMark: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          flexShrink: 0,
+          gap: 4,
+          marginBottom: 4,
+        },
+        tierMarkLabel: {
+          fontSize: 15,
+          fontWeight: '600',
+        },
         headerActions: {
           flexDirection: 'row',
           alignItems: 'center',
