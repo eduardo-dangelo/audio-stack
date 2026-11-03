@@ -21,15 +21,16 @@ import {
 } from 'expo-iap';
 
 import {
-  getDevTierOverrideSync,
   setDevTierOverride as persistDevTierOverride,
   type DevTierOverride,
 } from '@/src/settings/appSettings';
 
 import { tierDisplayName } from './capabilities';
 import {
+  getCachedDevTierOverride,
   getEffectiveTierSync,
   notifyBillingListeners,
+  setCachedDevTierOverride,
   setStoreEntitlements,
   subscribeBilling,
 } from './effectiveTierStore';
@@ -94,7 +95,7 @@ function dismissPaywallRoute(): void {
 export function BillingProvider({ children }: { children: ReactNode }) {
   const [purchasing, setPurchasing] = useState(false);
   const [devTierOverride, setDevTierOverrideState] = useState<DevTierOverride>(
-    () => (__DEV__ ? getDevTierOverrideSync() : null)
+    () => (__DEV__ ? getCachedDevTierOverride() : null)
   );
   const [tierTick, setTierTick] = useState(0);
   const closePaywallRef = useRef<() => void>(() => {});
@@ -286,6 +287,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
       return;
     }
     await persistDevTierOverride(override);
+    setCachedDevTierOverride(override);
     setDevTierOverrideState(override);
     notifyBillingListeners();
   }, []);

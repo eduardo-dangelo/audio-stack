@@ -17,6 +17,7 @@ const LITE_CAPABILITIES: TierCapabilities = {
   merge: false,
   loop: false,
   duplicate: false,
+  themes: false,
   exportFormats: [],
 };
 
@@ -29,6 +30,7 @@ const PLUS_CAPABILITIES: TierCapabilities = {
   merge: true,
   loop: true,
   duplicate: true,
+  themes: false,
   exportFormats: ['m4a'],
 };
 
@@ -41,6 +43,7 @@ const PRO_CAPABILITIES: TierCapabilities = {
   merge: true,
   loop: true,
   duplicate: true,
+  themes: true,
   exportFormats: ['m4a', 'wav', 'vcr'],
 };
 
@@ -106,6 +109,10 @@ export function canDuplicate(tier: TierId): boolean {
   return getCapabilities(tier).duplicate;
 }
 
+export function canUseThemes(tier: TierId): boolean {
+  return getCapabilities(tier).themes;
+}
+
 export function canExportAnything(tier: TierId): boolean {
   return getCapabilities(tier).exportFormats.length > 0;
 }
@@ -150,6 +157,8 @@ export function paywallSubtitle(reason: UpgradeReason): string {
       return 'Looping is included with Plus and Pro.';
     case 'duplicate':
       return 'Duplicating is included with Plus and Pro.';
+    case 'themes':
+      return 'Editor themes are included with Pro.';
   }
 }
 

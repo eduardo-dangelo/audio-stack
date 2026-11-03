@@ -11,6 +11,7 @@ const UPGRADE_REASONS: readonly UpgradeReason[] = [
   'export',
   'exportFormat',
   'folders',
+  'themes',
 ];
 
 function firstParam(value: string | string[] | undefined): string | undefined {

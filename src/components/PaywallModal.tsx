@@ -122,6 +122,14 @@ const FEATURES: FeatureRow[] = [
     pro: true,
     highlightReasons: ['exportFormat'],
   },
+  {
+    label: 'Themes',
+    symbol: 'paintbrush',
+    lite: false,
+    plus: false,
+    pro: true,
+    highlightReasons: ['themes'],
+  },
 ];
 
 const TIERS: TierId[] = ['lite', 'plus', 'pro'];
@@ -208,15 +216,18 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
       title: 'Plus',
       price: plusPriceLabel,
       symbol: 'sparkles',
-      // Plus when upgrading from Lite for a non–Pro-only reason.
+      // Plus when upgrading from Lite for a reason that is not Pro-only.
       recommended:
-        effectiveTier === 'lite' && reason != null && reason !== 'exportFormat',
+        effectiveTier === 'lite' &&
+        reason != null &&
+        reason !== 'exportFormat' &&
+        reason !== 'themes',
     },
     pro: {
       title: 'Pro',
       price: proPriceLabel,
       symbol: 'star.fill',
-      recommended: reason === 'exportFormat',
+      recommended: reason === 'exportFormat' || reason === 'themes',
     },
   };
 

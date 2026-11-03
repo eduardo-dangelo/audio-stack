@@ -8,7 +8,21 @@ import {
   type PrecountMode,
 } from '@/src/storage/types';
 
-export type ThemePreference = 'system' | 'light' | 'dark';
+export type ThemePreference =
+  | 'system'
+  | 'light'
+  | 'dark'
+  | 'solarizedLight'
+  | 'solarizedDark'
+  | 'tintedBlue'
+  | 'tintedRed'
+  | 'quietLight'
+  | 'monokai'
+  | 'dracula'
+  | 'nord'
+  | 'gruvbox'
+  | 'tokyoNight'
+  | 'cyberpunk';
 
 /** Dev-only billing override. Ignored outside `__DEV__`. */
 export type DevTierOverride = 'lite' | 'plus' | 'pro' | null;
@@ -33,7 +47,22 @@ export type AppSettings = {
   devTierOverride: DevTierOverride;
 };
 
-const THEME_PREFERENCES: readonly ThemePreference[] = ['system', 'light', 'dark'];
+const THEME_PREFERENCES: readonly ThemePreference[] = [
+  'system',
+  'light',
+  'dark',
+  'solarizedLight',
+  'solarizedDark',
+  'tintedBlue',
+  'tintedRed',
+  'quietLight',
+  'monokai',
+  'dracula',
+  'nord',
+  'gruvbox',
+  'tokyoNight',
+  'cyberpunk',
+];
 
 const DEFAULT_RECORDING_DEFAULTS: RecordingDefaults = {
   precount: DEFAULT_PRECOUNT_MODE,

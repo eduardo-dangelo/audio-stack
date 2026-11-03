@@ -18,13 +18,15 @@ import { useIsRegularWidth } from '@/src/hooks/useIsRegularWidth';
 import { awaitSaveInFlight } from '@/src/recording/activeRecordingSession';
 import { ensureRecordingBootstrapComplete } from '@/src/recording/recordingBootstrap';
 import { maybeNavigateToActiveRecording } from '@/src/recording/resumeActiveRecording';
-import { getThemePreferenceSync } from '@/src/settings/appSettings';
 import { purgeExpiredTrash } from '@/src/storage/memoStore';
-import { applyThemePreference } from '@/src/theme/applyThemePreference';
+import {
+  applyStoredThemePreference,
+  ThemeAppearanceSync,
+} from '@/src/theme/applyThemePreference';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 import '@/src/widgets/RecordingLiveActivity';
 
-applyThemePreference(getThemePreferenceSync());
+applyStoredThemePreference();
 
 function buildHeaderOptions(colors: VoiceMemosColorScheme, surfaceColor = colors.background) {
   return {
@@ -207,6 +209,7 @@ export default function RootLayout() {
         <AppFrame onCanvasColor={setCanvasColor}>
           <AudioEngineProvider>
             <BillingProvider>
+              <ThemeAppearanceSync />
               {/* Host before navigator so its layout effect registers before route effects. */}
               <ImportSuccessHost />
               <LowBatteryWarningHost />

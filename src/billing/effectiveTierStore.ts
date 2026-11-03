@@ -1,10 +1,22 @@
-import { getDevTierOverrideSync } from '@/src/settings/appSettings';
+import {
+  getDevTierOverrideSync,
+  type DevTierOverride,
+} from '@/src/settings/appSettings';
 
 import { resolveEffectiveTier } from './capabilities';
 import type { StoreEntitlements, TierId } from './types';
 
 let storeEntitlements: StoreEntitlements = { hasPlus: false, hasPro: false };
+let devTierOverride: DevTierOverride = __DEV__ ? getDevTierOverrideSync() : null;
 let listeners = new Set<() => void>();
+
+export function setCachedDevTierOverride(next: DevTierOverride): void {
+  devTierOverride = next;
+}
+
+export function getCachedDevTierOverride(): DevTierOverride {
+  return devTierOverride;
+}
 
 export function setStoreEntitlements(next: StoreEntitlements): void {
   if (
@@ -25,7 +37,7 @@ export function getEffectiveTierSync(): TierId {
   return resolveEffectiveTier({
     hasPlus: storeEntitlements.hasPlus,
     hasPro: storeEntitlements.hasPro,
-    devTierOverride: __DEV__ ? getDevTierOverrideSync() : null,
+    devTierOverride,
   });
 }
 

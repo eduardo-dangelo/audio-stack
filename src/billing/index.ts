@@ -7,6 +7,7 @@ export {
   canCreateFolder,
   canCreateRecording,
   canDuplicate,
+  canUseThemes,
   canExportAnything,
   canExportFormat,
   canImport,

@@ -17,6 +17,7 @@ import {
 import { NamePromptDialog } from '@/src/components/NamePromptDialog';
 import {
   canCreateFolder,
+  canUseThemes,
   getEffectiveTierSync,
   isBillingLimitError,
   requestUpgrade,
@@ -30,12 +31,19 @@ import { useFolders } from '@/src/hooks/useFolders';
 import { useLibraryCounts } from '@/src/hooks/useLibraryCounts';
 import {
   getAppSettings,
+  getThemePreferenceSync,
   setLocationBasedNaming,
   setThemePreference,
   type ThemePreference,
 } from '@/src/settings/appSettings';
 import { createFolder, deleteFolder, reorderFolders } from '@/src/storage/folderStore';
-import { applyThemePreference } from '@/src/theme/applyThemePreference';
+import { publishThemePreference } from '@/src/theme/themeStore';
+import {
+  isProTheme,
+  PRO_EDITOR_THEMES,
+  PRO_THEME_CHOICES,
+  resolveEffectiveTheme,
+} from '@/src/theme/themes';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 import { endIdlePlaybackLiveActivities } from '@/src/widgets/recordingLiveActivityController';
 
@@ -82,7 +90,9 @@ export default function FoldersHomeScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const [newFolderVisible, setNewFolderVisible] = useState(false);
   const [locationBasedNaming, setLocationBasedNamingEnabled] = useState(true);
-  const [themePreference, setThemePreferenceState] = useState<ThemePreference>('system');
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(
+    getThemePreferenceSync
+  );
   const {
     effectiveTier,
     openPaywall,
@@ -100,6 +110,7 @@ export default function FoldersHomeScreen() {
     void getAppSettings().then((settings) => {
       setLocationBasedNamingEnabled(settings.locationBasedNaming);
       setThemePreferenceState(settings.themePreference);
+      publishThemePreference(settings.themePreference);
     });
   }, []);
 
@@ -145,14 +156,21 @@ export default function FoldersHomeScreen() {
     ]);
   };
 
+  const themesEnabled = canUseThemes(effectiveTier);
+
   const selectThemePreference = (pref: ThemePreference) => {
+    if (isProTheme(pref) && !themesEnabled) {
+      requestUpgrade('themes');
+      return;
+    }
     setThemePreferenceState(pref);
-    applyThemePreference(pref);
+    publishThemePreference(pref);
     void setThemePreference(pref);
   };
 
-  const overrideEnabled = themePreference !== 'system';
-  const darkModeEnabled = themePreference === 'dark';
+  const appliedPreference = resolveEffectiveTheme(themePreference, effectiveTier);
+  const overrideEnabled = appliedPreference !== 'system';
+  const darkModeEnabled = appliedPreference === 'dark';
 
   const toggleOverride = (enabled: boolean) => {
     if (!enabled) {
@@ -453,12 +471,47 @@ export default function FoldersHomeScreen() {
                 <View style={styles.settingsCopy}>
                   <Text style={styles.settingsTitle}>Appearance</Text>
                   <Text style={styles.settingsSubtitle}>
-                    Off follows your system setting. Turn on to choose light or dark.
+                    {themesEnabled
+                      ? 'Off follows your system setting. Turn on to choose a theme.'
+                      : 'Off follows your system setting. Turn on to choose light or dark.'}
                   </Text>
                 </View>
                 <Switch value={overrideEnabled} onValueChange={toggleOverride} />
               </View>
-              {overrideEnabled ? (
+              {overrideEnabled && themesEnabled ? (
+                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(140)}>
+                  {PRO_THEME_CHOICES.map((theme) => {
+                    const selected = themePreference === theme.id;
+                    return (
+                      <Pressable
+                        key={theme.id}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        onPress={() => selectThemePreference(theme.id)}
+                        style={({ pressed }) => [
+                          styles.settingsRow,
+                          styles.settingsRowNested,
+                          styles.settingsRowBorder,
+                          pressed && styles.settingsRowPressed,
+                        ]}>
+                        <Text
+                          style={[styles.settingsTitle, selected && styles.settingsThemeActive]}>
+                          {theme.label}
+                        </Text>
+                        {selected ? (
+                          <SymbolView
+                            name={{ ios: 'checkmark' }}
+                            size={16}
+                            weight="semibold"
+                            tintColor={colors.accent}
+                          />
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+                </Animated.View>
+              ) : null}
+              {overrideEnabled && !themesEnabled ? (
                 <Animated.View
                   entering={FadeIn.duration(200)}
                   exiting={FadeOut.duration(140)}
@@ -476,6 +529,22 @@ export default function FoldersHomeScreen() {
                   <Switch value={darkModeEnabled} onValueChange={toggleDarkMode} />
                 </Animated.View>
               ) : null}
+              {overrideEnabled && !themesEnabled
+                ? PRO_EDITOR_THEMES.map((theme) => (
+                    <Pressable
+                      key={theme.id}
+                      accessibilityRole="button"
+                      onPress={() => selectThemePreference(theme.id)}
+                      style={({ pressed }) => [
+                        styles.settingsRow,
+                        styles.settingsRowNested,
+                        styles.settingsRowBorder,
+                        pressed && styles.settingsRowPressed,
+                      ]}>
+                      <Text style={styles.settingsTitle}>{theme.label}</Text>
+                    </Pressable>
+                  ))
+                : null}
               <View style={[styles.settingsRow, styles.settingsRowBorder]}>
                 <SymbolView
                   name={{ ios: 'location.fill' }}
@@ -697,6 +766,10 @@ function useStyles(
         settingsTitle: {
           color: colors.text,
           fontSize: 17,
+        },
+        settingsThemeActive: {
+          color: colors.accent,
+          fontWeight: '600',
         },
         settingsSubtitle: {
           color: colors.secondaryText,
