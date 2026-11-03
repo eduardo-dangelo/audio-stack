@@ -6,6 +6,7 @@ export {
   canAddPlayableLayer,
   canCreateFolder,
   canCreateRecording,
+  canDuplicate,
   canExportAnything,
   canExportFormat,
   canImport,

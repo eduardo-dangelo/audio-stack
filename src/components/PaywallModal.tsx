@@ -29,10 +29,12 @@ const CLOSED_RAIL_MIN_SHEET = 360;
 const HEADER_HEIGHT = 52;
 const ROW_HEIGHT = 32;
 const CTA_HEIGHT = 40;
-const LABEL_WIDTH = 82;
+const LABEL_WIDTH = 100;
+const PRO_STAR_TINT = '#FFCC00';
 
 type FeatureRow = {
   label: string;
+  symbol: SFSymbol;
   lite: boolean | string;
   plus: boolean | string;
   pro: boolean | string;
@@ -42,6 +44,7 @@ type FeatureRow = {
 const FEATURES: FeatureRow[] = [
   {
     label: 'Recordings',
+    symbol: 'waveform',
     lite: String(LITE_MAX_RECORDINGS),
     plus: '∞',
     pro: '∞',
@@ -49,13 +52,23 @@ const FEATURES: FeatureRow[] = [
   },
   {
     label: 'Layers',
+    symbol: 'square.stack.3d.up',
     lite: String(LITE_MAX_LAYERS),
     plus: '∞',
     pro: '∞',
     highlightReasons: ['layers'],
   },
   {
+    label: 'Duplicate',
+    symbol: 'plus.square.on.square',
+    lite: false,
+    plus: true,
+    pro: true,
+    highlightReasons: ['duplicate'],
+  },
+  {
     label: 'Custom FX',
+    symbol: 'slider.horizontal.3',
     lite: false,
     plus: true,
     pro: true,
@@ -63,6 +76,7 @@ const FEATURES: FeatureRow[] = [
   },
   {
     label: 'Folders',
+    symbol: 'folder',
     lite: false,
     plus: true,
     pro: true,
@@ -70,6 +84,7 @@ const FEATURES: FeatureRow[] = [
   },
   {
     label: 'Merge',
+    symbol: 'square.stack.3d.down.right',
     lite: false,
     plus: true,
     pro: true,
@@ -77,6 +92,7 @@ const FEATURES: FeatureRow[] = [
   },
   {
     label: 'Loop',
+    symbol: 'repeat',
     lite: false,
     plus: true,
     pro: true,
@@ -84,6 +100,7 @@ const FEATURES: FeatureRow[] = [
   },
   {
     label: 'Import',
+    symbol: 'square.and.arrow.down',
     lite: false,
     plus: true,
     pro: true,
@@ -91,6 +108,7 @@ const FEATURES: FeatureRow[] = [
   },
   {
     label: 'M4A export',
+    symbol: 'square.and.arrow.up',
     lite: false,
     plus: true,
     pro: true,
@@ -98,16 +116,11 @@ const FEATURES: FeatureRow[] = [
   },
   {
     label: 'WAV / .vcr',
+    symbol: 'doc',
     lite: false,
     plus: false,
     pro: true,
     highlightReasons: ['exportFormat'],
-  },
-  {
-    label: 'Pro tools',
-    lite: false,
-    plus: false,
-    pro: 'Soon',
   },
 ];
 
@@ -181,30 +194,20 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
     hasPro,
   } = useBilling();
 
-  const highlightTier = useMemo(() => {
-    if (!reason) {
-      return { plus: false, pro: false };
-    }
-    if (reason === 'exportFormat') {
-      return { plus: false, pro: true };
-    }
-    return { plus: true, pro: true };
-  }, [reason]);
-
   const tierMeta: Record<
     TierId,
-    { title: string; price: string; highlighted: boolean; recommended: boolean }
+    { title: string; price: string; symbol: SFSymbol | null; recommended: boolean }
   > = {
     lite: {
       title: 'Lite',
       price: 'Free',
-      highlighted: false,
+      symbol: null,
       recommended: false,
     },
     plus: {
       title: 'Plus',
       price: plusPriceLabel,
-      highlighted: highlightTier.plus,
+      symbol: 'sparkles',
       // Plus when upgrading from Lite for a non–Pro-only reason.
       recommended:
         effectiveTier === 'lite' && reason != null && reason !== 'exportFormat',
@@ -212,7 +215,7 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
     pro: {
       title: 'Pro',
       price: proPriceLabel,
-      highlighted: highlightTier.pro,
+      symbol: 'star.fill',
       recommended: reason === 'exportFormat',
     },
   };
@@ -249,11 +252,16 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
     };
   };
 
-  const columnTone = (tier: TierId) => [
+  const hasRecommended = TIERS.some((tier) => tierMeta[tier].recommended);
+  const columnTone = (tier: TierId, edge?: 'top' | 'bottom', rowActive = false) => [
     styles.tierCol,
-    effectiveTier === tier ? styles.tierColCurrent : null,
-    tierMeta[tier].highlighted ? styles.tierColHighlighted : null,
+    hasRecommended && tier === 'lite' ? styles.tierColLite : null,
+    tierMeta[tier].recommended ? styles.tierColWide : null,
+    effectiveTier === tier && !rowActive ? styles.tierColCurrent : null,
+    tierMeta[tier].recommended ? styles.tierColHighlighted : null,
     tierMeta[tier].recommended ? styles.tierColRecommended : null,
+    tierMeta[tier].recommended && edge === 'top' ? styles.tierColRecommendedTop : null,
+    tierMeta[tier].recommended && edge === 'bottom' ? styles.tierColRecommendedBottom : null,
   ];
 
   const comparison: ReactNode = (
@@ -263,17 +271,28 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
         <View style={[styles.row, styles.headerRow, closedRail ? styles.closedRailTightRow : null]}>
           <View style={[styles.labelCol, styles.headerCellPad]} />
           {TIERS.map((tier) => (
-            <View key={tier} style={[...columnTone(tier), styles.headerCellPad]}>
-              <Text style={styles.tierTitle} numberOfLines={1}>
-                {tierMeta[tier].title}
-              </Text>
+            <View key={tier} style={[...columnTone(tier, 'top'), styles.headerCellPad]}>
+              <View style={styles.tierTitleRow}>
+                {tierMeta[tier].symbol ? (
+                  <SymbolView
+                    name={{ ios: tierMeta[tier].symbol }}
+                    size={13}
+                    tintColor={tier === 'pro' ? PRO_STAR_TINT : colors.accent}
+                  />
+                ) : null}
+                <Text style={styles.tierTitle} numberOfLines={1}>
+                  {tierMeta[tier].title}
+                </Text>
+              </View>
               <Text style={styles.tierPrice} numberOfLines={1}>
                 {tierMeta[tier].price}
               </Text>
               {tierMeta[tier].recommended ? (
-                <Text style={styles.recommended} numberOfLines={1}>
-                  Recommended
-                </Text>
+                <View style={styles.recommendedPill}>
+                  <Text style={styles.recommended} numberOfLines={1}>
+                    Recommended
+                  </Text>
+                </View>
               ) : (
                 <View style={styles.recommendedSpacer} />
               )}
@@ -291,9 +310,15 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
               style={[
                 styles.row,
                 closedRail ? styles.closedRailFeatureRow : styles.featureRow,
+                highlighted ? styles.featureRowActive : null,
                 index < FEATURES.length - 1 ? styles.featureRowBorder : null,
               ]}>
               <View style={styles.labelCol}>
+                <SymbolView
+                  name={{ ios: feature.symbol }}
+                  size={12}
+                  tintColor={highlighted ? colors.accent : colors.secondaryText}
+                />
                 <Text
                   style={[
                     styles.featureLabel,
@@ -304,7 +329,7 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
                 </Text>
               </View>
               {TIERS.map((tier) => (
-                <View key={tier} style={columnTone(tier)}>
+                <View key={tier} style={columnTone(tier, undefined, highlighted)}>
                   <FeatureCell
                     value={cellValue(tier, feature)}
                     styles={styles}
@@ -322,7 +347,7 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
           {TIERS.map((tier) => {
             const cta = ctaFor(tier);
             return (
-              <View key={tier} style={[...columnTone(tier), styles.ctaCellPad]}>
+              <View key={tier} style={[...columnTone(tier, 'bottom'), styles.ctaCellPad]}>
                 {cta.kind === 'action' ? (
                   <Pressable
                     accessibilityRole="button"
@@ -413,6 +438,7 @@ function useStyles(
   const sheetBg = isDark ? colors.sheetBackground : colors.background;
   const mutedCol = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
   const accentWash = isDark ? 'rgba(10,132,255,0.14)' : 'rgba(0,122,255,0.08)';
+  const rowHighlight = isDark ? 'rgba(10,132,255,0.07)' : 'rgba(0,122,255,0.045)';
   const accentBorder = colors.accent;
 
   return useMemo(
@@ -489,7 +515,7 @@ function useStyles(
           backgroundColor: mutedCol,
         },
         table: {
-          borderRadius: 16,
+          borderRadius: 12,
           overflow: 'hidden',
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.separator,
@@ -516,6 +542,9 @@ function useStyles(
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: colors.separator,
         },
+        featureRowActive: {
+          backgroundColor: rowHighlight,
+        },
         ctaRow: {
           minHeight: CTA_HEIGHT + 16,
           borderTopWidth: StyleSheet.hairlineWidth,
@@ -527,9 +556,11 @@ function useStyles(
         },
         labelCol: {
           width: LABEL_WIDTH,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
           paddingLeft: 10,
           paddingRight: 4,
-          justifyContent: 'center',
         },
         tierCol: {
           flex: 1,
@@ -538,6 +569,12 @@ function useStyles(
           justifyContent: 'center',
           paddingHorizontal: 4,
         },
+        tierColLite: {
+          flex: 0.8,
+        },
+        tierColWide: {
+          flex: 1.2,
+        },
         tierColCurrent: {
           backgroundColor: mutedCol,
         },
@@ -545,9 +582,27 @@ function useStyles(
           backgroundColor: accentWash,
         },
         tierColRecommended: {
-          borderLeftWidth: StyleSheet.hairlineWidth,
-          borderRightWidth: StyleSheet.hairlineWidth,
+          borderLeftWidth: StyleSheet.hairlineWidth + 2,
+          borderRightWidth: StyleSheet.hairlineWidth + 2,
           borderColor: accentBorder,
+        },
+        tierColRecommendedTop: {
+          borderTopWidth: StyleSheet.hairlineWidth + 2,
+          borderTopLeftRadius: 12,
+          borderTopRightRadius: 12,
+          overflow: 'hidden',
+        },
+        tierColRecommendedBottom: {
+          borderBottomWidth: StyleSheet.hairlineWidth + 2,
+          borderBottomLeftRadius: 12,
+          borderBottomRightRadius: 12,
+          overflow: 'hidden',
+        },
+        tierTitleRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 3,
         },
         tierTitle: {
           fontSize: 15,
@@ -561,12 +616,19 @@ function useStyles(
           fontWeight: '500',
           color: colors.secondaryText,
         },
-        recommended: {
+        recommendedPill: {
           marginTop: 4,
+          height: 13,
+          paddingHorizontal: 6,
+          borderRadius: 6,
+          backgroundColor: accentWash,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        recommended: {
           fontSize: 9,
           fontWeight: '700',
           letterSpacing: 0.2,
-          textTransform: 'uppercase',
           color: colors.accent,
         },
         recommendedSpacer: {
@@ -574,6 +636,7 @@ function useStyles(
           marginTop: 4,
         },
         featureLabel: {
+          flex: 1,
           fontSize: 11,
           fontWeight: '500',
           color: colors.secondaryText,
@@ -593,11 +656,11 @@ function useStyles(
           opacity: 0.55,
         },
         cta: {
-          alignSelf: 'stretch',
+          alignSelf: 'center',
           borderRadius: 10,
           backgroundColor: colors.accent,
           paddingVertical: 8,
-          paddingHorizontal: 4,
+          paddingHorizontal: 10,
           alignItems: 'center',
           justifyContent: 'center',
         },
@@ -634,6 +697,6 @@ function useStyles(
           color: colors.accent,
         },
       }),
-    [accentBorder, accentWash, colors, isDark, mutedCol, sheetBg]
+    [accentBorder, accentWash, colors, isDark, mutedCol, rowHighlight, sheetBg]
   );
 }

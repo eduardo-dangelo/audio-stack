@@ -39,6 +39,7 @@ import {
   BillingLimitError,
   canAddPlayableLayer,
   canCreateRecording,
+  canDuplicate,
   canExportFormat,
   getEffectiveTierSync,
 } from '@/src/billing';
@@ -1280,6 +1281,10 @@ export async function duplicateLayer(
     throw new Error('Layer not found');
   }
 
+  if (!canDuplicate(getEffectiveTierSync())) {
+    throw new BillingLimitError('duplicate');
+  }
+
   if (!canAddPlayableLayer(getEffectiveTierSync(), getPlayableLayers(memo).length)) {
     throw new BillingLimitError('layers');
   }
@@ -1415,6 +1420,10 @@ export async function duplicateMemo(memoId: string): Promise<Memo> {
   const memo = await getMemo(memoId);
   if (!memo) {
     throw new Error('Memo not found');
+  }
+
+  if (!canDuplicate(getEffectiveTierSync())) {
+    throw new BillingLimitError('duplicate');
   }
 
   const copy = await createMemo({

@@ -16,6 +16,7 @@ const LITE_CAPABILITIES: TierCapabilities = {
   folders: false,
   merge: false,
   loop: false,
+  duplicate: false,
   exportFormats: [],
 };
 
@@ -27,6 +28,7 @@ const PLUS_CAPABILITIES: TierCapabilities = {
   folders: true,
   merge: true,
   loop: true,
+  duplicate: true,
   exportFormats: ['m4a'],
 };
 
@@ -38,6 +40,7 @@ const PRO_CAPABILITIES: TierCapabilities = {
   folders: true,
   merge: true,
   loop: true,
+  duplicate: true,
   exportFormats: ['m4a', 'wav', 'vcr'],
 };
 
@@ -99,6 +102,10 @@ export function canUseLoop(tier: TierId): boolean {
   return getCapabilities(tier).loop;
 }
 
+export function canDuplicate(tier: TierId): boolean {
+  return getCapabilities(tier).duplicate;
+}
+
 export function canExportAnything(tier: TierId): boolean {
   return getCapabilities(tier).exportFormats.length > 0;
 }
@@ -124,23 +131,25 @@ export function resolveEffectiveTier(options: {
 export function paywallSubtitle(reason: UpgradeReason): string {
   switch (reason) {
     case 'recordings':
-      return `Lite includes up to ${LITE_MAX_RECORDINGS} recordings`;
+      return `Unlimited recordings on Plus and Pro. Lite includes up to ${LITE_MAX_RECORDINGS}.`;
     case 'layers':
-      return `Lite includes up to ${LITE_MAX_LAYERS} layers`;
+      return `Unlimited layers on Plus and Pro. Lite includes up to ${LITE_MAX_LAYERS}.`;
     case 'customEffects':
-      return 'Custom effects need Plus or Pro';
+      return 'Custom effects are included with Plus and Pro.';
     case 'import':
-      return 'Import needs Plus or Pro';
+      return 'Importing audio is included with Plus and Pro.';
     case 'export':
-      return 'Export needs Plus or Pro';
+      return 'M4A export is included with Plus. WAV and .vcr need Pro.';
     case 'exportFormat':
-      return 'WAV and .vcr need Pro';
+      return 'WAV and .vcr projects are included with Pro.';
     case 'folders':
-      return 'Folders need Plus or Pro';
+      return 'Folders are included with Plus and Pro.';
     case 'merge':
-      return 'Merge layers need Plus or Pro';
+      return 'Merging layers is included with Plus and Pro.';
     case 'loop':
-      return 'Loop needs Plus or Pro';
+      return 'Looping is included with Plus and Pro.';
+    case 'duplicate':
+      return 'Duplicating is included with Plus and Pro.';
   }
 }
 

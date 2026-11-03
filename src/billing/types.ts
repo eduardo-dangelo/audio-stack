@@ -9,7 +9,8 @@ export type UpgradeReason =
   | 'exportFormat'
   | 'folders'
   | 'merge'
-  | 'loop';
+  | 'loop'
+  | 'duplicate';
 
 export type ExportFormatCapability = 'm4a' | 'wav' | 'vcr';
 
@@ -21,6 +22,7 @@ export type TierCapabilities = {
   folders: boolean;
   merge: boolean;
   loop: boolean;
+  duplicate: boolean;
   exportFormats: readonly ExportFormatCapability[];
 };
 
