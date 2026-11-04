@@ -25,24 +25,24 @@ export type ShareMemoOptions = {
 };
 
 const AUDIO_FORMATS = ['m4a', 'wav'] as const;
-const PROJECT_FORMAT_LABEL = 'Project (.vcr)';
+const PROJECT_FORMAT_LABEL = 'Project (.aud)';
 
 function getShareMimeType(format: ExportFormat): string {
-  if (format === 'vcr') {
+  if (format === 'aud') {
     return PROJECT_MIME_TYPE;
   }
   return format === 'm4a' ? 'audio/mp4' : 'audio/wav';
 }
 
 function getShareUti(format: ExportFormat): string {
-  if (format === 'vcr') {
+  if (format === 'aud') {
     return PROJECT_UTI;
   }
   return format === 'm4a' ? 'public.mpeg-4-audio' : 'com.microsoft.waveform-audio';
 }
 
 async function stampProjectFileIfNeeded(uri: string, format: ExportFormat): Promise<void> {
-  if (format !== 'vcr') {
+  if (format !== 'aud') {
     return;
   }
   await stampProjectTypeAsync(uri);
@@ -53,7 +53,7 @@ function resolveFormatSelection(label: string): ExportFormat | null {
     return label;
   }
   if (label === PROJECT_FORMAT_LABEL) {
-    return 'vcr';
+    return 'aud';
   }
   return null;
 }
@@ -68,7 +68,7 @@ function showFormatPicker(
     return;
   }
 
-  // Plus and Pro both pick a format; Plus wav/vcr is gated in the callback.
+  // Plus and Pro both pick a format; Plus wav/aud is gated in the callback.
   const sheetOptions = includeProject
     ? ([...AUDIO_FORMATS, PROJECT_FORMAT_LABEL, 'Cancel'] as const)
     : ([...AUDIO_FORMATS, 'Cancel'] as const);
@@ -179,7 +179,7 @@ function runExport(
   format: ExportFormat,
   options?: ShareMemoOptions
 ): void {
-  if (format === 'vcr' && options?.layerId) {
+  if (format === 'aud' && options?.layerId) {
     Alert.alert('Export failed', 'Project export is only available for the full memo.');
     return;
   }
@@ -198,7 +198,7 @@ export function shareMemo(memo: Memo, options?: ShareMemoOptions): void {
     return;
   }
 
-  if (options?.format === 'm4a' || options?.format === 'wav' || options?.format === 'vcr') {
+  if (options?.format === 'm4a' || options?.format === 'wav' || options?.format === 'aud') {
     runExport([memo], options.format, options);
     return;
   }
@@ -220,7 +220,7 @@ export function shareMemos(memos: Memo[], options?: ShareMemoOptions): void {
     return;
   }
 
-  if (options?.format === 'm4a' || options?.format === 'wav' || options?.format === 'vcr') {
+  if (options?.format === 'm4a' || options?.format === 'wav' || options?.format === 'aud') {
     runExport(exportable, options.format, options);
     return;
   }

@@ -50,7 +50,7 @@
             ],
             "UTTypeTagSpecification": {
               "public.filename-extension": [
-                "vcr",
+                "aud",
                 "vmp"
               ],
               "public.mime-type": [
@@ -67,7 +67,7 @@
             "CFBundleTypeRole": "Editor",
             "LSHandlerRank": "Owner",
             "CFBundleTypeExtensions": [
-              "vcr",
+              "aud",
               "vmp"
             ],
             "LSItemContentTypes": [

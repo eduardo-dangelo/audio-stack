@@ -1,7 +1,7 @@
 {
   "name": "project-document-picker",
   "version": "1.0.0",
-  "description": "Pick Audio Stack .vcr / .vmp project files via UIDocumentPicker and the app UTI",
+  "description": "Pick Audio Stack .aud / .vmp project files via UIDocumentPicker and the app UTI",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "peerDependencies": {

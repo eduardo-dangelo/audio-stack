@@ -81,7 +81,7 @@ import {
   hasRecording,
 } from './types';
 
-export type ExportFormat = 'm4a' | 'wav' | 'vcr';
+export type ExportFormat = 'm4a' | 'wav' | 'aud';
 
 function alignLayerFileNameWithSource(layer: Layer, sourcePath: string): void {
   const sourceIsWav = sourcePath.toLowerCase().endsWith('.wav');
@@ -1474,7 +1474,7 @@ export async function exportMemoToFile(
     );
   }
 
-  if (format === 'vcr') {
+  if (format === 'aud') {
     if (layerId) {
       throw new Error('Project export is only available for the full memo.');
     }

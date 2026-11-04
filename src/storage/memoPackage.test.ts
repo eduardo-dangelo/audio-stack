@@ -138,11 +138,12 @@ function buildArchiveFiles(memo: Memo = makeMemo()): Record<string, Uint8Array> 
 }
 
 describe('isProjectFileName', () => {
-  it('accepts .vcr and legacy .vmp and rejects other extensions', () => {
-    assert.equal(isProjectFileName('Session A.vcr'), true);
-    assert.equal(isProjectFileName('Session A.VCR'), true);
+  it('accepts .aud and legacy .vmp and rejects other extensions', () => {
+    assert.equal(isProjectFileName('Session A.aud'), true);
+    assert.equal(isProjectFileName('Session A.AUD'), true);
     assert.equal(isProjectFileName('Session A.vmp'), true);
     assert.equal(isProjectFileName('Session A.VMP'), true);
+    assert.equal(isProjectFileName('Session A.vcr'), false);
     assert.equal(isProjectFileName('Session A.zip'), false);
     assert.equal(isProjectFileName('Session A.m4a'), false);
   });

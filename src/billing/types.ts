@@ -13,7 +13,7 @@ export type UpgradeReason =
   | 'duplicate'
   | 'themes';
 
-export type ExportFormatCapability = 'm4a' | 'wav' | 'vcr';
+export type ExportFormatCapability = 'm4a' | 'wav' | 'aud';
 
 export type TierCapabilities = {
   maxRecordings: number | null;

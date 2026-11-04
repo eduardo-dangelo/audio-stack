@@ -77,7 +77,7 @@ async function importFromUri(
   }
 }
 
-/** Import a `.vcr` / `.vmp` already readable by the app (picker cache or copied URL). Overlay is the caller's job. */
+/** Import a `.aud` / `.vmp` already readable by the app (picker cache or copied URL). Overlay is the caller's job. */
 export async function importProjectFromCachedUri(
   uri: string,
   options?: Pick<ImportMemoOptions, 'folderId'>
@@ -101,7 +101,7 @@ export async function importMemoFromUri(
 }
 
 /**
- * Opens the document picker and imports an Audio Stack project (`.vcr` / `.vmp`).
+ * Opens the document picker and imports an Audio Stack project (`.aud` / `.vmp`).
  * Returns `canceled` when the user dismisses the picker.
  */
 export async function importMemoFromPicker(
@@ -115,7 +115,7 @@ export async function importMemoFromPicker(
     }
 
     if (!isProjectFileName(result.name)) {
-      throw new Error('Please select an Audio Stack project (.vcr) file.');
+      throw new Error('Please select an Audio Stack project (.aud) file.');
     }
 
     options?.onImportStarted?.();

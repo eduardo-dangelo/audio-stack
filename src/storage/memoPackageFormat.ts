@@ -23,10 +23,10 @@ export const PROJECT_PACKAGE_META_PATH = 'package.json';
 export const PROJECT_MANIFEST_PATH = 'manifest.json';
 export const PROJECT_MEDIA_PREFIX = 'media/';
 /** File extension for portable project packages (without dot). */
-export const PROJECT_FILE_EXTENSION = 'vcr';
+export const PROJECT_FILE_EXTENSION = 'aud';
 /** Older shared projects used `.vmp`; still accepted on import. */
 export const LEGACY_PROJECT_FILE_EXTENSIONS = ['vmp'] as const;
-/** MIME type registered for `.vcr` (used by share + document picker). */
+/** MIME type registered for `.aud` (used by share + document picker). */
 export const PROJECT_MIME_TYPE = 'application/vnd.audio-stack.project';
 /** Legacy MIME types still accepted by the document picker. */
 export const LEGACY_PROJECT_MIME_TYPES = [

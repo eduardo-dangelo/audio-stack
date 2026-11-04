@@ -85,7 +85,7 @@ export function writeImportedMemoFiles(
   manifestFile.write(JSON.stringify(memo, null, 2));
 }
 
-/** Pack a memo into a `.vcr` project file in the cache directory. */
+/** Pack a memo into a `.aud` project file in the cache directory. */
 export async function packMemoToProjectFile(
   memo: Memo,
   options?: { appVersion?: string }

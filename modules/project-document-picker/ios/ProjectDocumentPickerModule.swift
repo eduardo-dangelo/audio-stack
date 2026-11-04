@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 import UIKit
 
 private let projectUtiIdentifier = "com.eduardodangelo.voicememosplus.project"
-private let projectFileExtension = "vcr"
+private let projectFileExtension = "aud"
 private let legacyProjectFileExtension = "vmp"
 
 public class ProjectDocumentPickerModule: Module {
@@ -79,7 +79,7 @@ public class ProjectDocumentPickerModule: Module {
     AsyncFunction("stampProjectTypeAsync") { (uri: String) in
       let source = projectFileURL(from: uri)
       // URLResourceValues.typeIdentifier/contentType are get-only. Best-effort stamp
-      // via NSURL; iOS may still derive the type from the .vcr / .vmp extension.
+      // via NSURL; iOS may still derive the type from the .aud / .vmp extension.
       try? (source as NSURL).setResourceValue(
         projectUtiIdentifier,
         forKey: .typeIdentifierKey

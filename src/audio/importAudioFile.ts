@@ -105,7 +105,7 @@ export async function pickAudioFile(): Promise<
   return pickDocument('audio/*');
 }
 
-/** List import: audio files and Audio Stack `.vcr` / `.vmp` projects. */
+/** List import: audio files and Audio Stack `.aud` / `.vmp` projects. */
 export async function pickImportableFile(): Promise<
   { canceled: true } | ({ canceled: false } & PickedAudioFile)
 > {

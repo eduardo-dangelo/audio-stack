@@ -27,9 +27,9 @@ const PLUS_CAPABILITIES: TierCapabilities = {
   customEffects: true,
   import: true,
   folders: true,
-  merge: true,
-  loop: true,
-  duplicate: true,
+  merge: false,
+  loop: false,
+  duplicate: false,
   themes: false,
   exportFormats: ['m4a'],
 };
@@ -44,7 +44,7 @@ const PRO_CAPABILITIES: TierCapabilities = {
   loop: true,
   duplicate: true,
   themes: true,
-  exportFormats: ['m4a', 'wav', 'vcr'],
+  exportFormats: ['m4a', 'wav', 'aud'],
 };
 
 export function getCapabilities(tier: TierId): TierCapabilities {
@@ -146,17 +146,17 @@ export function paywallSubtitle(reason: UpgradeReason): string {
     case 'import':
       return 'Importing audio and projects is included on every plan.';
     case 'export':
-      return 'M4A export is included with Plus. WAV and .vcr need Pro.';
+      return 'M4A export is included with Plus. WAV and .aud need Pro.';
     case 'exportFormat':
-      return 'WAV and .vcr projects are included with Pro.';
+      return 'WAV and .aud projects are included with Pro.';
     case 'folders':
       return 'Folders are included with Plus and Pro.';
     case 'merge':
-      return 'Merging layers is included with Plus and Pro.';
+      return 'Merging layers is included with Pro.';
     case 'loop':
-      return 'Looping is included with Plus and Pro.';
+      return 'Looping is included with Pro.';
     case 'duplicate':
-      return 'Duplicating is included with Plus and Pro.';
+      return 'Duplicating is included with Pro.';
     case 'themes':
       return 'Editor themes are included with Pro.';
   }

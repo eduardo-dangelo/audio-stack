@@ -59,12 +59,12 @@ const FEATURES: FeatureRow[] = [
     highlightReasons: ['layers'],
   },
   {
-    label: 'Duplicate',
-    symbol: 'plus.square.on.square',
-    lite: false,
+    label: 'Import',
+    symbol: 'square.and.arrow.down',
+    lite: true,
     plus: true,
     pro: true,
-    highlightReasons: ['duplicate'],
+    highlightReasons: ['import'],
   },
   {
     label: 'Custom FX',
@@ -83,30 +83,6 @@ const FEATURES: FeatureRow[] = [
     highlightReasons: ['folders'],
   },
   {
-    label: 'Merge',
-    symbol: 'square.stack.3d.down.right',
-    lite: false,
-    plus: true,
-    pro: true,
-    highlightReasons: ['merge'],
-  },
-  {
-    label: 'Loop',
-    symbol: 'repeat',
-    lite: false,
-    plus: true,
-    pro: true,
-    highlightReasons: ['loop'],
-  },
-  {
-    label: 'Import',
-    symbol: 'square.and.arrow.down',
-    lite: true,
-    plus: true,
-    pro: true,
-    highlightReasons: ['import'],
-  },
-  {
     label: 'M4A export',
     symbol: 'square.and.arrow.up',
     lite: false,
@@ -115,7 +91,31 @@ const FEATURES: FeatureRow[] = [
     highlightReasons: ['export'],
   },
   {
-    label: 'WAV / .vcr',
+    label: 'Duplicate',
+    symbol: 'plus.square.on.square',
+    lite: false,
+    plus: false,
+    pro: true,
+    highlightReasons: ['duplicate'],
+  },
+  {
+    label: 'Merge',
+    symbol: 'square.stack.3d.down.right',
+    lite: false,
+    plus: false,
+    pro: true,
+    highlightReasons: ['merge'],
+  },
+  {
+    label: 'Loop',
+    symbol: 'repeat',
+    lite: false,
+    plus: false,
+    pro: true,
+    highlightReasons: ['loop'],
+  },
+  {
+    label: 'WAV / .aud',
     symbol: 'doc',
     lite: false,
     plus: false,
@@ -221,13 +221,21 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
         effectiveTier === 'lite' &&
         reason != null &&
         reason !== 'exportFormat' &&
-        reason !== 'themes',
+        reason !== 'themes' &&
+        reason !== 'duplicate' &&
+        reason !== 'merge' &&
+        reason !== 'loop',
     },
     pro: {
       title: 'Pro',
       price: proPriceLabel,
       symbol: 'star.fill',
-      recommended: reason === 'exportFormat' || reason === 'themes',
+      recommended:
+        reason === 'exportFormat' ||
+        reason === 'themes' ||
+        reason === 'duplicate' ||
+        reason === 'merge' ||
+        reason === 'loop',
     },
   };
 
