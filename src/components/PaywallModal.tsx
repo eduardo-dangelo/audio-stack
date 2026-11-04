@@ -91,20 +91,20 @@ const FEATURES: FeatureRow[] = [
     highlightReasons: ['export'],
   },
   {
+    label: 'Merge',
+    symbol: 'square.stack.3d.down.right',
+    lite: false,
+    plus: true,
+    pro: true,
+    highlightReasons: ['merge'],
+  },
+  {
     label: 'Duplicate',
     symbol: 'plus.square.on.square',
     lite: false,
     plus: false,
     pro: true,
     highlightReasons: ['duplicate'],
-  },
-  {
-    label: 'Merge',
-    symbol: 'square.stack.3d.down.right',
-    lite: false,
-    plus: false,
-    pro: true,
-    highlightReasons: ['merge'],
   },
   {
     label: 'Loop',
@@ -232,7 +232,6 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
         reason !== 'themes' &&
         reason !== 'pitch' &&
         reason !== 'duplicate' &&
-        reason !== 'merge' &&
         reason !== 'loop',
     },
     pro: {
@@ -244,7 +243,6 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
         reason === 'themes' ||
         reason === 'pitch' ||
         reason === 'duplicate' ||
-        reason === 'merge' ||
         reason === 'loop',
     },
   };

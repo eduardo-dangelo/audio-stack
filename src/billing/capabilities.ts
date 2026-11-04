@@ -28,7 +28,7 @@ const PLUS_CAPABILITIES: TierCapabilities = {
   customEffects: true,
   import: true,
   folders: true,
-  merge: false,
+  merge: true,
   loop: false,
   duplicate: false,
   themes: false,
@@ -159,7 +159,7 @@ export function paywallSubtitle(reason: UpgradeReason): string {
     case 'folders':
       return 'Folders are included with Plus and Pro.';
     case 'merge':
-      return 'Merging layers is included with Pro.';
+      return 'Merging layers is included with Plus and Pro.';
     case 'loop':
       return 'Looping is included with Pro.';
     case 'duplicate':
