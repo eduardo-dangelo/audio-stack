@@ -17,7 +17,6 @@ import {
 import { NamePromptDialog } from '@/src/components/NamePromptDialog';
 import {
   canCreateFolder,
-  canUseThemes,
   getEffectiveTierSync,
   isBillingLimitError,
   requestUpgrade,
@@ -39,8 +38,9 @@ import {
 import { createFolder, deleteFolder, reorderFolders } from '@/src/storage/folderStore';
 import { publishThemePreference } from '@/src/theme/themeStore';
 import {
-  isProTheme,
-  PRO_THEME_CHOICES,
+  canUseNamedTheme,
+  editorThemeChoicesForTier,
+  hasThemePicker,
   resolveEffectiveTheme,
 } from '@/src/theme/themes';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
@@ -155,10 +155,11 @@ export default function FoldersHomeScreen() {
     ]);
   };
 
-  const themesEnabled = canUseThemes(effectiveTier);
+  const themePickerEnabled = hasThemePicker(effectiveTier);
+  const themeChoices = editorThemeChoicesForTier(effectiveTier);
 
   const selectThemePreference = (pref: ThemePreference) => {
-    if (isProTheme(pref) && !themesEnabled) {
+    if (!canUseNamedTheme(effectiveTier, pref)) {
       requestUpgrade('themes');
       return;
     }
@@ -470,16 +471,16 @@ export default function FoldersHomeScreen() {
                 <View style={styles.settingsCopy}>
                   <Text style={styles.settingsTitle}>Appearance</Text>
                   <Text style={styles.settingsSubtitle}>
-                    {themesEnabled
+                    {themePickerEnabled
                       ? 'Off follows your system setting. Turn on to choose a theme.'
                       : 'Off follows your system setting. Turn on to choose light or dark.'}
                   </Text>
                 </View>
                 <Switch value={overrideEnabled} onValueChange={toggleOverride} />
               </View>
-              {overrideEnabled && themesEnabled ? (
+              {overrideEnabled && themePickerEnabled ? (
                 <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(140)}>
-                  {PRO_THEME_CHOICES.map((theme) => {
+                  {themeChoices.map((theme) => {
                     const selected = themePreference === theme.id;
                     return (
                       <Pressable
@@ -510,7 +511,7 @@ export default function FoldersHomeScreen() {
                   })}
                 </Animated.View>
               ) : null}
-              {overrideEnabled && !themesEnabled ? (
+              {overrideEnabled && !themePickerEnabled ? (
                 <Animated.View
                   entering={FadeIn.duration(200)}
                   exiting={FadeOut.duration(140)}

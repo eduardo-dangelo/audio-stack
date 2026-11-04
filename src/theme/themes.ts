@@ -4,7 +4,6 @@ import {
   VoiceMemosColorsLight,
   type VoiceMemosColorScheme,
 } from '@/constants/VoiceMemosColors';
-import { canUseThemes } from '@/src/billing/capabilities';
 import type { ThemePreference } from '@/src/settings/appSettings';
 import type { TierId } from '@/src/billing/types';
 
@@ -15,9 +14,9 @@ export type EditorThemeChoice = {
   label: string;
 };
 
-const PRO_THEME_IDS = [
-  'solarizedLight',
-  'solarizedDark',
+const PLUS_THEME_IDS = ['solarizedLight', 'solarizedDark'] as const;
+
+const PRO_ONLY_THEME_IDS = [
   'tintedBlue',
   'tintedRed',
   'quietLight',
@@ -29,6 +28,10 @@ const PRO_THEME_IDS = [
   'cyberpunk',
 ] as const;
 
+const PRO_THEME_IDS = [...PLUS_THEME_IDS, ...PRO_ONLY_THEME_IDS] as const;
+
+export type PlusThemeId = (typeof PLUS_THEME_IDS)[number];
+export type ProOnlyThemeId = (typeof PRO_ONLY_THEME_IDS)[number];
 export type ProThemeId = (typeof PRO_THEME_IDS)[number];
 
 export const FREE_APPEARANCE_THEMES: readonly EditorThemeChoice[] = [
@@ -36,9 +39,12 @@ export const FREE_APPEARANCE_THEMES: readonly EditorThemeChoice[] = [
   { id: 'dark', label: 'Dark' },
 ];
 
-export const PRO_EDITOR_THEMES: readonly EditorThemeChoice[] = [
+export const PLUS_EDITOR_THEMES: readonly EditorThemeChoice[] = [
   { id: 'solarizedLight', label: 'Solarized Light' },
   { id: 'solarizedDark', label: 'Solarized Dark' },
+];
+
+export const PRO_ONLY_EDITOR_THEMES: readonly EditorThemeChoice[] = [
   { id: 'tintedBlue', label: 'Tinted Blue' },
   { id: 'tintedRed', label: 'Tinted Red' },
   { id: 'quietLight', label: 'Quiet Light' },
@@ -50,6 +56,11 @@ export const PRO_EDITOR_THEMES: readonly EditorThemeChoice[] = [
   { id: 'cyberpunk', label: 'Cyberpunk' },
 ];
 
+export const PRO_EDITOR_THEMES: readonly EditorThemeChoice[] = [
+  ...PLUS_EDITOR_THEMES,
+  ...PRO_ONLY_EDITOR_THEMES,
+];
+
 export const PRO_THEME_CHOICES: readonly EditorThemeChoice[] = [
   ...FREE_APPEARANCE_THEMES,
   ...PRO_EDITOR_THEMES,
@@ -57,6 +68,43 @@ export const PRO_THEME_CHOICES: readonly EditorThemeChoice[] = [
 
 export function isProTheme(pref: ThemePreference): pref is ProThemeId {
   return (PRO_THEME_IDS as readonly string[]).includes(pref);
+}
+
+export function isPlusTheme(pref: ThemePreference): pref is PlusThemeId {
+  return (PLUS_THEME_IDS as readonly string[]).includes(pref);
+}
+
+export function isProOnlyTheme(pref: ThemePreference): pref is ProOnlyThemeId {
+  return (PRO_ONLY_THEME_IDS as readonly string[]).includes(pref);
+}
+
+/** Whether this preference may be applied for the tier (system/light/dark always). */
+export function canUseNamedTheme(tier: TierId, pref: ThemePreference): boolean {
+  if (pref === 'system' || pref === 'light' || pref === 'dark') {
+    return true;
+  }
+  if (isPlusTheme(pref)) {
+    return tier === 'plus' || tier === 'pro';
+  }
+  if (isProOnlyTheme(pref)) {
+    return tier === 'pro';
+  }
+  return false;
+}
+
+/** Plus and Pro get a theme list; Lite keeps the light/dark switch. */
+export function hasThemePicker(tier: TierId): boolean {
+  return tier === 'plus' || tier === 'pro';
+}
+
+export function editorThemeChoicesForTier(tier: TierId): readonly EditorThemeChoice[] {
+  if (tier === 'pro') {
+    return PRO_THEME_CHOICES;
+  }
+  if (tier === 'plus') {
+    return [...FREE_APPEARANCE_THEMES, ...PLUS_EDITOR_THEMES];
+  }
+  return FREE_APPEARANCE_THEMES;
 }
 
 export function appearanceForTheme(pref: ThemePreference): ThemeAppearance {
@@ -81,9 +129,9 @@ export function appearanceForTheme(pref: ThemePreference): ThemeAppearance {
   }
 }
 
-/** Saved Pro themes stay stored, but only Pro applies them. */
+/** Saved gated themes stay stored; apply System when the tier cannot use them. */
 export function resolveEffectiveTheme(pref: ThemePreference, tier: TierId): ThemePreference {
-  if (isProTheme(pref) && !canUseThemes(tier)) {
+  if (!canUseNamedTheme(tier, pref)) {
     return 'system';
   }
   return pref;
