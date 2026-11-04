@@ -40,7 +40,6 @@ import { createFolder, deleteFolder, reorderFolders } from '@/src/storage/folder
 import { publishThemePreference } from '@/src/theme/themeStore';
 import {
   isProTheme,
-  PRO_EDITOR_THEMES,
   PRO_THEME_CHOICES,
   resolveEffectiveTheme,
 } from '@/src/theme/themes';
@@ -529,22 +528,6 @@ export default function FoldersHomeScreen() {
                   <Switch value={darkModeEnabled} onValueChange={toggleDarkMode} />
                 </Animated.View>
               ) : null}
-              {overrideEnabled && !themesEnabled
-                ? PRO_EDITOR_THEMES.map((theme) => (
-                    <Pressable
-                      key={theme.id}
-                      accessibilityRole="button"
-                      onPress={() => selectThemePreference(theme.id)}
-                      style={({ pressed }) => [
-                        styles.settingsRow,
-                        styles.settingsRowNested,
-                        styles.settingsRowBorder,
-                        pressed && styles.settingsRowPressed,
-                      ]}>
-                      <Text style={styles.settingsTitle}>{theme.label}</Text>
-                    </Pressable>
-                  ))
-                : null}
               <View style={[styles.settingsRow, styles.settingsRowBorder]}>
                 <SymbolView
                   name={{ ios: 'location.fill' }}
@@ -590,28 +573,30 @@ export default function FoldersHomeScreen() {
                   tintColor={colors.secondaryText}
                 />
               </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  void restore();
-                }}
-                style={({ pressed }) => [
-                  styles.settingsRow,
-                  styles.settingsRowBorder,
-                  pressed ? styles.settingsRowPressed : null,
-                ]}>
-                <SymbolView
-                  name={{ ios: 'arrow.clockwise' }}
-                  size={20}
-                  tintColor={colors.accent}
-                />
-                <View style={styles.settingsCopy}>
-                  <Text style={styles.settingsTitle}>Restore Purchases</Text>
-                  <Text style={styles.settingsSubtitle}>
-                    Restore Plus or Pro on this device
-                  </Text>
-                </View>
-              </Pressable>
+              {effectiveTier !== 'lite' ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    void restore();
+                  }}
+                  style={({ pressed }) => [
+                    styles.settingsRow,
+                    styles.settingsRowBorder,
+                    pressed ? styles.settingsRowPressed : null,
+                  ]}>
+                  <SymbolView
+                    name={{ ios: 'arrow.clockwise' }}
+                    size={20}
+                    tintColor={colors.accent}
+                  />
+                  <View style={styles.settingsCopy}>
+                    <Text style={styles.settingsTitle}>Restore Purchases</Text>
+                    <Text style={styles.settingsSubtitle}>
+                      Restore Plus or Pro on this device
+                    </Text>
+                  </View>
+                </Pressable>
+              ) : null}
               {__DEV__ ? (
                 <View style={[styles.settingsRow, styles.settingsRowBorder]}>
                   <SymbolView

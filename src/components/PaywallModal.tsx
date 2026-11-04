@@ -101,7 +101,7 @@ const FEATURES: FeatureRow[] = [
   {
     label: 'Import',
     symbol: 'square.and.arrow.down',
-    lite: false,
+    lite: true,
     plus: true,
     pro: true,
     highlightReasons: ['import'],

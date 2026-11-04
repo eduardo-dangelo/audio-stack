@@ -12,7 +12,7 @@ const LITE_CAPABILITIES: TierCapabilities = {
   maxRecordings: LITE_MAX_RECORDINGS,
   maxLayers: LITE_MAX_LAYERS,
   customEffects: false,
-  import: false,
+  import: true,
   folders: false,
   merge: false,
   loop: false,
@@ -144,7 +144,7 @@ export function paywallSubtitle(reason: UpgradeReason): string {
     case 'customEffects':
       return 'Custom effects are included with Plus and Pro.';
     case 'import':
-      return 'Importing audio is included with Plus and Pro.';
+      return 'Importing audio and projects is included on every plan.';
     case 'export':
       return 'M4A export is included with Plus. WAV and .vcr need Pro.';
     case 'exportFormat':
