@@ -1,5 +1,5 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
@@ -7,6 +7,7 @@ import {
   clampEqBandFrequency,
   clampEqQ,
   syncDelayTimeMs,
+  type DelaySync,
   type EqBandFrequencies,
   type EqBandGains,
   type EqBandQFactors,
@@ -18,6 +19,7 @@ import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
 import { EditorSlider } from './primitives/EditorSlider';
 import { EqCurveChart, type EqBandChange } from './primitives/EqCurveChart';
+import { PresetPills } from './primitives/PresetPills';
 
 export type EffectCustomKind = 'reverb' | 'delay' | 'eq';
 
@@ -35,6 +37,15 @@ const TITLES: Record<EffectCustomKind, string> = {
   eq: 'EQ',
 };
 
+const DELAY_SYNC_OPTIONS: { id: DelaySync; label: string }[] = [
+  { id: 'off', label: 'Off' },
+  { id: '1/8', label: '1/8' },
+  { id: '3/16', label: '3/16' },
+  { id: '1/4', label: '1/4' },
+  { id: '1/2', label: '1/2' },
+  { id: '1/1', label: '1/1' },
+];
+
 const useGlass = isGlassEffectAPIAvailable();
 
 export function EffectCustomDialog({ visible, effect, effects, onChange, onClose }: Props) {
@@ -42,11 +53,19 @@ export function EffectCustomDialog({ visible, effect, effects, onChange, onClose
   const colorScheme = useColorScheme();
   const isRegularWidth = useIsRegularWidth();
   const styles = useStyles(colors, colorScheme, isRegularWidth);
+  const [delayAdvancedOpen, setDelayAdvancedOpen] = useState(false);
+
+  useEffect(() => {
+    if (!visible) {
+      setDelayAdvancedOpen(false);
+    }
+  }, [visible]);
 
   const updateBand = (index: number, change: EqBandChange) => {
     const nextBands = [...effects.eq.bands] as EqBandGains;
     const nextFrequencies = [...effects.eq.frequencies] as EqBandFrequencies;
     const nextQFactors = [...effects.eq.qFactors] as EqBandQFactors;
+    const nextTypes = [...effects.eq.types] as LayerEffects['eq']['types'];
     if (change.gain != null) {
       nextBands[index] = change.gain;
     }
@@ -60,11 +79,15 @@ export function EffectCustomDialog({ visible, effect, effects, onChange, onClose
     if (change.q != null) {
       nextQFactors[index] = clampEqQ(change.q);
     }
+    if (change.type != null) {
+      nextTypes[index] = change.type;
+    }
     onChange({
       eq: {
         bands: nextBands,
         frequencies: nextFrequencies,
         qFactors: nextQFactors,
+        types: nextTypes,
       },
     });
   };
@@ -152,6 +175,35 @@ export function EffectCustomDialog({ visible, effect, effects, onChange, onClose
             </View>
             <Text style={styles.sliderValue}>{Math.round(effects.delay.feedback)}%</Text>
           </View>
+          {delayAdvancedOpen ? (
+            <View style={styles.advancedBlock}>
+              <Text style={styles.advancedSectionLabel}>Sync</Text>
+              <PresetPills
+                align="center"
+                compact
+                options={DELAY_SYNC_OPTIONS}
+                selectedId={effects.delay.sync}
+                onSelect={(sync) => {
+                  if (sync === 'off') {
+                    onChange({ delay: { sync: 'off' } });
+                    return;
+                  }
+                  onChange({
+                    delay: { sync, timeMs: syncDelayTimeMs(sync) },
+                  });
+                }}
+              />
+            </View>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: delayAdvancedOpen }}
+            onPress={() => setDelayAdvancedOpen((open) => !open)}
+            style={styles.advancedButton}>
+            <Text style={styles.advancedButtonLabel}>
+              {delayAdvancedOpen ? 'Hide' : 'Advanced'}
+            </Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -163,6 +215,7 @@ export function EffectCustomDialog({ visible, effect, effects, onChange, onClose
             frequencies={effects.eq.frequencies}
             large={isRegularWidth}
             qFactors={effects.eq.qFactors}
+            types={effects.eq.types}
             onChange={updateBand}
           />
         </View>
@@ -287,6 +340,25 @@ function useStyles(
           color: colors.secondaryText,
           textAlign: 'right',
           fontVariant: ['tabular-nums'],
+        },
+        advancedBlock: {
+          gap: large ? 10 : 8,
+          paddingTop: large ? 4 : 2,
+        },
+        advancedSectionLabel: {
+          fontSize: large ? 15 : 13,
+          color: colors.secondaryText,
+          textAlign: 'center',
+        },
+        advancedButton: {
+          alignSelf: 'center',
+          paddingVertical: large ? 6 : 4,
+          paddingHorizontal: large ? 12 : 8,
+        },
+        advancedButtonLabel: {
+          fontSize: large ? 15 : 13,
+          fontWeight: '500',
+          color: colors.accent,
         },
       }),
     [cardSurface, colorScheme, colors, large]

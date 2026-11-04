@@ -84,12 +84,36 @@ export type LayerDelayEffects = {
 export type EqBandGains = [number, number, number, number, number];
 export type EqBandFrequencies = [number, number, number, number, number];
 export type EqBandQFactors = [number, number, number, number, number];
+export type EqFilterType =
+  | 'peaking'
+  | 'lowshelf'
+  | 'highshelf'
+  | 'lowpass'
+  | 'highpass'
+  | 'notch';
+export type EqBandTypes = [
+  EqFilterType,
+  EqFilterType,
+  EqFilterType,
+  EqFilterType,
+  EqFilterType,
+];
+
+export const EQ_FILTER_TYPES: EqFilterType[] = [
+  'peaking',
+  'lowshelf',
+  'highshelf',
+  'lowpass',
+  'highpass',
+  'notch',
+];
 
 export type LayerEqEffects = {
   preset: EqPreset;
   bands: EqBandGains;
   frequencies: EqBandFrequencies;
   qFactors: EqBandQFactors;
+  types: EqBandTypes;
 };
 
 export type LayerEffects = {
@@ -152,8 +176,32 @@ export function defaultEqQFactors(): EqBandQFactors {
   ];
 }
 
+export function defaultEqTypes(): EqBandTypes {
+  return ['peaking', 'peaking', 'peaking', 'peaking', 'peaking'];
+}
+
+export function isEqFilterType(value: unknown): value is EqFilterType {
+  return typeof value === 'string' && EQ_FILTER_TYPES.includes(value as EqFilterType);
+}
+
+/** Gain is unused for these Web Audio biquad types. */
+export function eqFilterTypeUsesGain(type: EqFilterType): boolean {
+  return type === 'peaking' || type === 'lowshelf' || type === 'highshelf';
+}
+
 export function clampEqQ(q: number): number {
   return Math.max(EQ_MIN_Q, Math.min(EQ_MAX_Q, q));
+}
+
+function normalizeEqTypes(stored: Partial<EqBandTypes> | undefined): EqBandTypes {
+  const defaults = defaultEqTypes();
+  return [
+    isEqFilterType(stored?.[0]) ? stored[0] : defaults[0],
+    isEqFilterType(stored?.[1]) ? stored[1] : defaults[1],
+    isEqFilterType(stored?.[2]) ? stored[2] : defaults[2],
+    isEqFilterType(stored?.[3]) ? stored[3] : defaults[3],
+    isEqFilterType(stored?.[4]) ? stored[4] : defaults[4],
+  ];
 }
 
 function normalizeEqQFactors(
@@ -336,6 +384,7 @@ export function createDefaultLayerEffects(duration: number): LayerEffects {
       bands: [0, 0, 0, 0, 0],
       frequencies: defaultEqFrequencies(),
       qFactors: defaultEqQFactors(),
+      types: defaultEqTypes(),
     },
   };
 }
@@ -364,6 +413,9 @@ export function hasActiveDelay(effects: LayerEffects): boolean {
 
 export function hasActiveEq(effects: LayerEffects): boolean {
   if (effects.eq.preset !== 'off') {
+    return true;
+  }
+  if (effects.eq.types.some((type) => type !== 'peaking')) {
     return true;
   }
   return effects.eq.bands.some((bandDb) => bandDb !== 0);
@@ -458,6 +510,7 @@ export function normalizeLayerEffects(
   ];
   const eqFrequencies = normalizeEqFrequencies(layer.effects.eq?.frequencies);
   const eqQFactors = normalizeEqQFactors(layer.effects.eq?.qFactors);
+  const eqTypes = normalizeEqTypes(layer.effects.eq?.types);
 
   const eqPreset = (() => {
     const storedPreset = layer.effects.eq?.preset;
@@ -522,6 +575,7 @@ export function normalizeLayerEffects(
       bands: eqBands,
       frequencies: eqFrequencies,
       qFactors: eqQFactors,
+      types: eqTypes,
     },
   };
 }
@@ -576,6 +630,15 @@ export function mergeLayerEffects(
             partial.eq.qFactors[4] ?? current.eq.qFactors[4],
           ])
         : current.eq.qFactors,
+      types: partial.eq?.types
+        ? normalizeEqTypes([
+            partial.eq.types[0] ?? current.eq.types[0],
+            partial.eq.types[1] ?? current.eq.types[1],
+            partial.eq.types[2] ?? current.eq.types[2],
+            partial.eq.types[3] ?? current.eq.types[3],
+            partial.eq.types[4] ?? current.eq.types[4],
+          ])
+        : current.eq.types,
     },
   };
 

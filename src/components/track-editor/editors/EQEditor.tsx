@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import {
   defaultEqFrequencies,
   defaultEqQFactors,
+  defaultEqTypes,
   EQ_PRESETS,
   type EqPreset,
   type LayerEffects,
@@ -35,7 +36,7 @@ const FLAT_BANDS: LayerEffects['eq']['bands'] = [0, 0, 0, 0, 0];
 
 export function EQEditor({ effects, onChange, onRequestCustomEdit }: Props) {
   const { eq } = effects;
-  const { bands, frequencies, qFactors, preset } = eq;
+  const { bands, frequencies, qFactors, types, preset } = eq;
 
   const handlePreset = (nextPreset: EqPreset) => {
     if (nextPreset === 'off') {
@@ -44,6 +45,7 @@ export function EQEditor({ effects, onChange, onRequestCustomEdit }: Props) {
         bands: FLAT_BANDS,
         frequencies: defaultEqFrequencies(),
         qFactors: defaultEqQFactors(),
+        types: defaultEqTypes(),
       });
       return;
     }
@@ -58,6 +60,7 @@ export function EQEditor({ effects, onChange, onRequestCustomEdit }: Props) {
           bands: FLAT_BANDS,
           frequencies: defaultEqFrequencies(),
           qFactors: defaultEqQFactors(),
+          types: defaultEqTypes(),
         });
       } else {
         onChange({
@@ -65,6 +68,7 @@ export function EQEditor({ effects, onChange, onRequestCustomEdit }: Props) {
           bands,
           frequencies,
           qFactors,
+          types,
         });
       }
       onRequestCustomEdit?.();
@@ -75,6 +79,7 @@ export function EQEditor({ effects, onChange, onRequestCustomEdit }: Props) {
       bands: [...EQ_PRESETS[nextPreset]] as LayerEffects['eq']['bands'],
       frequencies: defaultEqFrequencies(),
       qFactors: defaultEqQFactors(),
+      types: defaultEqTypes(),
     });
   };
 

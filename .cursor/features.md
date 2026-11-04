@@ -6,6 +6,20 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Custom EQ band types
+- Status: evolving
+- What: Custom EQ lets each selected band choose Peak / Low shelf / High shelf / Low pass / High pass / Notch via curve-shape icons.
+- Paths: `src/audio/layerEffects.ts`, `src/audio/layerEffectChain.ts`, `src/components/track-editor/primitives/EqCurveChart.tsx`, `src/components/track-editor/primitives/EqFilterTypeIcon.tsx`
+- Invariants: Missing types normalize to peaking; LP/HP/notch lock gain at 0 dB; curve and DSP use the selected biquad type; type control uses shape icons with text accessibility labels.
+- Updated: 2026-11-04
+
+### Custom delay Advanced
+- Status: evolving
+- What: Custom Delay sheet keeps Time/Mix/Feedback; Advanced expands tempo Sync pills.
+- Paths: `src/components/track-editor/EffectCustomDialog.tsx`
+- Invariants: Advanced resets closed when the dialog closes; picking a division sets sync + timeMs; dragging Time sets sync off.
+- Updated: 2026-11-04
+
 ### Editor slider subtitle
 - Status: evolving
 - What: Volume, pan, and pitch live values show in the memo header caption while that tool is open (same slot as zoom).

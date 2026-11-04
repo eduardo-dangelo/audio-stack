@@ -275,6 +275,10 @@ export function applyPathInputEffects(
   setAudioParamValue(path.panner.pan, clampPan(effects.pan), now);
   effects.eq.bands.forEach((bandDb, index) => {
     const filter = path.eqFilters[index];
+    const type = effects.eq.types[index] ?? 'peaking';
+    if (filter.type !== type) {
+      filter.type = type;
+    }
     setAudioParamValue(filter.gain, bandDb, now);
     setAudioParamValue(filter.frequency, effects.eq.frequencies[index], now);
     setAudioParamValue(filter.Q, effects.eq.qFactors[index], now);

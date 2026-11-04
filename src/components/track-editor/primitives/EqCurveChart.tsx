@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutChangeEvent,
   PanResponder,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -22,14 +23,18 @@ import {
   EQ_MAX_Q,
   EQ_MIN_FREQ,
   EQ_MIN_Q,
+  eqFilterTypeUsesGain,
   formatEqBand,
   formatFrequency,
   type EqBandFrequencies,
   type EqBandGains,
   type EqBandQFactors,
+  type EqBandTypes,
+  type EqFilterType,
 } from '@/src/audio/layerEffects';
 
 import { EditorSlider } from './EditorSlider';
+import { EqFilterTypeIcon } from './EqFilterTypeIcon';
 
 const MIN_DB = -12;
 const MAX_DB = 12;
@@ -61,16 +66,27 @@ export type EqBandChange = {
   gain?: number;
   frequency?: number;
   q?: number;
+  type?: EqFilterType;
 };
 
 type Props = {
   bands: EqBandGains;
   frequencies: EqBandFrequencies;
   qFactors: EqBandQFactors;
+  types: EqBandTypes;
   onChange: (index: number, change: EqBandChange) => void;
   /** Taller chart and larger knobs for regular-width (iPad) layouts. */
   large?: boolean;
 };
+
+const EQ_TYPE_OPTIONS: { id: EqFilterType; label: string }[] = [
+  { id: 'peaking', label: 'Peak' },
+  { id: 'lowshelf', label: 'Low shelf' },
+  { id: 'highshelf', label: 'High shelf' },
+  { id: 'lowpass', label: 'Low pass' },
+  { id: 'highpass', label: 'High pass' },
+  { id: 'notch', label: 'Notch' },
+];
 
 type ChartSize = {
   width: number;
@@ -130,41 +146,37 @@ function dbToY(db: number, size: ChartSize): number {
   return CHART_PADDING_Y + dbToNormalized(db) * innerHeight;
 }
 
+function bandHandleDb(type: EqFilterType, gainDb: number): number {
+  return eqFilterTypeUsesGain(type) ? gainDb : 0;
+}
+
 function getBandPoints(
   bands: EqBandGains,
   frequencies: EqBandFrequencies,
+  types: EqBandTypes,
   size: ChartSize
 ): Point[] {
   return bands.map((db, index) => ({
     x: freqToX(frequencies[index], size),
-    y: dbToY(db, size),
+    y: dbToY(bandHandleDb(types[index], db), size),
   }));
 }
 
-/** Peaking biquad magnitude (dB) at frequency f — Audio EQ Cookbook. */
-function peakingMagDb(
+type BiquadCoeffs = {
+  b0: number;
+  b1: number;
+  b2: number;
+  a0: number;
+  a1: number;
+  a2: number;
+};
+
+function biquadMagDb(
   f: number,
-  f0: number,
-  gainDb: number,
-  Q: number,
-  sampleRate = RESPONSE_SAMPLE_RATE
+  coeffs: BiquadCoeffs,
+  sampleRate: number
 ): number {
-  if (f <= 0 || f0 <= 0 || Q <= 0 || Math.abs(gainDb) < 1e-4) {
-    return 0;
-  }
-  const A = Math.pow(10, gainDb / 40);
-  const w0 = (2 * Math.PI * f0) / sampleRate;
-  const cosw0 = Math.cos(w0);
-  const sinw0 = Math.sin(w0);
-  const alpha = sinw0 / (2 * Q);
-
-  const b0 = 1 + alpha * A;
-  const b1 = -2 * cosw0;
-  const b2 = 1 - alpha * A;
-  const a0 = 1 + alpha / A;
-  const a1 = -2 * cosw0;
-  const a2 = 1 - alpha / A;
-
+  const { b0, b1, b2, a0, a1, a2 } = coeffs;
   const nb0 = b0 / a0;
   const nb1 = b1 / a0;
   const nb2 = b2 / a0;
@@ -187,10 +199,102 @@ function peakingMagDb(
   return 10 * Math.log10(mag2);
 }
 
+/** Biquad magnitude (dB) — Audio EQ Cookbook. */
+function filterMagDb(
+  f: number,
+  f0: number,
+  gainDb: number,
+  Q: number,
+  type: EqFilterType,
+  sampleRate = RESPONSE_SAMPLE_RATE
+): number {
+  if (f <= 0 || f0 <= 0 || Q <= 0) {
+    return 0;
+  }
+  if (eqFilterTypeUsesGain(type) && Math.abs(gainDb) < 1e-4) {
+    return 0;
+  }
+
+  const A = Math.pow(10, gainDb / 40);
+  const w0 = (2 * Math.PI * f0) / sampleRate;
+  const cosw0 = Math.cos(w0);
+  const sinw0 = Math.sin(w0);
+  const alpha = sinw0 / (2 * Q);
+  const twoSqrtAAlpha = 2 * Math.sqrt(A) * alpha;
+
+  let coeffs: BiquadCoeffs;
+  switch (type) {
+    case 'lowshelf':
+      coeffs = {
+        b0: A * (A + 1 - (A - 1) * cosw0 + twoSqrtAAlpha),
+        b1: 2 * A * (A - 1 - (A + 1) * cosw0),
+        b2: A * (A + 1 - (A - 1) * cosw0 - twoSqrtAAlpha),
+        a0: A + 1 + (A - 1) * cosw0 + twoSqrtAAlpha,
+        a1: -2 * (A - 1 + (A + 1) * cosw0),
+        a2: A + 1 + (A - 1) * cosw0 - twoSqrtAAlpha,
+      };
+      break;
+    case 'highshelf':
+      coeffs = {
+        b0: A * (A + 1 + (A - 1) * cosw0 + twoSqrtAAlpha),
+        b1: -2 * A * (A - 1 + (A + 1) * cosw0),
+        b2: A * (A + 1 + (A - 1) * cosw0 - twoSqrtAAlpha),
+        a0: A + 1 - (A - 1) * cosw0 + twoSqrtAAlpha,
+        a1: 2 * (A - 1 - (A + 1) * cosw0),
+        a2: A + 1 - (A - 1) * cosw0 - twoSqrtAAlpha,
+      };
+      break;
+    case 'lowpass':
+      coeffs = {
+        b0: (1 - cosw0) / 2,
+        b1: 1 - cosw0,
+        b2: (1 - cosw0) / 2,
+        a0: 1 + alpha,
+        a1: -2 * cosw0,
+        a2: 1 - alpha,
+      };
+      break;
+    case 'highpass':
+      coeffs = {
+        b0: (1 + cosw0) / 2,
+        b1: -(1 + cosw0),
+        b2: (1 + cosw0) / 2,
+        a0: 1 + alpha,
+        a1: -2 * cosw0,
+        a2: 1 - alpha,
+      };
+      break;
+    case 'notch':
+      coeffs = {
+        b0: 1,
+        b1: -2 * cosw0,
+        b2: 1,
+        a0: 1 + alpha,
+        a1: -2 * cosw0,
+        a2: 1 - alpha,
+      };
+      break;
+    case 'peaking':
+    default:
+      coeffs = {
+        b0: 1 + alpha * A,
+        b1: -2 * cosw0,
+        b2: 1 - alpha * A,
+        a0: 1 + alpha / A,
+        a1: -2 * cosw0,
+        a2: 1 - alpha / A,
+      };
+      break;
+  }
+
+  return biquadMagDb(f, coeffs, sampleRate);
+}
+
 function sampleResponsePoints(
   bands: EqBandGains,
   frequencies: EqBandFrequencies,
   qFactors: EqBandQFactors,
+  types: EqBandTypes,
   size: ChartSize
 ): Point[] {
   const points: Point[] = [];
@@ -201,7 +305,13 @@ function sampleResponsePoints(
     const freq = Math.pow(10, minLog + t * (maxLog - minLog));
     let db = 0;
     for (let band = 0; band < bands.length; band += 1) {
-      db += peakingMagDb(freq, frequencies[band], bands[band], qFactors[band]);
+      db += filterMagDb(
+        freq,
+        frequencies[band],
+        bands[band],
+        qFactors[band],
+        types[band]
+      );
     }
     db = clamp(db, MIN_DB, MAX_DB);
     points.push({ x: freqToX(freq, size), y: dbToY(db, size) });
@@ -234,10 +344,11 @@ function findNearestBandIndex(
   locationY: number,
   bands: EqBandGains,
   frequencies: EqBandFrequencies,
+  types: EqBandTypes,
   size: ChartSize,
   hitRadius: number
 ): number {
-  const points = getBandPoints(bands, frequencies, size);
+  const points = getBandPoints(bands, frequencies, types, size);
   let nearestIndex = 0;
   let nearestDistance = Infinity;
 
@@ -315,7 +426,14 @@ function sliderPosToQ(pos: number): number {
   return clampEqQ(EQ_MIN_Q * Math.pow(EQ_MAX_Q / EQ_MIN_Q, t));
 }
 
-export function EqCurveChart({ bands, frequencies, qFactors, onChange, large = false }: Props) {
+export function EqCurveChart({
+  bands,
+  frequencies,
+  qFactors,
+  types,
+  onChange,
+  large = false,
+}: Props) {
   const colors = useVoiceMemosColors();
   const styles = useStyles(colors, large);
   const chartHeight = large ? CHART_HEIGHT_LARGE : CHART_HEIGHT;
@@ -329,6 +447,7 @@ export function EqCurveChart({ bands, frequencies, qFactors, onChange, large = f
   const bandsRef = useRef(bands);
   const frequenciesRef = useRef(frequencies);
   const qFactorsRef = useRef(qFactors);
+  const typesRef = useRef(types);
   const onChangeRef = useRef(onChange);
   const chartSizeRef = useRef(chartSize);
   const hitRadiusRef = useRef(hitRadius);
@@ -344,6 +463,7 @@ export function EqCurveChart({ bands, frequencies, qFactors, onChange, large = f
   bandsRef.current = bands;
   frequenciesRef.current = frequencies;
   qFactorsRef.current = qFactors;
+  typesRef.current = types;
   onChangeRef.current = onChange;
   chartSizeRef.current = chartSize;
   hitRadiusRef.current = hitRadius;
@@ -359,12 +479,12 @@ export function EqCurveChart({ bands, frequencies, qFactors, onChange, large = f
   }, []);
 
   const handlePoints = useMemo(
-    () => getBandPoints(bands, frequencies, chartSize),
-    [bands, frequencies, chartSize]
+    () => getBandPoints(bands, frequencies, types, chartSize),
+    [bands, frequencies, types, chartSize]
   );
   const responsePoints = useMemo(
-    () => sampleResponsePoints(bands, frequencies, qFactors, chartSize),
-    [bands, frequencies, qFactors, chartSize]
+    () => sampleResponsePoints(bands, frequencies, qFactors, types, chartSize),
+    [bands, frequencies, qFactors, types, chartSize]
   );
   const { innerHeight } = getChartInner(chartSize);
   const fillBaselineY = CHART_PADDING_Y + innerHeight;
@@ -392,15 +512,20 @@ export function EqCurveChart({ bands, frequencies, qFactors, onChange, large = f
       return;
     }
     const size = chartSizeRef.current;
-    const { innerHeight: height } = getChartInner(size);
-    const deltaDb = (-gesture.dy / height) * (MAX_DB - MIN_DB);
-    const nextGain = quantizeDb(startDbRef.current + deltaDb);
     const startX = freqToX(startFreqRef.current, size);
     const nextFrequency = clampEqBandFrequency(
       index,
       xToFreq(startX + gesture.dx, size),
       frequenciesRef.current
     );
+    const usesGain = eqFilterTypeUsesGain(typesRef.current[index]);
+    if (!usesGain) {
+      onChangeRef.current(index, { frequency: nextFrequency });
+      return;
+    }
+    const { innerHeight: height } = getChartInner(size);
+    const deltaDb = (-gesture.dy / height) * (MAX_DB - MIN_DB);
+    const nextGain = quantizeDb(startDbRef.current + deltaDb);
     onChangeRef.current(index, { gain: nextGain, frequency: nextFrequency });
   };
 
@@ -415,6 +540,7 @@ export function EqCurveChart({ bands, frequencies, qFactors, onChange, large = f
           locationY,
           bandsRef.current,
           frequenciesRef.current,
+          typesRef.current,
           chartSizeRef.current,
           hitRadiusRef.current
         );
@@ -423,7 +549,10 @@ export function EqCurveChart({ bands, frequencies, qFactors, onChange, large = f
         // Selecting / moving a knob reveals the Wide–Narrow Q slider for that band.
         setQEditIndex(index);
         qEditIndexRef.current = index;
-        startDbRef.current = bandsRef.current[index];
+        startDbRef.current = bandHandleDb(
+          typesRef.current[index],
+          bandsRef.current[index]
+        );
         startFreqRef.current = frequenciesRef.current[index];
         grantTimeRef.current = Date.now();
         longPressFiredRef.current = false;
@@ -611,6 +740,37 @@ export function EqCurveChart({ bands, frequencies, qFactors, onChange, large = f
             {qSliderEnabled ? formatQ(qValue) : '—'}
           </Text>
         </View>
+        <View style={[styles.typeRow, !qSliderEnabled && styles.typeRowDisabled]}>
+          {EQ_TYPE_OPTIONS.map((option) => {
+            const selected =
+              qEditIndex != null && types[qEditIndex] === option.id;
+            return (
+              <Pressable
+                key={option.id}
+                accessibilityLabel={option.label}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !qSliderEnabled, selected }}
+                disabled={!qSliderEnabled}
+                onPress={() => {
+                  if (qEditIndex == null) {
+                    return;
+                  }
+                  if (eqFilterTypeUsesGain(option.id)) {
+                    onChange(qEditIndex, { type: option.id });
+                    return;
+                  }
+                  onChange(qEditIndex, { type: option.id, gain: 0 });
+                }}
+                style={[styles.typePill, selected && styles.typePillSelected]}>
+                <EqFilterTypeIcon
+                  color={selected ? colors.pillTextSelected : colors.text}
+                  size={large ? 24 : 20}
+                  type={option.id}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
@@ -633,6 +793,28 @@ function useStyles(colors: ReturnType<typeof useVoiceMemosColors>, large: boolea
         },
         qPanel: {
           paddingTop: large ? 8 : 4,
+          gap: large ? 10 : 8,
+        },
+        typeRow: {
+          width: '100%',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: large ? 8 : 6,
+        },
+        typeRowDisabled: {
+          opacity: 0.4,
+        },
+        typePill: {
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: large ? 40 : 34,
+          height: large ? 36 : 30,
+          borderRadius: large ? 10 : 8,
+          backgroundColor: colors.waveformBandBackground,
+        },
+        typePillSelected: {
+          backgroundColor: colors.accent,
         },
         qSliderRow: {
           flexDirection: 'row',
