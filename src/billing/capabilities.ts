@@ -128,7 +128,11 @@ export function resolveEffectiveTier(options: {
   hasPlus: boolean;
   hasPro: boolean;
   devTierOverride: TierId | null;
+  transientPro?: boolean;
 }): TierId {
+  if (options.transientPro) {
+    return 'pro';
+  }
   if (__DEV__ && options.devTierOverride) {
     return options.devTierOverride;
   }

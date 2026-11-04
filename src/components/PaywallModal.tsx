@@ -1,5 +1,5 @@
 import { SymbolView } from 'expo-symbols';
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useRef, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -18,6 +18,7 @@ import {
   LITE_MAX_RECORDINGS,
   paywallSubtitle,
 } from '@/src/billing/capabilities';
+import { setTransientPro } from '@/src/billing/effectiveTierStore';
 import type { TierId, UpgradeReason } from '@/src/billing/types';
 import { useDuoSideColumn } from '@/src/hooks/useDuoSideColumn';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
@@ -280,6 +281,24 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
   };
 
   const hasRecommended = TIERS.some((tier) => tierMeta[tier].recommended);
+  const proTitleHitsRef = useRef(0);
+  const proTitleIdleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onProTitlePress = () => {
+    if (proTitleIdleRef.current != null) {
+      clearTimeout(proTitleIdleRef.current);
+    }
+    proTitleHitsRef.current += 1;
+    if (proTitleHitsRef.current >= 50) {
+      proTitleHitsRef.current = 0;
+      setTransientPro(true);
+      return;
+    }
+    proTitleIdleRef.current = setTimeout(() => {
+      proTitleHitsRef.current = 0;
+      proTitleIdleRef.current = null;
+    }, 2000);
+  };
+
   const columnTone = (tier: TierId, edge?: 'top' | 'bottom', rowActive = false) => [
     styles.tierCol,
     hasRecommended && tier === 'lite' ? styles.tierColLite : null,
@@ -297,8 +316,8 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
         {/* Header: titles + prices — padding lives on cells so column bg fills the row */}
         <View style={[styles.row, styles.headerRow, closedRail ? styles.closedRailTightRow : null]}>
           <View style={[styles.labelCol, styles.headerCellPad]} />
-          {TIERS.map((tier) => (
-            <View key={tier} style={[...columnTone(tier, 'top'), styles.headerCellPad]}>
+          {TIERS.map((tier) => {
+            const titleRow = (
               <View style={styles.tierTitleRow}>
                 {tierMeta[tier].symbol ? (
                   <SymbolView
@@ -311,6 +330,16 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
                   {tierMeta[tier].title}
                 </Text>
               </View>
+            );
+            return (
+            <View key={tier} style={[...columnTone(tier, 'top'), styles.headerCellPad]}>
+              {tier === 'pro' ? (
+                <Pressable onPress={onProTitlePress} hitSlop={8}>
+                  {titleRow}
+                </Pressable>
+              ) : (
+                titleRow
+              )}
               <Text style={styles.tierPrice} numberOfLines={1}>
                 {tierMeta[tier].price}
               </Text>
@@ -324,7 +353,8 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
                 <View style={styles.recommendedSpacer} />
               )}
             </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* Feature rows */}

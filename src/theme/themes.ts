@@ -355,7 +355,9 @@ const cyberpunk = paint(VoiceMemosColorsDark, '#00e5ff', {
   recordRed: '#ff2a6d',
 });
 
-const PALETTES: Record<Exclude<ThemePreference, 'system'>, VoiceMemosColorScheme> = {
+type StaticThemeId = Exclude<ThemePreference, 'system'>;
+
+const PALETTES: Record<StaticThemeId, VoiceMemosColorScheme> = {
   light: VoiceMemosColorsLight,
   dark: VoiceMemosColorsDark,
   solarizedLight,
@@ -371,8 +373,6 @@ const PALETTES: Record<Exclude<ThemePreference, 'system'>, VoiceMemosColorScheme
   cyberpunk,
 };
 
-export function paletteForTheme(
-  pref: Exclude<ThemePreference, 'system'>
-): VoiceMemosColorScheme {
+export function paletteForTheme(pref: StaticThemeId): VoiceMemosColorScheme {
   return PALETTES[pref];
 }

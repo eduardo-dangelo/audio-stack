@@ -8,6 +8,7 @@ import type { StoreEntitlements, TierId } from './types';
 
 let storeEntitlements: StoreEntitlements = { hasPlus: false, hasPro: false };
 let devTierOverride: DevTierOverride = __DEV__ ? getDevTierOverrideSync() : null;
+let transientPro = false;
 let listeners = new Set<() => void>();
 
 export function setCachedDevTierOverride(next: DevTierOverride): void {
@@ -16,6 +17,18 @@ export function setCachedDevTierOverride(next: DevTierOverride): void {
 
 export function getCachedDevTierOverride(): DevTierOverride {
   return devTierOverride;
+}
+
+export function isTransientPro(): boolean {
+  return transientPro;
+}
+
+export function setTransientPro(active: boolean): void {
+  if (transientPro === active) {
+    return;
+  }
+  transientPro = active;
+  listeners.forEach((listener) => listener());
 }
 
 export function setStoreEntitlements(next: StoreEntitlements): void {
@@ -38,6 +51,7 @@ export function getEffectiveTierSync(): TierId {
     hasPlus: storeEntitlements.hasPlus,
     hasPro: storeEntitlements.hasPro,
     devTierOverride,
+    transientPro,
   });
 }
 
