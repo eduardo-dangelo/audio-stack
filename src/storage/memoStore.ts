@@ -829,6 +829,7 @@ export async function replaceLayerFile(
       trimOut: trimOutWasFull ? layer.duration : previousEffects.trimOut,
       volumeDb: previousEffects.volumeDb,
       pan: previousEffects.pan,
+      pitchSemitones: previousEffects.pitchSemitones,
       muted: previousEffects.muted,
       solo: previousEffects.solo,
       locked: previousEffects.locked,

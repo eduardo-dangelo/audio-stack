@@ -11,7 +11,8 @@ export type UpgradeReason =
   | 'merge'
   | 'loop'
   | 'duplicate'
-  | 'themes';
+  | 'themes'
+  | 'pitch';
 
 export type ExportFormatCapability = 'm4a' | 'wav' | 'aud';
 
@@ -25,6 +26,7 @@ export type TierCapabilities = {
   loop: boolean;
   duplicate: boolean;
   themes: boolean;
+  pitch: boolean;
   exportFormats: readonly ExportFormatCapability[];
 };
 

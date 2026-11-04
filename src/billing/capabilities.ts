@@ -18,6 +18,7 @@ const LITE_CAPABILITIES: TierCapabilities = {
   loop: false,
   duplicate: false,
   themes: false,
+  pitch: false,
   exportFormats: [],
 };
 
@@ -31,6 +32,7 @@ const PLUS_CAPABILITIES: TierCapabilities = {
   loop: false,
   duplicate: false,
   themes: false,
+  pitch: false,
   exportFormats: ['m4a'],
 };
 
@@ -44,6 +46,7 @@ const PRO_CAPABILITIES: TierCapabilities = {
   loop: true,
   duplicate: true,
   themes: true,
+  pitch: true,
   exportFormats: ['m4a', 'wav', 'aud'],
 };
 
@@ -113,6 +116,10 @@ export function canUseThemes(tier: TierId): boolean {
   return getCapabilities(tier).themes;
 }
 
+export function canUsePitch(tier: TierId): boolean {
+  return getCapabilities(tier).pitch;
+}
+
 export function canExportAnything(tier: TierId): boolean {
   return getCapabilities(tier).exportFormats.length > 0;
 }
@@ -159,6 +166,8 @@ export function paywallSubtitle(reason: UpgradeReason): string {
       return 'Duplicating is included with Pro.';
     case 'themes':
       return 'Editor themes are included with Pro.';
+    case 'pitch':
+      return 'Pitch shift is included with Pro.';
   }
 }
 

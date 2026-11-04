@@ -130,6 +130,14 @@ const FEATURES: FeatureRow[] = [
     pro: true,
     highlightReasons: ['themes'],
   },
+  {
+    label: 'Pitch',
+    symbol: 'tuningfork',
+    lite: false,
+    plus: false,
+    pro: true,
+    highlightReasons: ['pitch'],
+  },
 ];
 
 const TIERS: TierId[] = ['lite', 'plus', 'pro'];
@@ -222,6 +230,7 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
         reason != null &&
         reason !== 'exportFormat' &&
         reason !== 'themes' &&
+        reason !== 'pitch' &&
         reason !== 'duplicate' &&
         reason !== 'merge' &&
         reason !== 'loop',
@@ -233,6 +242,7 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
       recommended:
         reason === 'exportFormat' ||
         reason === 'themes' ||
+        reason === 'pitch' ||
         reason === 'duplicate' ||
         reason === 'merge' ||
         reason === 'loop',

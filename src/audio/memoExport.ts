@@ -14,6 +14,7 @@ import {
   type LayerEffectPathNodes,
 } from '@/src/audio/layerEffectChain';
 import type { LayerEffects } from '@/src/audio/layerEffects';
+import { createLayerBufferSource } from '@/src/audio/layerPitch';
 import type { LoadedLayer } from '@/src/audio/MemoAudioEngine';
 import { MemoMixGraph } from '@/src/audio/memoMixGraph';
 import { prepareLayersForMix } from '@/src/audio/mergeLayersLogic';
@@ -71,7 +72,10 @@ function schedulePathSource(
   bufferOffset: number,
   fadeSchedule?: { effects: LayerEffects; playLength: number } | null
 ): AudioBufferSourceNode {
-  const source = context.createBufferSource();
+  const source = createLayerBufferSource(
+    context,
+    fadeSchedule?.effects ?? { pitchSemitones: 0 }
+  );
   source.buffer = buffer;
   mixGraph.connectSourceToPath(source, path);
   source.start(startWhen, bufferOffset);

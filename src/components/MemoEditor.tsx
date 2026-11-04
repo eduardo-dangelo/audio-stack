@@ -454,6 +454,8 @@ function layerEffectsPersistPayload(effects: LayerEffects): LayerEffectsChange {
     trimIn: effects.trimIn,
     trimOut: effects.trimOut,
     volumeDb: effects.volumeDb,
+    pan: effects.pan,
+    pitchSemitones: effects.pitchSemitones,
     muted: effects.muted,
     solo: effects.solo,
     locked: effects.locked,
@@ -5343,7 +5345,7 @@ function MemoEditorInner({
     if (activeLayerEffects && isLayerLocked(activeLayerEffects)) {
       return [];
     }
-    return ['trim', 'move', 'volume', 'pan', 'reverb', 'delay', 'eq'];
+    return ['trim', 'move', 'volume', 'pan', 'pitch', 'reverb', 'delay', 'eq'];
   }, [activeLayerEffects]);
 
   useEffect(() => {
@@ -5375,6 +5377,7 @@ function MemoEditorInner({
     activeEditor === 'move' ||
     activeEditor === 'volume' ||
     activeEditor === 'pan' ||
+    activeEditor === 'pitch' ||
     editGestureActive;
 
   useLayoutEffect(() => {

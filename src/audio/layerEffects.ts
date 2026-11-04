@@ -98,6 +98,8 @@ export type LayerEffects = {
   volumeDb: number;
   /** Stereo balance −1…1 (0 = center). */
   pan: number;
+  /** Duration-preserving pitch shift in integer semitones (−12…+12). */
+  pitchSemitones: number;
   muted?: boolean;
   solo?: boolean;
   /** When true, track edits are blocked except mute/solo and unlock. */
@@ -131,6 +133,10 @@ export const EQ_BAND_MIN_RATIO = Math.pow(2, 1 / 6);
 export const DEFAULT_BPM = 100;
 export const MIN_TRIM_SELECTION = 0.5;
 export const TRIM_SNAP_SECONDS = 0.1;
+/** Library stretch clamp is ±1 octave. */
+export const MIN_PITCH_SEMITONES = -12;
+export const MAX_PITCH_SEMITONES = 12;
+const PITCH_ACTIVE_EPSILON = 0.5;
 
 export function defaultEqFrequencies(): EqBandFrequencies {
   return [...EQ_FREQUENCIES] as EqBandFrequencies;
@@ -299,12 +305,23 @@ export function clampPan(pan: number): number {
   return Math.max(-1, Math.min(1, pan));
 }
 
+export function clampPitchSemitones(semitones: number): number {
+  if (!Number.isFinite(semitones)) {
+    return 0;
+  }
+  return Math.max(
+    MIN_PITCH_SEMITONES,
+    Math.min(MAX_PITCH_SEMITONES, Math.round(semitones))
+  );
+}
+
 export function createDefaultLayerEffects(duration: number): LayerEffects {
   return {
     trimIn: 0,
     trimOut: duration > 0 ? duration : 0,
     volumeDb: 0,
     pan: 0,
+    pitchSemitones: 0,
     muted: false,
     solo: false,
     locked: false,
@@ -354,6 +371,17 @@ export function hasActiveEq(effects: LayerEffects): boolean {
 
 export function hasActivePan(effects: LayerEffects): boolean {
   return Math.abs(effects.pan) > PAN_ACTIVE_EPSILON;
+}
+
+export function hasActivePitch(
+  effects: Pick<LayerEffects, 'pitchSemitones'>
+): boolean {
+  return Math.abs(effects.pitchSemitones) >= PITCH_ACTIVE_EPSILON;
+}
+
+/** Cents for react-native-audio-api `detune` when pitchCorrection is on. */
+export function pitchSemitonesToDetuneCents(semitones: number): number {
+  return clampPitchSemitones(semitones) * 100;
 }
 
 export function hasAnySoloActive(effectsList: LayerEffects[]): boolean {
@@ -463,6 +491,7 @@ export function normalizeLayerEffects(
     trimOut: layer.duration > 0 ? trimOut : defaults.trimOut,
     volumeDb: layer.effects.volumeDb ?? 0,
     pan: clampPan(layer.effects.pan ?? 0),
+    pitchSemitones: clampPitchSemitones(layer.effects.pitchSemitones ?? 0),
     muted: layer.effects.muted ?? false,
     solo: layer.effects.solo ?? false,
     locked: layer.effects.locked ?? false,
@@ -574,6 +603,7 @@ export function mergeLayerEffects(
   merged.fadeInCurve = clampFadeCurveValue(merged.fadeInCurve ?? 0);
   merged.fadeOutCurve = clampFadeCurveValue(merged.fadeOutCurve ?? 0);
   merged.pan = clampPan(merged.pan ?? 0);
+  merged.pitchSemitones = clampPitchSemitones(merged.pitchSemitones ?? 0);
 
   return merged;
 }

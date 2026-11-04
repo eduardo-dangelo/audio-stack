@@ -11,6 +11,7 @@ import { DelayEditor } from './editors/DelayEditor';
 import { EditSnapEditor } from './editors/EditSnapEditor';
 import { EQEditor } from './editors/EQEditor';
 import { PanEditor } from './editors/PanEditor';
+import { PitchEditor } from './editors/PitchEditor';
 import { ReverbEditor } from './editors/ReverbEditor';
 import { VolumeEditor } from './editors/VolumeEditor';
 import { getEditorCanvasHeight, type EditorTool } from './types';
@@ -50,7 +51,8 @@ export function EditorCanvas({
   const colors = useVoiceMemosColors();
   const styles = useStyles(colors);
   const canvasHeight = getEditorCanvasHeight(activeTool);
-  const volumeCompact = activeTool === 'volume' || activeTool === 'pan';
+  const volumeCompact =
+    activeTool === 'volume' || activeTool === 'pan' || activeTool === 'pitch';
   const chipTools =
     activeTool === 'trim' ||
     activeTool === 'move' ||
@@ -89,6 +91,12 @@ export function EditorCanvas({
             <PanEditor
               effects={effects}
               onChange={(pan) => onEffectsChange({ pan })}
+            />
+          ) : null}
+          {activeTool === 'pitch' ? (
+            <PitchEditor
+              effects={effects}
+              onChange={(pitchSemitones) => onEffectsChange({ pitchSemitones })}
             />
           ) : null}
           {activeTool === 'reverb' ? (

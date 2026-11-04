@@ -8,6 +8,7 @@ export {
   canCreateRecording,
   canDuplicate,
   canUseThemes,
+  canUsePitch,
   canExportAnything,
   canExportFormat,
   canImport,

@@ -39,7 +39,18 @@ import {
   isReverbPathActive,
   type LayerEffectPathNodes,
 } from '@/src/audio/layerEffectChain';
-import { hasAnySoloActive, isLayerAudible, mergeLayerEffects, type LayerEffects, type LayerEffectsChange } from '@/src/audio/layerEffects';
+import {
+  hasActivePitch,
+  hasAnySoloActive,
+  isLayerAudible,
+  mergeLayerEffects,
+  type LayerEffects,
+  type LayerEffectsChange,
+} from '@/src/audio/layerEffects';
+import {
+  applyPitchDetuneToSource,
+  createLayerBufferSource,
+} from '@/src/audio/layerPitch';
 import { loadedLayerTimelineChanged } from '@/src/audio/engineLayerTimeline';
 import { runSerializedEngineLoad } from '@/src/audio/engineMemoLoadQueue';
 import { getMemoPlaybackTimeline } from '@/src/storage/paths';
@@ -1769,7 +1780,10 @@ export class MemoAudioEngine {
         scheduled.buffer,
         chunkStartWhen,
         chunkStartWhen + armedChunk,
-        scheduled.bufferOffset
+        scheduled.bufferOffset,
+        null,
+        null,
+        active.playbackEffects
       );
       if (drySource) {
         active.drySources.push(drySource);
@@ -1781,7 +1795,10 @@ export class MemoAudioEngine {
           scheduled.buffer,
           chunkStartWhen,
           chunkStartWhen + armedChunk,
-          scheduled.bufferOffset
+          scheduled.bufferOffset,
+          null,
+          null,
+          active.playbackEffects
         );
         if (delaySource) {
           active.delaySources.push(delaySource);
@@ -1794,7 +1811,10 @@ export class MemoAudioEngine {
           scheduled.buffer,
           chunkStartWhen,
           chunkStartWhen + armedChunk,
-          scheduled.bufferOffset
+          scheduled.bufferOffset,
+          null,
+          null,
+          active.playbackEffects
         );
         if (reverbSource) {
           active.reverbSources.push(reverbSource);
@@ -2467,10 +2487,14 @@ export class MemoAudioEngine {
       playLength: number;
       envelopeOverPlayLength?: boolean;
     } | null,
-    loopRegion?: { start: number; end: number } | null
+    loopRegion?: { start: number; end: number } | null,
+    pitchEffects?: Pick<LayerEffects, 'pitchSemitones'> | null
   ): AudioBufferSourceNode | null {
     try {
-      const source = context.createBufferSource();
+      const source = createLayerBufferSource(
+        context,
+        pitchEffects ?? fadeSchedule?.effects ?? { pitchSemitones: 0 }
+      );
       source.buffer = buffer;
       // Native BufferSources play 1:1 with the context and ignore buffer.sampleRate
       // for SRC. Compensate when an honest-tagged buffer slips onto a mismatched context.
@@ -3641,6 +3665,10 @@ export class MemoAudioEngine {
     layer.effects = mergeLayerEffects(current, partial, layer.duration);
     const nextEffects = this.getLoadedLayerEffects(layer);
 
+    const pitchChanged = partial.pitchSemitones !== undefined;
+    const needsPitchCreateResync =
+      pitchChanged && hasActivePitch(current) !== hasActivePitch(nextEffects);
+
     const needsWetPathResync =
       this.state.isPlaying &&
       segments.length > 0 &&
@@ -3650,14 +3678,16 @@ export class MemoAudioEngine {
           active.hasReverb !== isReverbPathActive(nextEffects)
       );
 
-    if (needsWetPathResync && this.context) {
+    if ((needsWetPathResync || needsPitchCreateResync) && this.context) {
       this.mixGraph.applyLayerEffects(
         this.context,
         layerId,
         nextEffects,
         this.getAnySoloActive()
       );
-      this.resyncPlaybackAtCurrentTime();
+      if (this.state.isPlaying && segments.length > 0) {
+        this.resyncPlaybackAtCurrentTime();
+      }
       return;
     }
 
@@ -3680,6 +3710,17 @@ export class MemoAudioEngine {
       if (segments.length > 0) {
         for (const active of segments) {
           active.playbackEffects = nextEffects;
+          if (pitchChanged && hasActivePitch(nextEffects)) {
+            for (const source of active.drySources) {
+              applyPitchDetuneToSource(source, nextEffects.pitchSemitones);
+            }
+            for (const source of active.delaySources) {
+              applyPitchDetuneToSource(source, nextEffects.pitchSemitones);
+            }
+            for (const source of active.reverbSources) {
+              applyPitchDetuneToSource(source, nextEffects.pitchSemitones);
+            }
+          }
         }
         const fadesChanged =
           partial.fadeInSec !== undefined ||

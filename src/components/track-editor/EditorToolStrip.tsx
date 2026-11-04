@@ -8,6 +8,7 @@ import {
   hasActiveDelay,
   hasActiveEq,
   hasActivePan,
+  hasActivePitch,
   hasActiveReverb,
 } from '@/src/audio/layerEffects';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
@@ -25,6 +26,8 @@ function isToolApplied(tool: EditorTool, effects: LayerEffects): boolean {
   switch (tool) {
     case 'pan':
       return hasActivePan(effects);
+    case 'pitch':
+      return hasActivePitch(effects);
     case 'reverb':
       return hasActiveReverb(effects);
     case 'delay':
