@@ -6,11 +6,18 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Editor slider subtitle
+- Status: evolving
+- What: Volume, pan, and pitch live values show in the memo header caption while that tool is open (same slot as zoom).
+- Paths: `src/components/track-editor/formatLayerEffectCaption.ts`, `src/components/MemoEditor.tsx`
+- Invariants: Priority is error → save phase → effect caption → zoom; volume is signed dB, pan is C/L/R, pitch is signed st.
+- Updated: 2026-11-04
+
 ### Pitch
 - Status: evolving
 - What: Pro-only per-layer duration-preserving pitch (±12 semitones) via editor strip after Pan.
 - Paths: `src/audio/layerEffects.ts`, `src/audio/layerPitch.ts`, `src/audio/MemoAudioEngine.ts`, `src/components/track-editor/editors/PitchEditor.tsx`, `src/billing/capabilities.ts`
-- Invariants: Stretch (`pitchCorrection`) only when pitch ≠ 0; live detune while pitched, resync only on 0↔nonzero; metronome unpitched; timeline length unchanged; Lite/Plus open paywall.
+- Invariants: Stretch (`pitchCorrection`) only when pitch ≠ 0; live detune while pitched, resync only on 0↔nonzero; metronome unpitched; timeline length unchanged; Lite/Plus open paywall; open Pitch shows value in header caption.
 - Updated: 2026-11-04
 
 ### iPhone Duo scene lifecycle

@@ -130,6 +130,7 @@ import {
   type RecordingPromptDismissOptions,
 } from '@/src/components/RecordingPromptDialog';
 import { TimeSeekDialog } from '@/src/components/TimeSeekDialog';
+import { formatLayerEffectCaption } from '@/src/components/track-editor/formatLayerEffectCaption';
 import { TrackEditorShell } from '@/src/components/track-editor/TrackEditorShell';
 import type { FadeRegionState } from '@/src/components/track-editor/TrackFadeOverlay';
 import type { EditorTool } from '@/src/components/track-editor/types';
@@ -4308,6 +4309,10 @@ function MemoEditorInner({
   }, [memo, trackAccordionEnabled]);
 
   const renderEditorTitle = useCallback(() => {
+    const effectCaption =
+      activeEditor != null && activeLayerEffects
+        ? formatLayerEffectCaption(activeEditor, activeLayerEffects)
+        : null;
     const showZoomSubtitle =
       !isTimelineZoomAtDefault(zoomControls.x, zoomControls.y) || zoomControls.visible;
     return (
@@ -4333,6 +4338,10 @@ function MemoEditorInner({
           <Text pointerEvents="none" style={styles.headerZoomCaption}>
             {SAVE_PHASE_LABELS[savePhase]}
           </Text>
+        ) : effectCaption ? (
+          <Text pointerEvents="none" style={styles.headerZoomCaption}>
+            {effectCaption}
+          </Text>
         ) : showZoomSubtitle ? (
           <Text pointerEvents="none" style={styles.headerZoomCaption}>
             {`x: ${formatTimelineZoomMultiplier(zoomControls.x)}  y: ${formatTimelineZoomMultiplier(zoomControls.y)}`}
@@ -4341,6 +4350,8 @@ function MemoEditorInner({
       </>
     );
   }, [
+    activeEditor,
+    activeLayerEffects,
     handleRename,
     handleTitleLongPress,
     isPersistingTake,
