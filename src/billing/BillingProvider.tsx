@@ -22,8 +22,11 @@ import {
 
 import {
   setDevTierOverride as persistDevTierOverride,
+  setThemePreference,
   type DevTierOverride,
 } from '@/src/settings/appSettings';
+import { publishThemePreference } from '@/src/theme/themeStore';
+import { PRO_WELCOME_THEME } from '@/src/theme/themes';
 
 import { tierDisplayName } from './capabilities';
 import {
@@ -43,6 +46,11 @@ import {
   registerPaywallOpener,
 } from './upgradeBridge';
 import type { TierId, UpgradeReason } from './types';
+
+async function applyProWelcomeTheme(): Promise<void> {
+  publishThemePreference(PRO_WELCOME_THEME);
+  await setThemePreference(PRO_WELCOME_THEME);
+}
 
 type BillingContextValue = {
   connected: boolean;
@@ -124,6 +132,9 @@ export function BillingProvider({ children }: { children: ReactNode }) {
         setPurchasing(false);
         closePaywallRef.current();
         await refreshEntitlementsRef.current?.();
+        if (purchase.productId === PRO_YEARLY_PRODUCT_ID) {
+          await applyProWelcomeTheme();
+        }
       })();
     },
     onPurchaseError: (error) => {
@@ -288,11 +299,15 @@ export function BillingProvider({ children }: { children: ReactNode }) {
     if (!__DEV__) {
       return;
     }
+    const enteringPro = override === 'pro' && devTierOverride !== 'pro';
     await persistDevTierOverride(override);
     setCachedDevTierOverride(override);
     setDevTierOverrideState(override);
     notifyBillingListeners();
-  }, []);
+    if (enteringPro) {
+      await applyProWelcomeTheme();
+    }
+  }, [devTierOverride]);
 
   const storeFlags = useMemo(() => {
     void tierTick;
