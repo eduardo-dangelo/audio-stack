@@ -24,20 +24,22 @@ Localization example:
 - Display name: **Plus**
 - Description: Unlimited recordings and layers, custom effects, import, and M4A export.
 
-### Pro (monthly)
+### Pro (yearly)
 
 | Field | Value |
 |---|---|
 | Type | **Auto-Renewable Subscription** |
 | Subscription group | e.g. `audio_stack_access` (create if needed) |
-| Product ID | `com.eduardodangelo.voicememosplus.pro.monthly` |
-| Duration | 1 month |
-| Price | £9.99 / month |
+| Product ID | `com.eduardodangelo.voicememosplus.pro.yearly` |
+| Duration | 1 year |
+| Price | £19.99 / year |
 
 Localization example:
 
 - Display name: **Pro**
-- Description: Everything in Plus, plus WAV and project (.vcr) export. Future Pro tools (quantize, distortion, automation) coming soon.
+- Description: Everything in Plus, plus loop, duplicate, pitch, WAV, and project (.aud) export.
+
+If an older monthly product (`…pro.monthly`) was never released, take it off sale. If anyone already subscribed, leave it in the same subscription group so renewals continue until they lapse. Apple does not allow changing a subscription’s duration; yearly Pro is a separate product.
 
 ## Sandbox testing
 

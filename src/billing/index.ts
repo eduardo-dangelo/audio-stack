@@ -25,7 +25,7 @@ export { entitlementsFromPurchases } from './entitlements';
 export {
   IAP_PRODUCT_IDS,
   PLUS_PRODUCT_ID,
-  PRO_MONTHLY_PRODUCT_ID,
+  PRO_YEARLY_PRODUCT_ID,
 } from './productIds';
 export {
   closePaywallPreferred,

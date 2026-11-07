@@ -36,7 +36,7 @@ import {
   subscribeBilling,
 } from './effectiveTierStore';
 import { entitlementsFromPurchases } from './entitlements';
-import { PLUS_PRODUCT_ID, PRO_MONTHLY_PRODUCT_ID } from './productIds';
+import { PLUS_PRODUCT_ID, PRO_YEARLY_PRODUCT_ID } from './productIds';
 import {
   closePaywallPreferred,
   openPaywallPreferred,
@@ -68,6 +68,7 @@ type BillingContextValue = {
 const BillingContext = createContext<BillingContextValue | null>(null);
 
 const FALLBACK_PLUS_PRICE = '£9.99';
+const FALLBACK_PRO_PRICE = '£19.99/year';
 
 function productPriceLabel(
   product: { displayPrice?: string } | null | undefined,
@@ -81,7 +82,7 @@ function applyPurchasesToStore(purchases: Purchase[], activePro: boolean): void 
   const fromPurchases = entitlementsFromPurchases(purchases);
   setStoreEntitlements({
     hasPlus: fromPurchases.hasPlus,
-    hasPro: activePro || fromPurchases.hasPro,
+    hasPro: activePro,
   });
 }
 
@@ -146,7 +147,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
     }
     try {
       await getAvailablePurchases();
-      await getActiveSubscriptions([PRO_MONTHLY_PRODUCT_ID]);
+      await getActiveSubscriptions([PRO_YEARLY_PRODUCT_ID]);
     } catch {
       // Keep last known entitlements on transient store errors.
     }
@@ -156,7 +157,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const hasPro = activeSubscriptions.some(
-      (sub) => sub.productId === PRO_MONTHLY_PRODUCT_ID
+      (sub) => sub.productId === PRO_YEARLY_PRODUCT_ID
     );
     applyPurchasesToStore(availablePurchases, hasPro);
   }, [activeSubscriptions, availablePurchases]);
@@ -172,7 +173,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         await fetchProducts({ skus: [PLUS_PRODUCT_ID], type: 'in-app' });
-        await fetchProducts({ skus: [PRO_MONTHLY_PRODUCT_ID], type: 'subs' });
+        await fetchProducts({ skus: [PRO_YEARLY_PRODUCT_ID], type: 'subs' });
         await refreshEntitlements();
       } catch {
         // Products may be missing until ASC is configured.
@@ -183,7 +184,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
   const plusProduct =
     products.find((product) => product.id === PLUS_PRODUCT_ID) ?? null;
   const proProduct =
-    subscriptions.find((product) => product.id === PRO_MONTHLY_PRODUCT_ID) ??
+    subscriptions.find((product) => product.id === PRO_YEARLY_PRODUCT_ID) ??
     null;
 
   const effectiveTier = useMemo(() => {
@@ -240,7 +241,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
     setPurchasing(true);
     try {
       await requestPurchase({
-        request: { apple: { sku: PRO_MONTHLY_PRODUCT_ID } },
+        request: { apple: { sku: PRO_YEARLY_PRODUCT_ID } },
         type: 'subs',
       });
     } catch (error) {
@@ -296,20 +297,20 @@ export function BillingProvider({ children }: { children: ReactNode }) {
   const storeFlags = useMemo(() => {
     void tierTick;
     const hasPro = activeSubscriptions.some(
-      (sub) => sub.productId === PRO_MONTHLY_PRODUCT_ID
+      (sub) => sub.productId === PRO_YEARLY_PRODUCT_ID
     );
     const fromPurchases = entitlementsFromPurchases(availablePurchases);
     return {
       hasPlus: fromPurchases.hasPlus,
-      hasPro: hasPro || fromPurchases.hasPro || isTransientPro(),
+      hasPro: hasPro || isTransientPro(),
     };
   }, [tierTick, activeSubscriptions, availablePurchases]);
 
   const plusPriceLabel = productPriceLabel(plusProduct, FALLBACK_PLUS_PRICE);
-  const proBasePrice = productPriceLabel(proProduct, '£9.99');
-  const proPriceLabel = /mo|month/i.test(proBasePrice)
+  const proBasePrice = productPriceLabel(proProduct, FALLBACK_PRO_PRICE);
+  const proPriceLabel = /year|yr|\/y|mo|month/i.test(proBasePrice)
     ? proBasePrice
-    : `${proBasePrice}/mo`;
+    : `${proBasePrice}/year`;
 
   const value = useMemo<BillingContextValue>(
     () => ({
