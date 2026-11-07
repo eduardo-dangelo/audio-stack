@@ -15,6 +15,7 @@ import {
   finishTransaction,
   isUserCancelledError,
   useIAP,
+  type ActiveSubscription,
   type Product,
   type ProductSubscription,
   type Purchase,
@@ -50,6 +51,14 @@ import type { TierId, UpgradeReason } from './types';
 async function applyProWelcomeTheme(): Promise<void> {
   publishThemePreference(PRO_WELCOME_THEME);
   await setThemePreference(PRO_WELCOME_THEME);
+}
+
+function hasActiveProSubscription(
+  subscriptions: readonly ActiveSubscription[]
+): boolean {
+  return subscriptions.some(
+    (sub) => sub.productId === PRO_YEARLY_PRODUCT_ID && sub.isActive
+  );
 }
 
 type BillingContextValue = {
@@ -167,10 +176,10 @@ export function BillingProvider({ children }: { children: ReactNode }) {
   refreshEntitlementsRef.current = refreshEntitlements;
 
   useEffect(() => {
-    const hasPro = activeSubscriptions.some(
-      (sub) => sub.productId === PRO_YEARLY_PRODUCT_ID
+    applyPurchasesToStore(
+      availablePurchases,
+      hasActiveProSubscription(activeSubscriptions)
     );
-    applyPurchasesToStore(availablePurchases, hasPro);
   }, [activeSubscriptions, availablePurchases]);
 
   useEffect(() => {
@@ -304,20 +313,19 @@ export function BillingProvider({ children }: { children: ReactNode }) {
     setCachedDevTierOverride(override);
     setDevTierOverrideState(override);
     notifyBillingListeners();
+    await refreshEntitlements();
+    notifyBillingListeners();
     if (enteringPro) {
       await applyProWelcomeTheme();
     }
-  }, [devTierOverride]);
+  }, [devTierOverride, refreshEntitlements]);
 
   const storeFlags = useMemo(() => {
     void tierTick;
-    const hasPro = activeSubscriptions.some(
-      (sub) => sub.productId === PRO_YEARLY_PRODUCT_ID
-    );
     const fromPurchases = entitlementsFromPurchases(availablePurchases);
     return {
       hasPlus: fromPurchases.hasPlus,
-      hasPro: hasPro || isTransientPro(),
+      hasPro: hasActiveProSubscription(activeSubscriptions) || isTransientPro(),
     };
   }, [tierTick, activeSubscriptions, availablePurchases]);
 
