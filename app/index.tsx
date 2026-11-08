@@ -1,8 +1,13 @@
 import { Stack, router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+  ZoomIn,
+} from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
 
 import { useColorScheme } from '@/components/useColorScheme';
@@ -30,13 +35,16 @@ import { useFolders } from '@/src/hooks/useFolders';
 import { useLibraryCounts } from '@/src/hooks/useLibraryCounts';
 import {
   getAppSettings,
-  getThemePreferenceSync,
   setLocationBasedNaming,
   setThemePreference,
   type ThemePreference,
 } from '@/src/settings/appSettings';
 import { createFolder, deleteFolder, reorderFolders } from '@/src/storage/folderStore';
-import { publishThemePreference } from '@/src/theme/themeStore';
+import {
+  getThemePreferenceLive,
+  publishThemePreference,
+  subscribeTheme,
+} from '@/src/theme/themeStore';
 import {
   canUseNamedTheme,
   editorThemeChoicesForTier,
@@ -77,6 +85,35 @@ function ProTierMark() {
   );
 }
 
+function HomeTierMark({
+  tier,
+  accentColor,
+  labelStyle,
+  rowStyle,
+}: {
+  tier: Exclude<TierId, 'lite'>;
+  accentColor: string;
+  labelStyle: object;
+  rowStyle: object;
+}) {
+  return (
+    <Animated.View
+      key={tier}
+      entering={ZoomIn.springify().damping(13).stiffness(170)}
+      exiting={FadeOut.duration(160)}
+      style={rowStyle}>
+      {tier === 'pro' ? (
+        <ProTierMark />
+      ) : (
+        <>
+          <SymbolView name={{ ios: 'sparkles' }} size={15} tintColor={accentColor} />
+          <Text style={[labelStyle, { color: accentColor }]}>Plus</Text>
+        </>
+      )}
+    </Animated.View>
+  );
+}
+
 export default function FoldersHomeScreen() {
   const colors = useVoiceMemosColors();
   const colorScheme = useColorScheme();
@@ -89,8 +126,10 @@ export default function FoldersHomeScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const [newFolderVisible, setNewFolderVisible] = useState(false);
   const [locationBasedNaming, setLocationBasedNamingEnabled] = useState(true);
-  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(
-    getThemePreferenceSync
+  const themePreference = useSyncExternalStore(
+    subscribeTheme,
+    getThemePreferenceLive,
+    getThemePreferenceLive
   );
   const {
     effectiveTier,
@@ -108,7 +147,6 @@ export default function FoldersHomeScreen() {
   useEffect(() => {
     void getAppSettings().then((settings) => {
       setLocationBasedNamingEnabled(settings.locationBasedNaming);
-      setThemePreferenceState(settings.themePreference);
       publishThemePreference(settings.themePreference);
     });
   }, []);
@@ -163,7 +201,6 @@ export default function FoldersHomeScreen() {
       requestUpgrade('themes');
       return;
     }
-    setThemePreferenceState(pref);
     publishThemePreference(pref);
     void setThemePreference(pref);
   };
@@ -353,20 +390,12 @@ export default function FoldersHomeScreen() {
         largeTitle="Audio Stack"
         largeTitleTrailing={
           effectiveTier === 'lite' ? null : (
-            <View style={styles.tierMark}>
-              {effectiveTier === 'pro' ? (
-                <ProTierMark />
-              ) : (
-                <>
-                  <SymbolView
-                    name={{ ios: 'sparkles' }}
-                    size={15}
-                    tintColor={colors.accent}
-                  />
-                  <Text style={[styles.tierMarkLabel, { color: colors.accent }]}>Plus</Text>
-                </>
-              )}
-            </View>
+            <HomeTierMark
+              tier={effectiveTier}
+              accentColor={colors.accent}
+              labelStyle={styles.tierMarkLabel}
+              rowStyle={styles.tierMark}
+            />
           )
         }>
         <GroupedListSection>

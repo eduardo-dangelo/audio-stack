@@ -41,6 +41,7 @@ import {
 } from './effectiveTierStore';
 import { entitlementsFromPurchases } from './entitlements';
 import { PLUS_PRODUCT_ID, PRO_YEARLY_PRODUCT_ID } from './productIds';
+import { requestUpgradeCelebration } from './celebrationBridge';
 import {
   closePaywallPreferred,
   openPaywallPreferred,
@@ -51,6 +52,14 @@ import type { TierId, UpgradeReason } from './types';
 async function applyProWelcomeTheme(): Promise<void> {
   publishThemePreference(PRO_WELCOME_THEME);
   await setThemePreference(PRO_WELCOME_THEME);
+}
+
+/** Theme (Pro) + jackpot in one beat after entitlements are live. */
+async function celebrateUpgrade(tier: 'plus' | 'pro'): Promise<void> {
+  if (tier === 'pro') {
+    await applyProWelcomeTheme();
+  }
+  requestUpgradeCelebration(tier);
 }
 
 function hasActiveProSubscription(
@@ -142,7 +151,9 @@ export function BillingProvider({ children }: { children: ReactNode }) {
         closePaywallRef.current();
         await refreshEntitlementsRef.current?.();
         if (purchase.productId === PRO_YEARLY_PRODUCT_ID) {
-          await applyProWelcomeTheme();
+          await celebrateUpgrade('pro');
+        } else if (purchase.productId === PLUS_PRODUCT_ID) {
+          await celebrateUpgrade('plus');
         }
       })();
     },
@@ -309,6 +320,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
       return;
     }
     const enteringPro = override === 'pro' && devTierOverride !== 'pro';
+    const enteringPlus = override === 'plus' && devTierOverride !== 'plus';
     await persistDevTierOverride(override);
     setCachedDevTierOverride(override);
     setDevTierOverrideState(override);
@@ -316,7 +328,9 @@ export function BillingProvider({ children }: { children: ReactNode }) {
     await refreshEntitlements();
     notifyBillingListeners();
     if (enteringPro) {
-      await applyProWelcomeTheme();
+      await celebrateUpgrade('pro');
+    } else if (enteringPlus) {
+      await celebrateUpgrade('plus');
     }
   }, [devTierOverride, refreshEntitlements]);
 

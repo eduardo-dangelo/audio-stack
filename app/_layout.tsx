@@ -13,6 +13,7 @@ import { BillingProvider } from '@/src/billing';
 import { memoAudioEngine } from '@/src/audio/MemoAudioEngine';
 import { ImportSuccessHost } from '@/src/components/ImportSuccessDialog';
 import { LowBatteryWarningHost } from '@/src/components/LowBatteryWarningHost';
+import { UpgradeCelebrationHost } from '@/src/components/UpgradeCelebration';
 import { useDuoSideColumn } from '@/src/hooks/useDuoSideColumn';
 import { useIsRegularWidth } from '@/src/hooks/useIsRegularWidth';
 import { awaitSaveInFlight } from '@/src/recording/activeRecordingSession';
@@ -213,6 +214,7 @@ export default function RootLayout() {
               {/* Host before navigator so its layout effect registers before route effects. */}
               <ImportSuccessHost />
               <LowBatteryWarningHost />
+              <UpgradeCelebrationHost />
               <RootNavigator />
             </BillingProvider>
           </AudioEngineProvider>

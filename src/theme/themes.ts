@@ -35,7 +35,7 @@ export type ProOnlyThemeId = (typeof PRO_ONLY_THEME_IDS)[number];
 export type ProThemeId = (typeof PRO_THEME_IDS)[number];
 
 /** Theme applied when entering Pro via purchase or Dev Tier. */
-export const PRO_WELCOME_THEME: ProOnlyThemeId = 'gruvbox';
+export const PRO_WELCOME_THEME: ProOnlyThemeId = 'quietLight';
 
 export const FREE_APPEARANCE_THEMES: readonly EditorThemeChoice[] = [
   { id: 'light', label: 'Light' },
