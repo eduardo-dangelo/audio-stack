@@ -1,5 +1,5 @@
 import { SymbolView } from 'expo-symbols';
-import { useMemo } from 'react';
+import { forwardRef, useMemo } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -19,45 +19,48 @@ type GroupedListProps = {
   style?: StyleProp<ViewStyle>;
   largeTitle?: string;
   largeTitleTrailing?: React.ReactNode;
+  innerViewRef?: React.RefObject<View | null>;
 };
 
-export function GroupedListScreen({
-  children,
-  style,
-  largeTitle,
-  largeTitleTrailing,
-}: GroupedListProps) {
-  const colors = useVoiceMemosColors();
-  const colorScheme = useColorScheme();
-  const sideColumn = useDuoSideColumn();
-  const styles = useStyles(colors, colorScheme);
-  const contentContainerStyle =
-    sideColumn.edge === 'right'
-      ? [styles.scrollContent, { paddingRight: sideColumn.inset }]
-      : sideColumn.edge === 'left'
-        ? [styles.scrollContent, { paddingLeft: sideColumn.inset }]
-        : styles.scrollContent;
-  return (
-    <ScrollView
-      contentContainerStyle={contentContainerStyle}
-      keyboardShouldPersistTaps="handled"
-      style={[styles.screen, style]}>
-      {largeTitle ? (
-        <View style={styles.largeTitleRow}>
-          <Text
-            adjustsFontSizeToFit
-            minimumFontScale={0.85}
-            numberOfLines={1}
-            style={styles.largeTitle}>
-            {largeTitle}
-          </Text>
-          {largeTitleTrailing}
-        </View>
-      ) : null}
-      {children}
-    </ScrollView>
-  );
-}
+export const GroupedListScreen = forwardRef<ScrollView, GroupedListProps>(
+  function GroupedListScreen(
+    { children, style, largeTitle, largeTitleTrailing, innerViewRef },
+    ref
+  ) {
+    const colors = useVoiceMemosColors();
+    const colorScheme = useColorScheme();
+    const sideColumn = useDuoSideColumn();
+    const styles = useStyles(colors, colorScheme);
+    const contentContainerStyle =
+      sideColumn.edge === 'right'
+        ? [styles.scrollContent, { paddingRight: sideColumn.inset }]
+        : sideColumn.edge === 'left'
+          ? [styles.scrollContent, { paddingLeft: sideColumn.inset }]
+          : styles.scrollContent;
+    return (
+      <ScrollView
+        ref={ref}
+        contentContainerStyle={contentContainerStyle}
+        innerViewRef={innerViewRef as React.RefObject<View> | undefined}
+        keyboardShouldPersistTaps="handled"
+        style={[styles.screen, style]}>
+        {largeTitle ? (
+          <View style={styles.largeTitleRow}>
+            <Text
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+              numberOfLines={1}
+              style={styles.largeTitle}>
+              {largeTitle}
+            </Text>
+            {largeTitleTrailing}
+          </View>
+        ) : null}
+        {children}
+      </ScrollView>
+    );
+  }
+);
 
 export function GroupedListSection({ children, style }: GroupedListProps) {
   const colors = useVoiceMemosColors();

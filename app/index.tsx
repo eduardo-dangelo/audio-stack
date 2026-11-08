@@ -1,7 +1,17 @@
 import { Stack, router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  Alert,
+  InteractionManager,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -124,6 +134,10 @@ export default function FoldersHomeScreen() {
   const { counts, refresh: refreshCounts } = useLibraryCounts();
   const [editMode, setEditMode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollInnerRef = useRef<View>(null);
+  const settingsHeaderRef = useRef<View>(null);
+  const pendingScrollToSettings = useRef(false);
   const [newFolderVisible, setNewFolderVisible] = useState(false);
   const [locationBasedNaming, setLocationBasedNamingEnabled] = useState(true);
   const themePreference = useSyncExternalStore(
@@ -230,7 +244,33 @@ export default function FoldersHomeScreen() {
   }, []);
 
   const toggleSettings = useCallback(() => {
-    setShowSettings((current) => !current);
+    setShowSettings((current) => {
+      const next = !current;
+      if (next) pendingScrollToSettings.current = true;
+      return next;
+    });
+  }, []);
+
+  const scrollSettingsIntoView = useCallback(() => {
+    if (!pendingScrollToSettings.current) return;
+    pendingScrollToSettings.current = false;
+
+    InteractionManager.runAfterInteractions(() => {
+      requestAnimationFrame(() => {
+        const header = settingsHeaderRef.current;
+        const inner = scrollInnerRef.current;
+        const scroll = scrollRef.current;
+        if (!header || !inner || !scroll) return;
+
+        header.measureLayout(
+          inner,
+          (_x, y) => {
+            scroll.scrollTo({ y: Math.max(0, y - 8), animated: true });
+          },
+          () => {}
+        );
+      });
+    });
   }, []);
 
   const toggleEditMode = useCallback(() => {
@@ -387,6 +427,8 @@ export default function FoldersHomeScreen() {
         }}
       />
       <GroupedListScreen
+        ref={scrollRef}
+        innerViewRef={scrollInnerRef}
         largeTitle="Audio Stack"
         largeTitleTrailing={
           effectiveTier === 'lite' ? null : (
@@ -488,7 +530,12 @@ export default function FoldersHomeScreen() {
             entering={FadeIn.duration(220)}
             exiting={FadeOut.duration(160)}
             layout={LinearTransition.duration(220)}>
-            <GroupedListSectionHeader title="Settings" />
+            <View
+              ref={settingsHeaderRef}
+              collapsable={false}
+              onLayout={scrollSettingsIntoView}>
+              <GroupedListSectionHeader title="Settings" />
+            </View>
             <GroupedListSection>
               <View
                 style={[styles.settingsRow, !overrideEnabled && styles.settingsRowBorder]}>

@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Scroll Settings into view
+- Status: evolving
+- What: Opening Settings from the home gear scrolls the list so the Settings header is visible.
+- Paths: `app/index.tsx`, `src/components/GroupedList.tsx`
+- Invariants: Scroll only when Settings opens (not on close); header sits near the top of the visible area; GroupedListScreen exposes a ScrollView ref.
+- Updated: 2026-11-08
+
 ### Custom EQ band types
 - Status: evolving
 - What: Custom EQ lets each selected band choose Peak / Low shelf / High shelf / Low pass / High pass / Notch via curve-shape icons.
