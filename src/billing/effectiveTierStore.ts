@@ -6,10 +6,21 @@ import {
 import { resolveEffectiveTier } from './capabilities';
 import type { StoreEntitlements, TierId } from './types';
 
+const RIBBON_SKEW_MS = 3 * 60 * 1000;
+
 let storeEntitlements: StoreEntitlements = { hasPlus: false, hasPro: false };
 let devTierOverride: DevTierOverride = __DEV__ ? getDevTierOverrideSync() : null;
-let transientPro = false;
+let ribbonSkew = false;
+let ribbonSkewTimer: ReturnType<typeof setTimeout> | null = null;
 let listeners = new Set<() => void>();
+
+function clearRibbonSkewTimer(): void {
+  if (ribbonSkewTimer == null) {
+    return;
+  }
+  clearTimeout(ribbonSkewTimer);
+  ribbonSkewTimer = null;
+}
 
 export function setCachedDevTierOverride(next: DevTierOverride): void {
   devTierOverride = next;
@@ -19,15 +30,29 @@ export function getCachedDevTierOverride(): DevTierOverride {
   return devTierOverride;
 }
 
-export function isTransientPro(): boolean {
-  return transientPro;
+export function hasRibbonSkew(): boolean {
+  return ribbonSkew;
 }
 
-export function setTransientPro(active: boolean): void {
-  if (transientPro === active) {
+export function setRibbonSkew(active: boolean): void {
+  if (active) {
+    clearRibbonSkewTimer();
+    if (!ribbonSkew) {
+      ribbonSkew = true;
+      listeners.forEach((listener) => listener());
+    }
+    ribbonSkewTimer = setTimeout(() => {
+      ribbonSkewTimer = null;
+      setRibbonSkew(false);
+    }, RIBBON_SKEW_MS);
     return;
   }
-  transientPro = active;
+
+  clearRibbonSkewTimer();
+  if (!ribbonSkew) {
+    return;
+  }
+  ribbonSkew = false;
   listeners.forEach((listener) => listener());
 }
 
@@ -51,7 +76,7 @@ export function getEffectiveTierSync(): TierId {
     hasPlus: storeEntitlements.hasPlus,
     hasPro: storeEntitlements.hasPro,
     devTierOverride,
-    transientPro,
+    ribbonSkew,
   });
 }
 

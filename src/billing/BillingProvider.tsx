@@ -33,7 +33,7 @@ import { tierDisplayName } from './capabilities';
 import {
   getCachedDevTierOverride,
   getEffectiveTierSync,
-  isTransientPro,
+  hasRibbonSkew,
   notifyBillingListeners,
   setCachedDevTierOverride,
   setStoreEntitlements,
@@ -339,7 +339,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
     const fromPurchases = entitlementsFromPurchases(availablePurchases);
     return {
       hasPlus: fromPurchases.hasPlus,
-      hasPro: hasActiveProSubscription(activeSubscriptions) || isTransientPro(),
+      hasPro: hasActiveProSubscription(activeSubscriptions) || hasRibbonSkew(),
     };
   }, [tierTick, activeSubscriptions, availablePurchases]);
 

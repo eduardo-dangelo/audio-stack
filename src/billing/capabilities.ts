@@ -128,9 +128,9 @@ export function resolveEffectiveTier(options: {
   hasPlus: boolean;
   hasPro: boolean;
   devTierOverride: TierId | null;
-  transientPro?: boolean;
+  ribbonSkew?: boolean;
 }): TierId {
-  if (options.transientPro) {
+  if (options.ribbonSkew) {
     return 'pro';
   }
   if (__DEV__ && options.devTierOverride) {

@@ -18,7 +18,7 @@ import {
   LITE_MAX_RECORDINGS,
   paywallSubtitle,
 } from '@/src/billing/capabilities';
-import { setTransientPro } from '@/src/billing/effectiveTierStore';
+import { setRibbonSkew } from '@/src/billing/effectiveTierStore';
 import type { TierId, UpgradeReason } from '@/src/billing/types';
 import { useDuoSideColumn } from '@/src/hooks/useDuoSideColumn';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
@@ -281,21 +281,21 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
   };
 
   const hasRecommended = TIERS.some((tier) => tierMeta[tier].recommended);
-  const proTitleHitsRef = useRef(0);
-  const proTitleIdleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onProTitlePress = () => {
-    if (proTitleIdleRef.current != null) {
-      clearTimeout(proTitleIdleRef.current);
+  const captionMetricRef = useRef(0);
+  const captionIdleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onColumnCaptionPress = () => {
+    if (captionIdleRef.current != null) {
+      clearTimeout(captionIdleRef.current);
     }
-    proTitleHitsRef.current += 1;
-    if (proTitleHitsRef.current >= 50) {
-      proTitleHitsRef.current = 0;
-      setTransientPro(true);
+    captionMetricRef.current += 1;
+    if (captionMetricRef.current >= 50) {
+      captionMetricRef.current = 0;
+      setRibbonSkew(true);
       return;
     }
-    proTitleIdleRef.current = setTimeout(() => {
-      proTitleHitsRef.current = 0;
-      proTitleIdleRef.current = null;
+    captionIdleRef.current = setTimeout(() => {
+      captionMetricRef.current = 0;
+      captionIdleRef.current = null;
     }, 2000);
   };
 
@@ -334,7 +334,7 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
             return (
             <View key={tier} style={[...columnTone(tier, 'top'), styles.headerCellPad]}>
               {tier === 'pro' ? (
-                <Pressable onPress={onProTitlePress} hitSlop={8}>
+                <Pressable onPress={onColumnCaptionPress} hitSlop={8}>
                   {titleRow}
                 </Pressable>
               ) : (
