@@ -55,10 +55,13 @@ import {
   publishThemePreference,
   subscribeTheme,
 } from '@/src/theme/themeStore';
+import { ThemePickerModal } from '@/src/components/ThemePickerModal';
 import {
   canUseNamedTheme,
-  editorThemeChoicesForTier,
   hasThemePicker,
+  INLINE_EDITOR_THEMES,
+  isProOnlyTheme,
+  PRO_ONLY_EDITOR_THEMES,
   resolveEffectiveTheme,
 } from '@/src/theme/themes';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
@@ -134,6 +137,7 @@ export default function FoldersHomeScreen() {
   const { counts, refresh: refreshCounts } = useLibraryCounts();
   const [editMode, setEditMode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [themeModalVisible, setThemeModalVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const scrollInnerRef = useRef<View>(null);
   const settingsHeaderRef = useRef<View>(null);
@@ -208,7 +212,10 @@ export default function FoldersHomeScreen() {
   };
 
   const themePickerEnabled = hasThemePicker(effectiveTier);
-  const themeChoices = editorThemeChoicesForTier(effectiveTier);
+  const showProThemePicker = effectiveTier === 'pro';
+  const selectedProThemeLabel = isProOnlyTheme(themePreference)
+    ? PRO_ONLY_EDITOR_THEMES.find((theme) => theme.id === themePreference)?.label
+    : null;
 
   const selectThemePreference = (pref: ThemePreference) => {
     if (!canUseNamedTheme(effectiveTier, pref)) {
@@ -556,7 +563,7 @@ export default function FoldersHomeScreen() {
               </View>
               {overrideEnabled && themePickerEnabled ? (
                 <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(140)}>
-                  {themeChoices.map((theme) => {
+                  {INLINE_EDITOR_THEMES.map((theme) => {
                     const selected = themePreference === theme.id;
                     return (
                       <Pressable
@@ -585,6 +592,35 @@ export default function FoldersHomeScreen() {
                       </Pressable>
                     );
                   })}
+                  {showProThemePicker ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => setThemeModalVisible(true)}
+                      style={({ pressed }) => [
+                        styles.settingsRow,
+                        styles.settingsRowNested,
+                        styles.settingsRowBorder,
+                        pressed && styles.settingsRowPressed,
+                      ]}>
+                      <View style={styles.settingsCopy}>
+                        <Text
+                          style={[
+                            styles.settingsTitle,
+                            selectedProThemeLabel ? styles.settingsThemeActive : null,
+                          ]}>
+                          Select Theme
+                        </Text>
+                        <Text style={styles.settingsSubtitle}>
+                          {selectedProThemeLabel ?? 'More themes…'}
+                        </Text>
+                      </View>
+                      <SymbolView
+                        name={{ ios: 'chevron.right' }}
+                        size={14}
+                        tintColor={colors.secondaryText}
+                      />
+                    </Pressable>
+                  ) : null}
                 </Animated.View>
               ) : null}
               {overrideEnabled && !themePickerEnabled ? (
@@ -747,6 +783,15 @@ export default function FoldersHomeScreen() {
           </Animated.View>
         ) : null}
       </GroupedListScreen>
+      <ThemePickerModal
+        visible={themeModalVisible}
+        themes={PRO_ONLY_EDITOR_THEMES}
+        selectedId={themePreference}
+        onSelect={(id) => {
+          selectThemePreference(id);
+        }}
+        onClose={() => setThemeModalVisible(false)}
+      />
     </>
   );
 }

@@ -22,7 +22,11 @@ export type ThemePreference =
   | 'nord'
   | 'gruvbox'
   | 'tokyoNight'
-  | 'cyberpunk';
+  | 'cyberpunk'
+  | 'rosePine'
+  | 'everforest'
+  | 'matrix'
+  | 'sepia';
 
 /** Dev-only billing override. Ignored outside `__DEV__`. */
 export type DevTierOverride = 'lite' | 'plus' | 'pro' | null;
@@ -62,6 +66,10 @@ const THEME_PREFERENCES: readonly ThemePreference[] = [
   'gruvbox',
   'tokyoNight',
   'cyberpunk',
+  'rosePine',
+  'everforest',
+  'matrix',
+  'sepia',
 ];
 
 const DEFAULT_RECORDING_DEFAULTS: RecordingDefaults = {

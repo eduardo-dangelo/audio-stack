@@ -26,6 +26,10 @@ const PRO_ONLY_THEME_IDS = [
   'gruvbox',
   'tokyoNight',
   'cyberpunk',
+  'rosePine',
+  'everforest',
+  'matrix',
+  'sepia',
 ] as const;
 
 const PRO_THEME_IDS = [...PLUS_THEME_IDS, ...PRO_ONLY_THEME_IDS] as const;
@@ -57,6 +61,16 @@ export const PRO_ONLY_EDITOR_THEMES: readonly EditorThemeChoice[] = [
   { id: 'gruvbox', label: 'Gruvbox' },
   { id: 'tokyoNight', label: 'Tokyo Night' },
   { id: 'cyberpunk', label: 'Cyberpunk' },
+  { id: 'rosePine', label: 'Rose Pine' },
+  { id: 'everforest', label: 'Everforest' },
+  { id: 'matrix', label: 'Terminal' },
+  { id: 'sepia', label: 'Sepia' },
+];
+
+/** Inline Appearance rows for Plus/Pro (before Select Theme). */
+export const INLINE_EDITOR_THEMES: readonly EditorThemeChoice[] = [
+  ...FREE_APPEARANCE_THEMES,
+  ...PLUS_EDITOR_THEMES,
 ];
 
 export const PRO_EDITOR_THEMES: readonly EditorThemeChoice[] = [
@@ -117,6 +131,7 @@ export function appearanceForTheme(pref: ThemePreference): ThemeAppearance {
     case 'light':
     case 'solarizedLight':
     case 'quietLight':
+    case 'sepia':
       return 'light';
     case 'dark':
     case 'solarizedDark':
@@ -128,6 +143,9 @@ export function appearanceForTheme(pref: ThemePreference): ThemeAppearance {
     case 'gruvbox':
     case 'tokyoNight':
     case 'cyberpunk':
+    case 'rosePine':
+    case 'everforest':
+    case 'matrix':
       return 'dark';
   }
 }
@@ -358,6 +376,81 @@ const cyberpunk = paint(VoiceMemosColorsDark, '#00e5ff', {
   recordRed: '#ff2a6d',
 });
 
+const rosePine = paint(VoiceMemosColorsDark, '#c4a7e7', {
+  text: '#e0def4',
+  secondaryText: '#908caa',
+  background: '#191724',
+  sheetBackground: '#1f1d2e',
+  editorCanvasBackground: '#26233a',
+  separator: '#403d52',
+  searchFieldBackground: '#26233a',
+  pillBackground: '#403d52',
+  pillText: '#e0def4',
+  pillTextSelected: '#191724',
+  waveformInactive: '#524f67',
+  waveformBandBackground: '#26233a',
+  waveformDimBackground: '#16141f',
+  waveformBar: '#6e6a86',
+  waveformMarkerBackground: '#1f1d2e',
+  recordRed: '#eb6f92',
+});
+
+const everforest = paint(VoiceMemosColorsDark, '#a7c080', {
+  text: '#d3c6aa',
+  secondaryText: '#859289',
+  background: '#2d353b',
+  sheetBackground: '#343f44',
+  editorCanvasBackground: '#232a2e',
+  separator: '#4a555b',
+  searchFieldBackground: '#232a2e',
+  pillBackground: '#4a555b',
+  pillText: '#d3c6aa',
+  pillTextSelected: '#2d353b',
+  waveformInactive: '#4a555b',
+  waveformBandBackground: '#232a2e',
+  waveformDimBackground: '#1e2428',
+  waveformBar: '#7a8478',
+  waveformMarkerBackground: '#343f44',
+  recordRed: '#e67e80',
+});
+
+const matrix = paint(VoiceMemosColorsDark, '#00ff66', {
+  text: '#b8ffc8',
+  secondaryText: '#3d9a55',
+  background: '#020805',
+  sheetBackground: '#06140c',
+  editorCanvasBackground: '#000000',
+  separator: '#0f2a18',
+  searchFieldBackground: '#000000',
+  pillBackground: '#0f2a18',
+  pillText: '#b8ffc8',
+  pillTextSelected: '#020805',
+  waveformInactive: '#14522a',
+  waveformBandBackground: '#000000',
+  waveformDimBackground: '#010503',
+  waveformBar: '#1f6b38',
+  waveformMarkerBackground: '#06140c',
+  recordRed: '#ff3355',
+});
+
+const sepia = paint(VoiceMemosColorsLight, '#8b5e3c', {
+  text: '#4a3728',
+  secondaryText: '#8a6f58',
+  background: '#f4ecd8',
+  sheetBackground: '#efe4cc',
+  editorCanvasBackground: '#e8d9bc',
+  separator: '#d4c2a3',
+  searchFieldBackground: '#e8d9bc',
+  pillBackground: '#e0d0b0',
+  pillText: '#4a3728',
+  waveformInactive: '#cbb892',
+  waveformBandBackground: '#e8d9bc',
+  waveformDimBackground: '#f7f0e2',
+  waveformBar: '#a89070',
+  waveformMarkerBackground: '#efe4cc',
+  recordRed: '#a33b2b',
+});
+
 type StaticThemeId = Exclude<ThemePreference, 'system'>;
 
 const PALETTES: Record<StaticThemeId, VoiceMemosColorScheme> = {
@@ -374,6 +467,10 @@ const PALETTES: Record<StaticThemeId, VoiceMemosColorScheme> = {
   gruvbox,
   tokyoNight,
   cyberpunk,
+  rosePine,
+  everforest,
+  matrix,
+  sepia,
 };
 
 export function paletteForTheme(pref: StaticThemeId): VoiceMemosColorScheme {
