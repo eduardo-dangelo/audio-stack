@@ -58,7 +58,6 @@ import {
 import { ThemePickerModal } from '@/src/components/ThemePickerModal';
 import {
   canUseNamedTheme,
-  hasThemePicker,
   INLINE_EDITOR_THEMES,
   isProOnlyTheme,
   PRO_ONLY_EDITOR_THEMES,
@@ -211,11 +210,32 @@ export default function FoldersHomeScreen() {
     ]);
   };
 
-  const themePickerEnabled = hasThemePicker(effectiveTier);
-  const showProThemePicker = effectiveTier === 'pro';
   const selectedProThemeLabel = isProOnlyTheme(themePreference)
     ? PRO_ONLY_EDITOR_THEMES.find((theme) => theme.id === themePreference)?.label
     : null;
+  const canOpenThemeModal = effectiveTier === 'pro';
+  const lockedThemeIds = useMemo(() => {
+    const locked = new Set<string>();
+    for (const theme of INLINE_EDITOR_THEMES) {
+      if (!canUseNamedTheme(effectiveTier, theme.id)) {
+        locked.add(theme.id);
+      }
+    }
+    for (const theme of PRO_ONLY_EDITOR_THEMES) {
+      if (!canUseNamedTheme(effectiveTier, theme.id)) {
+        locked.add(theme.id);
+      }
+    }
+    return locked;
+  }, [effectiveTier]);
+
+  const openThemePickerOrPaywall = useCallback(() => {
+    if (!canOpenThemeModal) {
+      requestUpgrade('themes');
+      return;
+    }
+    setThemeModalVisible(true);
+  }, [canOpenThemeModal]);
 
   const selectThemePreference = (pref: ThemePreference) => {
     if (!canUseNamedTheme(effectiveTier, pref)) {
@@ -228,7 +248,6 @@ export default function FoldersHomeScreen() {
 
   const appliedPreference = resolveEffectiveTheme(themePreference, effectiveTier);
   const overrideEnabled = appliedPreference !== 'system';
-  const darkModeEnabled = appliedPreference === 'dark';
 
   const toggleOverride = (enabled: boolean) => {
     if (!enabled) {
@@ -236,10 +255,6 @@ export default function FoldersHomeScreen() {
       return;
     }
     selectThemePreference(colorScheme === 'dark' ? 'dark' : 'light');
-  };
-
-  const toggleDarkMode = (enabled: boolean) => {
-    selectThemePreference(enabled ? 'dark' : 'light');
   };
 
   const handleNewFolder = useCallback(() => {
@@ -554,22 +569,21 @@ export default function FoldersHomeScreen() {
                 <View style={styles.settingsCopy}>
                   <Text style={styles.settingsTitle}>Appearance</Text>
                   <Text style={styles.settingsSubtitle}>
-                    {themePickerEnabled
-                      ? 'Off follows your system setting. Turn on to choose a theme.'
-                      : 'Off follows your system setting. Turn on to choose light or dark.'}
+                    Off follows your system setting. Turn on to choose a theme.
                   </Text>
                 </View>
                 <Switch value={overrideEnabled} onValueChange={toggleOverride} />
               </View>
-              {overrideEnabled && themePickerEnabled ? (
+              {overrideEnabled ? (
                 <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(140)}>
                   {INLINE_EDITOR_THEMES.map((theme) => {
                     const selected = themePreference === theme.id;
+                    const locked = lockedThemeIds.has(theme.id);
                     return (
                       <Pressable
                         key={theme.id}
                         accessibilityRole="button"
-                        accessibilityState={{ selected }}
+                        accessibilityState={{ selected, disabled: locked }}
                         onPress={() => selectThemePreference(theme.id)}
                         style={({ pressed }) => [
                           styles.settingsRow,
@@ -578,10 +592,19 @@ export default function FoldersHomeScreen() {
                           pressed && styles.settingsRowPressed,
                         ]}>
                         <Text
-                          style={[styles.settingsTitle, selected && styles.settingsThemeActive]}>
+                          style={[
+                            styles.settingsTitle,
+                            selected && !locked && styles.settingsThemeActive,
+                          ]}>
                           {theme.label}
                         </Text>
-                        {selected ? (
+                        {locked ? (
+                          <SymbolView
+                            name={{ ios: 'lock.fill' }}
+                            size={14}
+                            tintColor={colors.secondaryText}
+                          />
+                        ) : selected ? (
                           <SymbolView
                             name={{ ios: 'checkmark' }}
                             size={16}
@@ -592,53 +615,42 @@ export default function FoldersHomeScreen() {
                       </Pressable>
                     );
                   })}
-                  {showProThemePicker ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => setThemeModalVisible(true)}
-                      style={({ pressed }) => [
-                        styles.settingsRow,
-                        styles.settingsRowNested,
-                        styles.settingsRowBorder,
-                        pressed && styles.settingsRowPressed,
-                      ]}>
-                      <View style={styles.settingsCopy}>
-                        <Text
-                          style={[
-                            styles.settingsTitle,
-                            selectedProThemeLabel ? styles.settingsThemeActive : null,
-                          ]}>
-                          Select Theme
-                        </Text>
-                        <Text style={styles.settingsSubtitle}>
-                          {selectedProThemeLabel ?? 'More themes…'}
-                        </Text>
-                      </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !canOpenThemeModal }}
+                    onPress={openThemePickerOrPaywall}
+                    style={({ pressed }) => [
+                      styles.settingsRow,
+                      styles.settingsRowNested,
+                      styles.settingsRowBorder,
+                      pressed && styles.settingsRowPressed,
+                    ]}>
+                    <View style={styles.settingsCopy}>
+                      <Text
+                        style={[
+                          styles.settingsTitle,
+                          selectedProThemeLabel ? styles.settingsThemeActive : null,
+                        ]}>
+                        Select Theme
+                      </Text>
+                      <Text style={styles.settingsSubtitle}>
+                        {selectedProThemeLabel ?? 'More themes…'}
+                      </Text>
+                    </View>
+                    {canOpenThemeModal ? (
                       <SymbolView
                         name={{ ios: 'chevron.right' }}
                         size={14}
                         tintColor={colors.secondaryText}
                       />
-                    </Pressable>
-                  ) : null}
-                </Animated.View>
-              ) : null}
-              {overrideEnabled && !themePickerEnabled ? (
-                <Animated.View
-                  entering={FadeIn.duration(200)}
-                  exiting={FadeOut.duration(140)}
-                  style={[styles.settingsRow, styles.settingsRowNested, styles.settingsRowBorder]}>
-                  <SymbolView
-                    name={{ ios: !darkModeEnabled ? 'moon.fill' : 'sun.max.fill' }}
-                    size={20}
-                    tintColor={colors.accent}
-                  />
-                  <View style={styles.settingsCopy}>
-                    <Text style={styles.settingsTitle}>
-                      {darkModeEnabled ? 'Light Mode' : 'Dark Mode'}
-                    </Text>
-                  </View>
-                  <Switch value={darkModeEnabled} onValueChange={toggleDarkMode} />
+                    ) : (
+                      <SymbolView
+                        name={{ ios: 'lock.fill' }}
+                        size={14}
+                        tintColor={colors.secondaryText}
+                      />
+                    )}
+                  </Pressable>
                 </Animated.View>
               ) : null}
               <View style={[styles.settingsRow, styles.settingsRowBorder]}>
@@ -787,6 +799,7 @@ export default function FoldersHomeScreen() {
         visible={themeModalVisible}
         themes={PRO_ONLY_EDITOR_THEMES}
         selectedId={themePreference}
+        lockedIds={lockedThemeIds}
         onSelect={(id) => {
           selectThemePreference(id);
         }}

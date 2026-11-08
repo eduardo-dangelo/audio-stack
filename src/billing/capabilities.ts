@@ -169,7 +169,7 @@ export function paywallSubtitle(reason: UpgradeReason): string {
     case 'duplicate':
       return 'Duplicating is included with Pro.';
     case 'themes':
-      return 'Editor themes are included with Pro.';
+      return 'Solarized themes need Plus. Named IDE themes need Pro.';
     case 'pitch':
       return 'Pitch shift is included with Pro.';
   }

@@ -21,6 +21,8 @@ type ThemePickerModalProps = {
   visible: boolean;
   themes: readonly EditorThemeChoice[];
   selectedId: ThemePreference;
+  /** Theme ids the current tier cannot apply (show lock, still tappable). */
+  lockedIds?: ReadonlySet<string>;
   onSelect: (id: Exclude<ThemePreference, 'system'>) => void;
   onClose: () => void;
 };
@@ -29,6 +31,7 @@ export function ThemePickerModal({
   visible,
   themes,
   selectedId,
+  lockedIds,
   onSelect,
   onClose,
 }: ThemePickerModalProps) {
@@ -63,22 +66,33 @@ export function ThemePickerModal({
             keyboardShouldPersistTaps="handled">
             {themes.map((theme, index) => {
               const selected = selectedId === theme.id;
+              const locked = lockedIds?.has(theme.id) ?? false;
               const isLast = index === themes.length - 1;
               return (
                 <Pressable
                   key={theme.id}
                   accessibilityRole="button"
-                  accessibilityState={{ selected }}
+                  accessibilityState={{ selected, disabled: locked }}
                   onPress={() => onSelect(theme.id)}
                   style={({ pressed }) => [
                     styles.row,
                     !isLast && styles.rowBorder,
                     pressed && styles.rowPressed,
                   ]}>
-                  <Text style={[styles.rowLabel, selected && styles.rowLabelSelected]}>
+                  <Text
+                    style={[
+                      styles.rowLabel,
+                      selected && !locked && styles.rowLabelSelected,
+                    ]}>
                     {theme.label}
                   </Text>
-                  {selected ? (
+                  {locked ? (
+                    <SymbolView
+                      name={{ ios: 'lock.fill' }}
+                      size={14}
+                      tintColor={colors.secondaryText}
+                    />
+                  ) : selected ? (
                     <SymbolView
                       name={{ ios: 'checkmark' }}
                       size={16}
@@ -211,6 +225,14 @@ function useStyles(
           fontWeight: '600',
         },
       }),
-    [cardSurface, colorScheme, colors.accent, colors.overlayBackground, colors.separator, colors.text]
+    [
+      cardSurface,
+      colorScheme,
+      colors.accent,
+      colors.overlayBackground,
+      colors.secondaryText,
+      colors.separator,
+      colors.text,
+    ]
   );
 }
