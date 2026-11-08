@@ -574,30 +574,28 @@ export default function FoldersHomeScreen() {
                   tintColor={colors.secondaryText}
                 />
               </Pressable>
-              {effectiveTier !== 'lite' ? (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => {
-                    void restore();
-                  }}
-                  style={({ pressed }) => [
-                    styles.settingsRow,
-                    styles.settingsRowBorder,
-                    pressed ? styles.settingsRowPressed : null,
-                  ]}>
-                  <SymbolView
-                    name={{ ios: 'arrow.clockwise' }}
-                    size={20}
-                    tintColor={colors.accent}
-                  />
-                  <View style={styles.settingsCopy}>
-                    <Text style={styles.settingsTitle}>Restore Purchases</Text>
-                    <Text style={styles.settingsSubtitle}>
-                      Restore Plus or Pro on this device
-                    </Text>
-                  </View>
-                </Pressable>
-              ) : null}
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  void restore();
+                }}
+                style={({ pressed }) => [
+                  styles.settingsRow,
+                  styles.settingsRowBorder,
+                  pressed ? styles.settingsRowPressed : null,
+                ]}>
+                <SymbolView
+                  name={{ ios: 'arrow.clockwise' }}
+                  size={20}
+                  tintColor={colors.accent}
+                />
+                <View style={styles.settingsCopy}>
+                  <Text style={styles.settingsTitle}>Restore Purchases</Text>
+                  <Text style={styles.settingsSubtitle}>
+                    Restore Plus or Pro on this device
+                  </Text>
+                </View>
+              </Pressable>
               {__DEV__ ? (
                 <View style={[styles.settingsRow, styles.settingsRowBorder]}>
                   <SymbolView
