@@ -2,7 +2,7 @@
   "expo": {
     "name": "Audio Stack",
     "slug": "audio-stack",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "voicememosplus",
@@ -15,7 +15,7 @@
       "supportsTablet": true,
       "appleTeamId": "JD2R9CV986",
       "bundleIdentifier": "com.eduardodangelo.voicememosplus",
-      "buildNumber": "26",
+      "buildNumber": "27",
       "userInterfaceStyle": "automatic",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Audio Stack needs microphone access to record audio.",
