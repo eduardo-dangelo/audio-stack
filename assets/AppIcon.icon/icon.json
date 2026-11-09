@@ -19,17 +19,173 @@
     {
       "layers" : [
         {
-          "fill" : {
-            "solid" : "srgb:1.00000,0.14913,0.00000,1.00000"
-          },
-          "glass" : false,
-          "image-name" : "Union.svg",
-          "name" : "Union",
+          "fill-specializations" : [
+            {
+              "value" : {
+                "solid" : "srgb:0.00000,0.00000,0.00000,1.00000"
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ],
+          "glass-specializations" : [
+            {
+              "value" : false
+            },
+            {
+              "appearance" : "dark",
+              "value" : true
+            }
+          ],
+          "hidden" : true,
+          "image-name" : "Union 3.svg",
+          "name" : "Union 3",
           "position" : {
-            "scale" : 1,
+            "scale" : 0.73,
             "translation-in-points" : [
-              0,
-              -168
+              12.448227479924526,
+              340.359375
+            ]
+          }
+        },
+        {
+          "fill" : {
+            "solid" : "srgb:0.00000,0.00000,0.00000,1.00000"
+          },
+          "glass-specializations" : [
+            {
+              "value" : false
+            },
+            {
+              "appearance" : "dark",
+              "value" : true
+            }
+          ],
+          "hidden" : true,
+          "image-name" : "Union 3.svg",
+          "name" : "Union 3",
+          "opacity-specializations" : [
+            {
+              "value" : 0.37
+            },
+            {
+              "appearance" : "dark",
+              "value" : 0.9
+            }
+          ],
+          "position" : {
+            "scale" : 0.73,
+            "translation-in-points" : [
+              17.448227479924526,
+              347.359375
+            ]
+          }
+        },
+        {
+          "fill-specializations" : [
+            {
+              "value" : {
+                "solid" : "srgb:0.00000,0.00000,0.00000,1.00000"
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ],
+          "glass" : false,
+          "image-name" : "Union 3.svg",
+          "name" : "Union 3",
+          "position" : {
+            "scale" : 0.73,
+            "translation-in-points" : [
+              12.448227479924526,
+              340.359375
+            ]
+          }
+        },
+        {
+          "blend-mode" : "normal",
+          "fill-specializations" : [
+            {
+              "value" : {
+                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ],
+          "glass" : false,
+          "hidden" : true,
+          "image-name" : "headphones.svg",
+          "name" : "headphones",
+          "opacity" : 0.09,
+          "position" : {
+            "scale" : 0.69,
+            "translation-in-points" : [
+              -15.6224666144592,
+              -135.1015625
+            ]
+          }
+        },
+        {
+          "fill-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ],
+          "glass-specializations" : [
+            {
+              "value" : false
+            },
+            {
+              "appearance" : "dark",
+              "value" : true
+            }
+          ],
+          "image-name" : "headphones.svg",
+          "name" : "headphones",
+          "position" : {
+            "scale" : 0.69,
+            "translation-in-points" : [
+              -0.03652911445919926,
+              -103.484375
+            ]
+          }
+        },
+        {
+          "blend-mode" : "normal",
+          "glass" : false,
+          "hidden" : true,
+          "image-name" : "headphones.svg",
+          "name" : "headphones",
+          "opacity-specializations" : [
+            {
+              "value" : 0.3
+            },
+            {
+              "appearance" : "dark",
+              "value" : 0.9
+            }
+          ],
+          "position" : {
+            "scale" : 0.69,
+            "translation-in-points" : [
+              6.315338365465323,
+              -75.81358218111359
             ]
           }
         }
@@ -45,14 +201,7 @@
     },
     {
       "layers" : [
-        {
-          "fill" : {
-            "solid" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
-          },
-          "glass" : true,
-          "image-name" : "Union (2).svg",
-          "name" : "Union (2)"
-        }
+
       ],
       "shadow" : {
         "kind" : "neutral",
@@ -65,54 +214,7 @@
     },
     {
       "layers" : [
-        {
-          "blend-mode" : "normal",
-          "fill" : {
-            "solid" : "display-p3:0.13164,0.32312,0.55676,1.00000"
-          },
-          "glass" : false,
-          "image-name" : "Union (1).svg",
-          "name" : "Union (1)",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              -0.35450000000003,
-              172.88243749999992
-            ]
-          }
-        },
-        {
-          "blend-mode" : "normal",
-          "fill" : {
-            "solid" : "srgb:1.00000,0.14913,0.00000,1.00000"
-          },
-          "image-name" : "Rectangle 22.svg",
-          "name" : "Rectangle 22",
-          "opacity" : 0.4,
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              0,
-              -181.10937500000023
-            ]
-          }
-        },
-        {
-          "blend-mode" : "normal",
-          "fill" : {
-            "solid" : "srgb:1.00000,0.14913,0.00000,1.00000"
-          },
-          "image-name" : "Rectangle 22.svg",
-          "name" : "Rectangle 22",
-          "opacity" : 0.4,
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              0,
-              -181.10937500000023
-            ]
-          }
-        }
+
       ],
       "shadow" : {
         "kind" : "neutral",
