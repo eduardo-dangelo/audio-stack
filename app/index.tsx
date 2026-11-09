@@ -102,16 +102,21 @@ function HomeTierMark({
   accentColor,
   labelStyle,
   rowStyle,
+  animate,
 }: {
   tier: Exclude<TierId, 'lite'>;
   accentColor: string;
   labelStyle: object;
   rowStyle: object;
+  /** Zoom in only on a real upgrade — not on cold start / remount. */
+  animate: boolean;
 }) {
   return (
     <Animated.View
       key={tier}
-      entering={ZoomIn.springify().damping(13).stiffness(170)}
+      entering={
+        animate ? ZoomIn.springify().damping(13).stiffness(170) : undefined
+      }
       exiting={FadeOut.duration(160)}
       style={rowStyle}>
       {tier === 'pro' ? (
@@ -155,6 +160,22 @@ export default function FoldersHomeScreen() {
     setDevTierOverride,
     devTierOverride,
   } = useBilling();
+
+  const previousTierRef = useRef<TierId | null>(null);
+  const shouldAnimateTierMark = useMemo(() => {
+    const previous = previousTierRef.current;
+    if (previous == null) {
+      return false;
+    }
+    if (previous === 'lite' && (effectiveTier === 'plus' || effectiveTier === 'pro')) {
+      return true;
+    }
+    return previous === 'plus' && effectiveTier === 'pro';
+  }, [effectiveTier]);
+
+  useEffect(() => {
+    previousTierRef.current = effectiveTier;
+  }, [effectiveTier]);
 
   const refresh = () => {
     refreshFolders();
@@ -459,6 +480,7 @@ export default function FoldersHomeScreen() {
               accentColor={colors.accent}
               labelStyle={styles.tierMarkLabel}
               rowStyle={styles.tierMark}
+              animate={shouldAnimateTierMark}
             />
           )
         }>

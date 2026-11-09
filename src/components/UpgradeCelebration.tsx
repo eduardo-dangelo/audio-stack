@@ -17,6 +17,7 @@ import {
   registerUpgradeCelebration,
   type CelebrationTier,
 } from '@/src/billing/celebrationBridge';
+import { UpgradeWelcomeModal } from '@/src/components/UpgradeWelcomeModal';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
 const PARTICLE_COUNT = 16;
@@ -159,26 +160,36 @@ function UpgradeCelebrationOverlay({ tier, onFinished }: Props) {
 
 /** Mount once near the app root so billing can present the burst. */
 export function UpgradeCelebrationHost() {
-  const [tier, setTier] = useState<CelebrationTier | null>(null);
+  const [burstTier, setBurstTier] = useState<CelebrationTier | null>(null);
+  const [welcomeTier, setWelcomeTier] = useState<CelebrationTier | null>(null);
 
   useLayoutEffect(() => {
     registerUpgradeCelebration((next) => {
-      setTier(next);
+      setWelcomeTier(null);
+      setBurstTier(next);
     });
     return () => registerUpgradeCelebration(null);
   }, []);
 
-  if (tier == null) {
-    return null;
-  }
-
   return (
-    <UpgradeCelebrationOverlay
-      tier={tier}
-      onFinished={() => {
-        setTier(null);
-      }}
-    />
+    <>
+      {burstTier != null ? (
+        <UpgradeCelebrationOverlay
+          tier={burstTier}
+          onFinished={() => {
+            setWelcomeTier(burstTier);
+            setBurstTier(null);
+          }}
+        />
+      ) : null}
+      {welcomeTier != null ? (
+        <UpgradeWelcomeModal
+          visible
+          tier={welcomeTier}
+          onClose={() => setWelcomeTier(null)}
+        />
+      ) : null}
+    </>
   );
 }
 

@@ -127,6 +127,8 @@ export function BillingProvider({ children }: { children: ReactNode }) {
   );
   const [tierTick, setTierTick] = useState(0);
   const closePaywallRef = useRef<() => void>(() => {});
+  /** True only while a Buy/Subscribe tap is in flight — ignores StoreKit redelivery on launch. */
+  const expectingPurchaseRef = useRef(false);
 
   const {
     connected,
@@ -142,14 +144,21 @@ export function BillingProvider({ children }: { children: ReactNode }) {
   } = useIAP({
     onPurchaseSuccess: (purchase) => {
       void (async () => {
+        const userInitiated = expectingPurchaseRef.current;
+        expectingPurchaseRef.current = false;
         try {
           await finishTransaction({ purchase, isConsumable: false });
         } catch {
           // Still refresh; StoreKit may retry unfinished transactions later.
         }
         setPurchasing(false);
-        closePaywallRef.current();
+        if (userInitiated) {
+          closePaywallRef.current();
+        }
         await refreshEntitlementsRef.current?.();
+        if (!userInitiated) {
+          return;
+        }
         if (purchase.productId === PRO_YEARLY_PRODUCT_ID) {
           await celebrateUpgrade('pro');
         } else if (purchase.productId === PLUS_PRODUCT_ID) {
@@ -158,6 +167,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
       })();
     },
     onPurchaseError: (error) => {
+      expectingPurchaseRef.current = false;
       setPurchasing(false);
       if (isUserCancelledError(error)) {
         return;
@@ -250,6 +260,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
       Alert.alert('Unavailable', 'Purchases are only available on iOS.');
       return;
     }
+    expectingPurchaseRef.current = true;
     setPurchasing(true);
     try {
       await requestPurchase({
@@ -257,6 +268,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
         type: 'in-app',
       });
     } catch (error) {
+      expectingPurchaseRef.current = false;
       setPurchasing(false);
       const message =
         error instanceof Error ? error.message : 'Could not start purchase.';
@@ -269,6 +281,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
       Alert.alert('Unavailable', 'Purchases are only available on iOS.');
       return;
     }
+    expectingPurchaseRef.current = true;
     setPurchasing(true);
     try {
       await requestPurchase({
@@ -276,6 +289,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
         type: 'subs',
       });
     } catch (error) {
+      expectingPurchaseRef.current = false;
       setPurchasing(false);
       const message =
         error instanceof Error ? error.message : 'Could not start purchase.';
