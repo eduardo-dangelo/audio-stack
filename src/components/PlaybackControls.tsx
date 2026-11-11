@@ -1,8 +1,8 @@
 import * as Haptics from 'expo-haptics';
-import { SymbolView } from 'expo-symbols';
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AppSymbol } from '@/src/components/AppSymbol';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 import { formatDuration } from '@/src/utils/format';
 
@@ -87,7 +87,7 @@ export function PlaybackControls({
                 styles.iconButton,
                 pressed && styles.controlPressed,
               ]}>
-              <SymbolView name={{ ios: 'gobackward.15' }} size={compact ? 24 : 28} tintColor={colors.text} />
+              <AppSymbol name="gobackward.15" size={compact ? 24 : 28} tintColor={colors.text} />
             </Pressable>
             <Pressable
               accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
@@ -105,8 +105,8 @@ export function PlaybackControls({
                 playDisabled && styles.playDisabled,
                 pressed && !playDisabled && styles.controlPressed,
               ]}>
-              <SymbolView
-                name={{ ios: isPlaying ? 'pause.fill' : 'play.fill' }}
+              <AppSymbol
+                name={isPlaying ? 'pause.fill' : 'play.fill'}
                 size={compact ? 28 : 34}
                 tintColor={colors.text}
               />
@@ -131,7 +131,7 @@ export function PlaybackControls({
                 styles.iconButton,
                 pressed && styles.controlPressed,
               ]}>
-              <SymbolView name={{ ios: 'goforward.15' }} size={compact ? 24 : 28} tintColor={colors.text} />
+              <AppSymbol name="goforward.15" size={compact ? 24 : 28} tintColor={colors.text} />
             </Pressable>
           </View>
         )}

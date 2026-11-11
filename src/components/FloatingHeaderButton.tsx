@@ -1,9 +1,16 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
-import { SymbolView } from 'expo-symbols';
 import { memo, useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View, type ColorValue } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ColorValue,
+} from 'react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
 export type FloatingHeaderIcon =
@@ -57,13 +64,14 @@ type IconFaceProps = {
 };
 
 const useGlass = isGlassEffectAPIAvailable();
+const isAndroid = Platform.OS === 'android';
 
 const ICON_SIZE = {
-  regular: { button: 44, symbol: 22 },
-  small: { button: 32, symbol: 16 },
+  regular: { button: 44, symbol: 22, androidButton: 48, androidSymbol: 24 },
+  small: { button: 32, symbol: 16, androidButton: 40, androidSymbol: 20 },
 } as const;
 
-/** Glass icon chrome without a Pressable — for MenuView / other native triggers. */
+/** Icon chrome without a Pressable — for MenuView / other native triggers. */
 export const FloatingHeaderIconFace = memo(function FloatingHeaderIconFace({
   icon,
   accessibilityLabel,
@@ -72,10 +80,18 @@ export const FloatingHeaderIconFace = memo(function FloatingHeaderIconFace({
 }: IconFaceProps) {
   const colors = useVoiceMemosColors();
   const colorScheme = useColorScheme();
-  const styles = useStyles(colors, colorScheme, useGlass, size);
+  const styles = useStyles(colors, colorScheme, size);
   const iconTint = tintColor ?? colors.accent;
-  const symbolSize = ICON_SIZE[size].symbol;
-  const content = <SymbolView name={{ ios: icon }} size={symbolSize} tintColor={iconTint} />;
+  const symbolSize = isAndroid ? ICON_SIZE[size].androidSymbol : ICON_SIZE[size].symbol;
+  const content = <AppSymbol name={icon} size={symbolSize} tintColor={iconTint} />;
+
+  if (isAndroid) {
+    return (
+      <View accessibilityLabel={accessibilityLabel} style={styles.androidIconHit}>
+        <View style={styles.androidIconCenter}>{content}</View>
+      </View>
+    );
+  }
 
   return (
     <View accessibilityLabel={accessibilityLabel} style={styles.iconPressable}>
@@ -101,9 +117,33 @@ export function FloatingHeaderButton({
 }: Props) {
   const colors = useVoiceMemosColors();
   const colorScheme = useColorScheme();
-  const styles = useStyles(colors, colorScheme, useGlass, size);
+  const styles = useStyles(colors, colorScheme, size);
+  const ripple = useMemo(
+    () =>
+      isAndroid
+        ? {
+            color: colorScheme === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.12)',
+            borderless: true,
+          }
+        : undefined,
+    [colorScheme]
+  );
 
   if (variant === 'pill' || !icon) {
+    if (isAndroid) {
+      return (
+        <Pressable
+          accessibilityLabel={accessibilityLabel}
+          accessibilityRole="button"
+          android_ripple={ripple}
+          hitSlop={8}
+          onPress={onPress}
+          style={styles.androidTextButton}>
+          <Text style={styles.pillText}>{label}</Text>
+        </Pressable>
+      );
+    }
+
     const content = <Text style={styles.pillText}>{label}</Text>;
     return (
       <Pressable
@@ -122,6 +162,24 @@ export function FloatingHeaderButton({
     );
   }
 
+  if (isAndroid) {
+    const symbolSize = ICON_SIZE[size].androidSymbol;
+    const iconTint = tintColor ?? colors.accent;
+    return (
+      <Pressable
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole="button"
+        android_ripple={ripple}
+        hitSlop={4}
+        onPress={onPress}
+        style={styles.androidIconHit}>
+        <View style={styles.androidIconCenter}>
+          <AppSymbol name={icon} size={symbolSize} tintColor={iconTint} />
+        </View>
+      </Pressable>
+    );
+  }
+
   return (
     <Pressable accessibilityLabel={accessibilityLabel} hitSlop={8} onPress={onPress}>
       <FloatingHeaderIconFace icon={icon} size={size} tintColor={tintColor} />
@@ -132,12 +190,12 @@ export function FloatingHeaderButton({
 function useStyles(
   colors: ReturnType<typeof useVoiceMemosColors>,
   colorScheme: 'light' | 'dark' | null | undefined,
-  glass: boolean,
   size: FloatingHeaderIconSize
 ) {
   const buttonSurface =
     colorScheme === 'dark' ? colors.sheetBackground : colors.background;
   const buttonSize = ICON_SIZE[size].button;
+  const androidButtonSize = ICON_SIZE[size].androidButton;
   const radius = buttonSize / 2;
 
   return useMemo(
@@ -168,6 +226,26 @@ function useStyles(
           shadowRadius: 4,
           elevation: 3,
         },
+        androidIconHit: {
+          width: androidButtonSize,
+          height: androidButtonSize,
+          borderRadius: androidButtonSize / 2,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        },
+        androidIconCenter: {
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        androidTextButton: {
+          minHeight: 48,
+          paddingHorizontal: 12,
+          justifyContent: 'center',
+          alignItems: 'center',
+          borderRadius: 24,
+          overflow: 'hidden',
+        },
         pillPressable: {
           borderRadius: 18,
           minHeight: 36,
@@ -197,9 +275,9 @@ function useStyles(
         pillText: {
           color: colors.accent,
           fontSize: 16,
-          fontWeight: '400',
+          fontWeight: '500',
         },
       }),
-    [buttonSize, buttonSurface, colorScheme, colors.accent, glass, radius]
+    [androidButtonSize, buttonSize, buttonSurface, colorScheme, colors.accent, radius]
   );
 }

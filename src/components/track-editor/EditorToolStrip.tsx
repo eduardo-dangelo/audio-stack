@@ -1,5 +1,4 @@
 import * as Haptics from 'expo-haptics';
-import { SymbolView } from 'expo-symbols';
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -11,6 +10,7 @@ import {
   hasActivePitch,
   hasActiveReverb,
 } from '@/src/audio/layerEffects';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
 import { EDITOR_STRIP_HEIGHT, EDITOR_TOOLS, type EditorTool } from './types';
@@ -69,8 +69,8 @@ export function EditorToolStrip({ activeTool, availableTools, effects, onToolCha
               accessibilityState={{ selected }}
               onPress={() => handlePress(tool.id)}
               style={[styles.tool, selected && styles.toolSelected]}>
-              <SymbolView
-                name={{ ios: tool.symbol }}
+              <AppSymbol
+                name={tool.symbol}
                 size={22}
                 tintColor={iconHighlighted ? colors.accent : colors.text}
               />

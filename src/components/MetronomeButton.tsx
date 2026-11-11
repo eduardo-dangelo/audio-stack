@@ -1,10 +1,10 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
-import { SymbolView } from 'expo-symbols';
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import {
   getMetronomeMode,
   type MetronomeMode,
@@ -14,7 +14,10 @@ import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
 const LONG_PRESS_DELAY_MS = 400;
 const useGlass = isGlassEffectAPIAvailable();
+const isAndroid = Platform.OS === 'android';
 const BUTTON_SIZE = 32;
+const ANDROID_HIT = 48;
+const ANDROID_SYMBOL = 22;
 
 type Props = {
   settings: MetronomeSettings;
@@ -64,6 +67,16 @@ export function MetronomeButton({
   const mode = getMetronomeMode(settings);
   const enabled = mode !== 'off';
   const iconTint = enabled ? colors.accent : colors.secondaryText;
+  const ripple = useMemo(
+    () =>
+      isAndroid
+        ? {
+            color: colorScheme === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.12)',
+            borderless: true,
+          }
+        : undefined,
+    [colorScheme]
+  );
 
   const handlePress = () => {
     if (disabled) {
@@ -82,12 +95,30 @@ export function MetronomeButton({
   };
 
   const content = (
-    <SymbolView
-      name={{ ios: iconNameForMode(mode, headphonesConnected) }}
-      size={18}
+    <AppSymbol
+      name={iconNameForMode(mode, headphonesConnected)}
+      size={isAndroid ? ANDROID_SYMBOL : 18}
       tintColor={iconTint}
     />
   );
+
+  if (isAndroid) {
+    return (
+      <Pressable
+        accessibilityHint="Cycles metronome with grid, grid only, then off"
+        accessibilityLabel={accessibilityLabelForMode(mode)}
+        accessibilityRole="button"
+        accessibilityState={{ selected: enabled, disabled }}
+        android_ripple={ripple}
+        delayLongPress={LONG_PRESS_DELAY_MS}
+        disabled={disabled}
+        onLongPress={handleLongPress}
+        onPress={handlePress}
+        style={[styles.androidHit, disabled && styles.pressableDisabled]}>
+        <View style={styles.androidCenter}>{content}</View>
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable
@@ -160,6 +191,18 @@ function useStyles(
           shadowOpacity: colorScheme === 'dark' ? 0.35 : 0.12,
           shadowRadius: 4,
           elevation: 3,
+        },
+        androidHit: {
+          width: ANDROID_HIT,
+          height: ANDROID_HIT,
+          borderRadius: ANDROID_HIT / 2,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        },
+        androidCenter: {
+          alignItems: 'center',
+          justifyContent: 'center',
         },
       }),
     [buttonSurface, colorScheme, colors.accent]

@@ -2,12 +2,12 @@ import * as Haptics from 'expo-haptics';
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import { router, useNavigation } from 'expo-router';
 import type { SFSymbol } from 'sf-symbols-typescript';
-import { SymbolView } from 'expo-symbols';
 import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DEFAULT_TRACK_COLOR, pickRandomTrackColor } from '@/constants/VoiceMemosColors';
 import { shareMemo } from '@/src/actions/shareMemo';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import {
   canAddPlayableLayer,
   canExportAnything,
@@ -4487,7 +4488,7 @@ function MemoEditorInner({
           disabled={engineState.isRecording}
           onPress={() => void handleDone()}
           style={[styles.doneButton, engineState.isRecording && styles.doneButtonDisabled]}>
-          <SymbolView name={{ ios: 'checkmark' }} size={22} tintColor="#FFFFFF" />
+          <AppSymbol name="checkmark" size={22} tintColor="#FFFFFF" />
         </Pressable>
       </View>
       );
@@ -4663,13 +4664,23 @@ function MemoEditorInner({
   ]);
 
   const headerBar = useMemo(() => renderHeaderBar(), [renderHeaderBar]);
+  /** Android formSheet does not host native stack headers — mirror the pane in-body bar. */
+  const showInBodyHeader = isPane || Platform.OS === 'android';
 
   useLayoutEffect(() => {
     if (isPane) {
       return;
     }
+    if (Platform.OS === 'android') {
+      navigation.setOptions({
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.sheetBackground },
+      });
+      return;
+    }
     navigation.setOptions({
       title: '',
+      headerShown: true,
       headerBackTitle: backTitle ?? 'Back',
       headerStyle: { backgroundColor: colors.sheetBackground },
       headerTintColor: colors.text,
@@ -5960,8 +5971,10 @@ function MemoEditorInner({
   }, [memo, waveformDuration]);
 
   return (
-    <SafeAreaView edges={['bottom']} style={styles.screen}>
-      {isPane ? <View style={styles.paneHeader}>{headerBar}</View> : null}
+    <SafeAreaView
+      edges={Platform.OS === 'android' ? ['top', 'bottom'] : ['bottom']}
+      style={styles.screen}>
+      {showInBodyHeader ? <View style={styles.paneHeader}>{headerBar}</View> : null}
       <View onLayout={handleContentLayout} style={styles.content}>
         <View style={styles.tracksArea}>
           {showEditorContent ? (
