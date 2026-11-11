@@ -45,6 +45,22 @@ const SF_TO_ANDROID: Record<string, AndroidSymbol> = {
   '4.circle': 'looks_4',
   '4.circle.fill': 'looks_4',
   'speaker.slash': 'volume_off',
+
+  // Memo / IconActionSheet options
+  waveform: 'graphic_eq',
+  'music.note': 'music_note',
+  folder: 'folder',
+  'square.stack.3d.down.right': 'layers',
+  'speaker.wave.2': 'volume_up',
+  headphones: 'headphones',
+  lock: 'lock',
+  'lock.open': 'lock_open',
+  'rectangle.expand.vertical': 'unfold_more',
+  'rectangle.compress.vertical': 'unfold_less',
+  'arrow.clockwise': 'refresh',
+  'arrow.uturn.backward': 'undo',
+  'checkmark.circle.fill': 'check_circle',
+  circle: 'radio_button_unchecked',
 };
 
 type Props = {

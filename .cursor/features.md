@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Android editor more menu
+- Status: evolving
+- What: Android … menus use IconActionSheet (48dp trigger, 320-wide list) instead of thin Material DropdownMenu.
+- Paths: `src/components/MemoOptionsMenu.tsx`, `src/components/IconActionSheet.tsx`, `src/components/MemoEditor.tsx`, `src/components/AppSymbol.tsx`
+- Invariants: iOS ThemedMenuView unchanged; Android trigger min 48×48; IconActionSheet maxWidth 320; sheet rows use AppSymbol (SF→Material); editor ellipsis regular size on Android.
+- Updated: 2026-11-11
+
 ### Android action sheet list
 - Status: evolving
 - What: Android choice sheets (export format, stack/replace, move folder) use a vertical list modal instead of horizontal Alert buttons.

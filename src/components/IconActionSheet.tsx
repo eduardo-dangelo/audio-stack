@@ -1,5 +1,4 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
-import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Modal,
@@ -10,9 +9,9 @@ import {
   type TextInputProps,
   View,
 } from 'react-native';
-import type { SFSymbol } from 'sf-symbols-typescript';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
 export type IconActionSheetItem = {
@@ -194,10 +193,8 @@ export function IconActionSheet({
               accessibilityState={{ checked }}
               style={styles.row}
               onPress={() => toggleSelected(option.id)}>
-              <SymbolView
-                name={{
-                  ios: (checked ? 'checkmark.circle.fill' : 'circle') as SFSymbol,
-                }}
+              <AppSymbol
+                name={checked ? 'checkmark.circle.fill' : 'circle'}
                 size={20}
                 tintColor={checked ? colors.accent : colors.secondaryText}
               />
@@ -253,8 +250,8 @@ export function IconActionSheet({
               }
             }}>
             {action.systemImage ? (
-              <SymbolView
-                name={{ ios: action.systemImage as SFSymbol }}
+              <AppSymbol
+                name={action.systemImage}
                 size={20}
                 tintColor={action.destructive ? colors.recordRed : colors.text}
               />
@@ -322,7 +319,7 @@ function useStyles(
         },
         cardPressable: {
           width: '100%',
-          maxWidth: 280,
+          maxWidth: 320,
         },
         cardGlass: {
           borderRadius: 20,

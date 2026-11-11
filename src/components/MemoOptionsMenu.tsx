@@ -1,6 +1,10 @@
-import { useMemo, type ReactNode } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Platform, Pressable, StyleSheet, type StyleProp, ViewStyle } from 'react-native';
 
+import {
+  IconActionSheet,
+  type IconActionSheetItem,
+} from '@/src/components/IconActionSheet';
 import {
   ThemedMenuView,
   type MenuAction,
@@ -266,28 +270,27 @@ export function MemoOptionsMenu({
   onDelete,
   style,
 }: MemoOptionsMenuProps) {
-  const actions = useMemo(
-    (): MenuAction[] =>
-      toMenuActions(
-        buildMemoOptionActions({
-          includeRecover,
-          deleteTitle,
-          includeEditRecording,
-          includeMoveToFolder,
-          includeShare,
-          includeImportTrack,
-          includeMergeLayers,
-          includeMuteTracks,
-          includeUnmuteTracks,
-          includeSoloTracks,
-          includeUnsoloTracks,
-          includeLockTracks,
-          includeUnlockTracks,
-          includeTrackAccordion,
-          trackAccordionEnabled,
-          includeRefresh,
-        })
-      ),
+  const [sheetVisible, setSheetVisible] = useState(false);
+
+  const optionFlags = useMemo(
+    (): MemoOptionActionFlags => ({
+      includeRecover,
+      deleteTitle,
+      includeEditRecording,
+      includeMoveToFolder,
+      includeShare,
+      includeImportTrack,
+      includeMergeLayers,
+      includeMuteTracks,
+      includeUnmuteTracks,
+      includeSoloTracks,
+      includeUnsoloTracks,
+      includeLockTracks,
+      includeUnlockTracks,
+      includeTrackAccordion,
+      trackAccordionEnabled,
+      includeRefresh,
+    }),
     [
       deleteTitle,
       includeEditRecording,
@@ -308,32 +311,101 @@ export function MemoOptionsMenu({
     ]
   );
 
+  const handlers = useMemo(
+    (): MemoOptionsMenuHandlers => ({
+      onShare,
+      onImportTrack,
+      onRename,
+      onEditRecording,
+      onMoveToFolder,
+      onMergeLayers,
+      onMuteTracks,
+      onUnmuteTracks,
+      onSoloTracks,
+      onUnsoloTracks,
+      onLockTracks,
+      onUnlockTracks,
+      onToggleTrackAccordion,
+      onDuplicate,
+      onRefresh,
+      onRecover,
+      onDelete,
+    }),
+    [
+      onDelete,
+      onDuplicate,
+      onEditRecording,
+      onImportTrack,
+      onLockTracks,
+      onMergeLayers,
+      onMoveToFolder,
+      onMuteTracks,
+      onRecover,
+      onRefresh,
+      onRename,
+      onShare,
+      onSoloTracks,
+      onToggleTrackAccordion,
+      onUnlockTracks,
+      onUnmuteTracks,
+      onUnsoloTracks,
+    ]
+  );
+
+  const sheetActions = useMemo((): IconActionSheetItem[] => {
+    return buildMemoOptionActions(optionFlags).map((item) => ({
+      id: item.id,
+      title: item.title,
+      systemImage: item.systemImage,
+      destructive: item.destructive,
+    }));
+  }, [optionFlags]);
+
+  const menuActions = useMemo(
+    (): MenuAction[] => toMenuActions(buildMemoOptionActions(optionFlags)),
+    [optionFlags]
+  );
+
+  if (Platform.OS === 'android') {
+    return (
+      <>
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={4}
+          style={[androidStyles.trigger, style]}
+          onPress={() => setSheetVisible(true)}>
+          {children}
+        </Pressable>
+        <IconActionSheet
+          visible={sheetVisible}
+          actions={sheetActions}
+          onSelect={(actionId) => {
+            setSheetVisible(false);
+            dispatchMemoOptionAction(actionId, handlers);
+          }}
+          onDismiss={() => setSheetVisible(false)}
+        />
+      </>
+    );
+  }
+
   return (
     <ThemedMenuView
-      actions={actions}
+      actions={menuActions}
       style={style}
       onPressAction={({ nativeEvent }) => {
-        dispatchMemoOptionAction(nativeEvent.event, {
-          onShare,
-          onImportTrack,
-          onRename,
-          onEditRecording,
-          onMoveToFolder,
-          onMergeLayers,
-          onMuteTracks,
-          onUnmuteTracks,
-          onSoloTracks,
-          onUnsoloTracks,
-          onLockTracks,
-          onUnlockTracks,
-          onToggleTrackAccordion,
-          onDuplicate,
-          onRefresh,
-          onRecover,
-          onDelete,
-        });
+        dispatchMemoOptionAction(nativeEvent.event, handlers);
       }}>
       {children}
     </ThemedMenuView>
   );
 }
+
+const androidStyles = StyleSheet.create({
+  trigger: {
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

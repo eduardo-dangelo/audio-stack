@@ -4455,7 +4455,7 @@ function MemoEditorInner({
           <FloatingHeaderIconFace
             accessibilityLabel="More options"
             icon="ellipsis"
-            size="small"
+            size={Platform.OS === 'android' ? 'regular' : 'small'}
           />
         </MemoOptionsMenu>
       );
