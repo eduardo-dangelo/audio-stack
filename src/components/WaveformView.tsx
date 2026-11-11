@@ -7,6 +7,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   PanResponder,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -3716,13 +3717,20 @@ function WaveformViewComponent({
       }
       const time = getPlaybackTimeRef.current?.() ?? currentTimeRef.current;
       const x = timeToScrollX(time, contentWidth, layoutPixelsPerSecond);
+      // Android: skip no-op scrollTo for sub-pixel deltas (expensive ScrollView).
+      // Still refresh the audio clock every frame; iOS always scrollTo as before.
+      const skipScrollTo =
+        Platform.OS === 'android' &&
+        Math.abs(x - scrollOffsetRef.current) < 0.5;
       scrollOffsetRef.current = x;
       // Scroll first; coalesce React viewport/grid updates onto the next frame so
       // bar remounts never land in the same frame as scrollTo (reads as shake).
-      scrollRef.current?.scrollTo({
-        x,
-        animated: false,
-      });
+      if (!skipScrollTo) {
+        scrollRef.current?.scrollTo({
+          x,
+          animated: false,
+        });
+      }
       pendingBufferScrollX = x;
       if (bufferSyncRaf === 0) {
         bufferSyncRaf = requestAnimationFrame(() => {

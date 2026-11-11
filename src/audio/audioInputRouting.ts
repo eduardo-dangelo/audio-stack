@@ -3,6 +3,7 @@ import { AppState, Platform } from 'react-native';
 
 import {
   getNormalizedOutputCategories,
+  hasHeadphoneOutput,
   pickPrimaryOutputCategory,
   resolveDeviceCategory,
 } from '@/src/audio/headphoneDetection';
@@ -13,6 +14,12 @@ import {
   type CueOutputRoute,
   type MonitorPath,
 } from '@/src/audio/recordingLatency';
+
+export type EditorAudioRouteUiState = {
+  headphonesConnected: boolean;
+  cueOutputRoute: CueOutputRoute;
+  monitorPath: MonitorPath;
+};
 
 const BLUETOOTH_INPUT_CATEGORIES = new Set([
   'BluetoothHFP',
@@ -200,16 +207,38 @@ export async function shouldDuckMonitorMixNow(): Promise<boolean> {
   }
 }
 
-/** Initial check + live updates whenever the audio route changes. */
-export function subscribeCueOutputRoute(
-  onChange: (route: CueOutputRoute) => void
+/**
+ * Headphones + cue + monitor from one device query.
+ * Use in the editor so Android only runs a single 2s poll instead of three.
+ */
+export async function getEditorAudioRouteUiState(): Promise<EditorAudioRouteUiState> {
+  try {
+    const categories = await getNormalizedOutputCategories();
+    const outputCategory = pickPrimaryOutputCategory(categories);
+    return {
+      headphonesConnected: hasHeadphoneOutput(categories),
+      cueOutputRoute: classifyCueOutputRoute(outputCategory),
+      monitorPath: classifyMonitorPath(outputCategory),
+    };
+  } catch {
+    return {
+      headphonesConnected: false,
+      cueOutputRoute: 'wired',
+      monitorPath: 'headphones',
+    };
+  }
+}
+
+/** Editor route UI: one refresh path (and one Android poll) for HP + cue + monitor. */
+export function subscribeEditorAudioRoutes(
+  onChange: (state: EditorAudioRouteUiState) => void
 ): () => void {
   let cancelled = false;
 
   const refresh = () => {
-    void getCueOutputRoute().then((route) => {
+    void getEditorAudioRouteUiState().then((state) => {
       if (!cancelled) {
-        onChange(route);
+        onChange(state);
       }
     });
   };
@@ -238,6 +267,37 @@ export function subscribeCueOutputRoute(
   };
 }
 
+/** Initial check + live updates whenever the audio route changes. */
+export function subscribeCueOutputRoute(
+  onChange: (route: CueOutputRoute) => void
+): () => void {
+  let cancelled = false;
+
+  const refresh = () => {
+    void getCueOutputRoute().then((route) => {
+      if (!cancelled) {
+        onChange(route);
+      }
+    });
+  };
+
+  refresh();
+  const subscription = AudioManager.addSystemEventListener('routeChange', () => {
+    refresh();
+  });
+  const appSub = AppState.addEventListener('change', (state) => {
+    if (state === 'active') {
+      refresh();
+    }
+  });
+
+  return () => {
+    cancelled = true;
+    subscription?.remove();
+    appSub.remove();
+  };
+}
+
 /** Live monitor-path updates for latency preview (headphones vs speakerBleed). */
 export function subscribeMonitorPath(
   onChange: (path: MonitorPath) => void
@@ -261,17 +321,10 @@ export function subscribeMonitorPath(
       refresh();
     }
   });
-  let interval: ReturnType<typeof setInterval> | undefined;
-  if (Platform.OS === 'android') {
-    interval = setInterval(refresh, 2000);
-  }
 
   return () => {
     cancelled = true;
     subscription?.remove();
     appSub.remove();
-    if (interval) {
-      clearInterval(interval);
-    }
   };
 }

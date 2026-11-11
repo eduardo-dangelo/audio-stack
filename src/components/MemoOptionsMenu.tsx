@@ -376,15 +376,17 @@ export function MemoOptionsMenu({
           onPress={() => setSheetVisible(true)}>
           {children}
         </Pressable>
-        <IconActionSheet
-          visible={sheetVisible}
-          actions={sheetActions}
-          onSelect={(actionId) => {
-            setSheetVisible(false);
-            dispatchMemoOptionAction(actionId, handlers);
-          }}
-          onDismiss={() => setSheetVisible(false)}
-        />
+        {sheetVisible ? (
+          <IconActionSheet
+            visible
+            actions={sheetActions}
+            onSelect={(actionId) => {
+              setSheetVisible(false);
+              dispatchMemoOptionAction(actionId, handlers);
+            }}
+            onDismiss={() => setSheetVisible(false)}
+          />
+        ) : null}
       </>
     );
   }

@@ -6,6 +6,20 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Playback UI audio clock
+- Status: evolving
+- What: Editor timer/playhead follow the audio clock via RAF; store `currentTime` stays coarse (~50ms) without advance capping.
+- Paths: `src/audio/MemoAudioEngine.ts`, `src/components/MemoEditor.tsx`, `src/components/WaveformView.tsx`
+- Invariants: Engine emits raw elapsed time (no max-advance); Android time label RAF + `getPlaybackTime`/`getRecordingDuration` while live; iOS label stays store-driven; Android follow RAF skips `scrollTo` when `|Δx| < 0.5`.
+- Updated: 2026-11-11
+
+### Android UI jank
+- Status: evolving
+- What: Cut Android JS-thread load from per-row Modals and triple route polls.
+- Paths: `src/components/MemoOptionsMenu.tsx`, `src/audio/audioInputRouting.ts`, `src/components/MemoEditor.tsx`
+- Invariants: IconActionSheet mounts only while open; editor uses one `subscribeEditorAudioRoutes` poll; home headphones poll unchanged.
+- Updated: 2026-11-11
+
 ### Android editor more menu
 - Status: evolving
 - What: Android … menus use IconActionSheet (48dp trigger, 320-wide list) instead of thin Material DropdownMenu.

@@ -103,10 +103,15 @@ export function pickPrimaryOutputCategory(categories: string[]): string | null {
   return nonSpeaker ?? categories[0] ?? null;
 }
 
+/** True when any normalized output category is a headphone/external cue path. */
+export function hasHeadphoneOutput(categories: string[]): boolean {
+  return categories.some(isHeadphoneCategory);
+}
+
 export async function isHeadphonesConnected(): Promise<boolean> {
   try {
     const categories = await getNormalizedOutputCategories();
-    return categories.some(isHeadphoneCategory);
+    return hasHeadphoneOutput(categories);
   } catch {
     return false;
   }

@@ -43,8 +43,7 @@ import {
 import { useAudioEngine, useAudioEngineSelector } from '@/src/audio/AudioEngineContext';
 import {
   shouldDuckMonitorMixNow,
-  subscribeCueOutputRoute,
-  subscribeMonitorPath,
+  subscribeEditorAudioRoutes,
 } from '@/src/audio/audioInputRouting';
 import { clampFadeValues } from '@/src/audio/fadeCurve';
 import {
@@ -52,7 +51,6 @@ import {
   isHeadphonesConnected,
   needsMonitorMix,
   subscribeHeadphoneDisconnect,
-  subscribeHeadphonesConnected,
 } from '@/src/audio/headphoneDetection';
 import type { LayerEffects, LayerEffectsChange } from '@/src/audio/layerEffects';
 import { hasAnySoloActive, isLayerLocked, isLayerSelectable, isLockedLayerEffectsChangeAllowed, mergeLayerEffects } from '@/src/audio/layerEffects';
@@ -387,33 +385,45 @@ function LiveRecordingWaveform({
   return <WaveformView {...waveformProps} isRecording={isRecording} tracks={tracksWithPeaks} />;
 }
 
-function MemoEditorTimeLabel({
-  memoId,
-  pendingRecordingLayout,
-  recordingStartTimeRef,
-  disabled,
-  style,
-  onPress,
-}: {
+type MemoEditorTimeLabelProps = {
   memoId: string | undefined;
   pendingRecordingLayout: boolean;
   recordingStartTimeRef: MutableRefObject<number>;
   disabled: boolean;
   style: StyleProp<TextStyle>;
   onPress: (currentLabel: string) => void;
-}) {
-  const label = useAudioEngineSelector((state) => {
-    if (pendingRecordingLayout) {
-      if (state.isRecording) {
-        return formatDurationWithTenths(
-          recordingStartTimeRef.current + state.recordingDuration
-        );
-      }
-      return formatDurationWithTenths(recordingStartTimeRef.current);
+};
+
+function formatEditorTimeLabel(
+  state: EngineState,
+  memoId: string | undefined,
+  pendingRecordingLayout: boolean,
+  recordingStartTimeRef: MutableRefObject<number>
+): string {
+  if (pendingRecordingLayout) {
+    if (state.isRecording) {
+      return formatDurationWithTenths(
+        recordingStartTimeRef.current + state.recordingDuration
+      );
     }
-    const isActive = memoId != null && state.memoId === memoId;
-    return formatDurationWithTenths(isActive ? state.currentTime : 0);
-  });
+    return formatDurationWithTenths(recordingStartTimeRef.current);
+  }
+  const isActive = memoId != null && state.memoId === memoId;
+  return formatDurationWithTenths(isActive ? state.currentTime : 0);
+}
+
+/** iOS: store-driven label (50ms emits look continuous with DisplayLink). */
+function MemoEditorTimeLabelIos({
+  memoId,
+  pendingRecordingLayout,
+  recordingStartTimeRef,
+  disabled,
+  style,
+  onPress,
+}: MemoEditorTimeLabelProps) {
+  const label = useAudioEngineSelector((state) =>
+    formatEditorTimeLabel(state, memoId, pendingRecordingLayout, recordingStartTimeRef)
+  );
 
   return (
     <Pressable
@@ -427,6 +437,116 @@ function MemoEditorTimeLabel({
       <Text style={style}>{label}</Text>
     </Pressable>
   );
+}
+
+/**
+ * Android: RAF reads the audio clock while playing/recording so hundredths tick
+ * smoothly; store currentTime is coarse-only when idle.
+ */
+function MemoEditorTimeLabelAndroid({
+  memoId,
+  pendingRecordingLayout,
+  recordingStartTimeRef,
+  disabled,
+  style,
+  onPress,
+}: MemoEditorTimeLabelProps) {
+  const engine = useAudioEngine();
+  const clock = useAudioEngineSelector(
+    (state) => {
+      const isActive = memoId != null && state.memoId === memoId;
+      return {
+        isPlaying: isActive && state.isPlaying,
+        isRecording: state.isRecording,
+        currentTime: isActive ? state.currentTime : 0,
+        recordingDuration: state.recordingDuration,
+      };
+    },
+    (a, b) => {
+      if (a.isPlaying !== b.isPlaying || a.isRecording !== b.isRecording) {
+        return false;
+      }
+      const live =
+        a.isPlaying || (pendingRecordingLayout && a.isRecording);
+      if (live) {
+        return true;
+      }
+      return (
+        a.currentTime === b.currentTime &&
+        a.recordingDuration === b.recordingDuration
+      );
+    }
+  );
+
+  const live =
+    clock.isPlaying || (pendingRecordingLayout && clock.isRecording);
+
+  const idleLabel = (() => {
+    if (pendingRecordingLayout) {
+      if (clock.isRecording) {
+        return formatDurationWithTenths(
+          recordingStartTimeRef.current + clock.recordingDuration
+        );
+      }
+      return formatDurationWithTenths(recordingStartTimeRef.current);
+    }
+    return formatDurationWithTenths(clock.currentTime);
+  })();
+
+  const [label, setLabel] = useState(idleLabel);
+
+  useEffect(() => {
+    if (live) {
+      return;
+    }
+    setLabel(idleLabel);
+  }, [live, idleLabel]);
+
+  useEffect(() => {
+    if (!live) {
+      return;
+    }
+    let raf = 0;
+    const tick = () => {
+      const seconds =
+        pendingRecordingLayout && clock.isRecording
+          ? recordingStartTimeRef.current + engine.getRecordingDuration()
+          : engine.getPlaybackTime();
+      const next = formatDurationWithTenths(seconds);
+      setLabel((prev) => (prev === next ? prev : next));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+    };
+  }, [
+    live,
+    clock.isRecording,
+    pendingRecordingLayout,
+    recordingStartTimeRef,
+    engine,
+  ]);
+
+  return (
+    <Pressable
+      accessibilityHint="Enter time"
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={() => onPress(label)}
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={style}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function MemoEditorTimeLabel(props: MemoEditorTimeLabelProps) {
+  if (Platform.OS === 'android') {
+    return <MemoEditorTimeLabelAndroid {...props} />;
+  }
+  return <MemoEditorTimeLabelIos {...props} />;
 }
 
 function deactivateLoopForMemo(
@@ -5316,7 +5436,15 @@ function MemoEditorInner({
     }
   }, [isRecording]);
 
-  useEffect(() => subscribeHeadphonesConnected(setHeadphonesConnected), []);
+  useEffect(
+    () =>
+      subscribeEditorAudioRoutes((route) => {
+        setHeadphonesConnected(route.headphonesConnected);
+        setCueOutputRoute(route.cueOutputRoute);
+        setMonitorPath(route.monitorPath);
+      }),
+    []
+  );
 
   // Clicks require headphones. Unplug (or open with clicks on and no HP) → grid-only.
   // Never restore clicks when headphones reconnect.
@@ -5332,9 +5460,6 @@ function MemoEditorInner({
     }
     handleMetronomeChange(settingsForMetronomeMode('grid'));
   }, [handleMetronomeChange, headphonesConnected]);
-
-  useEffect(() => subscribeCueOutputRoute(setCueOutputRoute), []);
-  useEffect(() => subscribeMonitorPath(setMonitorPath), []);
 
   useEffect(() => {
     if (!isRecording || !engineState.monitorMixActive) {
