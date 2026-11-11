@@ -12,6 +12,7 @@ import { shareMemo } from '@/src/actions/shareMemo';
 import { showMoveToFolderActionSheet } from '@/src/actions/showMoveToFolderActionSheet';
 import { useAudioEngine, useAudioEngineSelector } from '@/src/audio/AudioEngineContext';
 import { isBillingLimitError, requestUpgrade } from '@/src/billing';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import { useIsRegularWidth } from '@/src/hooks/useIsRegularWidth';
 import {
   deleteMemo,
@@ -369,7 +370,7 @@ function RecordingRowComponent({
                 onRename={() => {}}
                 onShare={() => {}}>
                 <View style={styles.moreButton}>
-                  <SymbolView name={{ ios: 'ellipsis' }} size={22} tintColor={colors.secondaryText} />
+                  <AppSymbol name="ellipsis" size={22} tintColor={colors.secondaryText} />
                 </View>
               </MemoOptionsMenu>
             ) : (
@@ -399,7 +400,7 @@ function RecordingRowComponent({
                 }
                 onDelete={confirmDelete}>
                 <View style={styles.moreButton}>
-                  <SymbolView name={{ ios: 'ellipsis' }} size={22} tintColor={colors.secondaryText} />
+                  <AppSymbol name="ellipsis" size={22} tintColor={colors.secondaryText} />
                 </View>
               </MemoOptionsMenu>
             )}
