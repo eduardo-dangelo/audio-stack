@@ -21,6 +21,7 @@ import Animated, {
   Easing,
   interpolateColor,
   useAnimatedStyle,
+  useFrameCallback,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -370,6 +371,8 @@ type Props = {
   isPlaying?: boolean;
   getPlaybackTime?: () => number;
   getRecordingTime?: () => number;
+  /** Live audio-clock time while follow RAF runs (playback/recording). Throttled by caller. */
+  onLiveTimelineTime?: (time: number) => void;
   onSeek: (time: number) => void;
   /** Pause playback when the user starts scrubbing the timeline while playing. */
   onPlaybackScrubStart?: () => void;
@@ -2299,6 +2302,7 @@ function WaveformViewComponent({
   isPlaying = false,
   getPlaybackTime,
   getRecordingTime,
+  onLiveTimelineTime,
   onSeek,
   onPlaybackScrubStart,
   onPlaybackScrubEnd,
@@ -2356,8 +2360,41 @@ function WaveformViewComponent({
   getPlaybackTimeRef.current = getPlaybackTime;
   const getRecordingTimeRef = useRef(getRecordingTime);
   getRecordingTimeRef.current = getRecordingTime;
+  const onLiveTimelineTimeRef = useRef(onLiveTimelineTime);
+  onLiveTimelineTimeRef.current = onLiveTimelineTime;
   const currentTimeRef = useRef(currentTime);
   currentTimeRef.current = currentTime;
+  /** Android recording follow: slide content under fixed playhead (avoid scrollTo thrash). */
+  const recordingFollowTranslateXSV = useSharedValue(0);
+  const recordingClockActiveSV = useSharedValue(false);
+  const recordingClockTimeSV = useSharedValue(0);
+  const recordingClockWallSV = useSharedValue(0);
+  const recordingClockSeqSV = useSharedValue(0);
+  const recordingClockAppliedSeqSV = useSharedValue(-1);
+  const recordingPpsSV = useSharedValue(1);
+  const recordingFrameCallback = useFrameCallback((frame) => {
+    'worklet';
+    if (!recordingClockActiveSV.value) {
+      return;
+    }
+    const pps = recordingPpsSV.value;
+    if (!(pps > 0)) {
+      return;
+    }
+    if (recordingClockAppliedSeqSV.value !== recordingClockSeqSV.value) {
+      recordingClockAppliedSeqSV.value = recordingClockSeqSV.value;
+      recordingClockWallSV.value = frame.timestamp;
+    }
+    const elapsedSec = Math.min(
+      1,
+      Math.max(0, (frame.timestamp - recordingClockWallSV.value) / 1000)
+    );
+    const time = recordingClockTimeSV.value + elapsedSec;
+    recordingFollowTranslateXSV.value = -(time * pps);
+  }, false);
+  const recordingFollowTranslateStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: recordingFollowTranslateXSV.value }],
+  }));
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
   const contentWidthRef = useRef(0);
@@ -3496,13 +3533,15 @@ function WaveformViewComponent({
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = event.nativeEvent.contentOffset.x;
+    // During auto-follow, RAF/translateX own the logical offset — lagged native
+    // contentOffset must not poison the next frame.
+    if (autoScrollingRef.current) {
+      return;
+    }
     scrollOffsetRef.current = x;
-    // RAF already syncs viewport buffers while auto-following; skip duplicate setState.
-    if (!autoScrollingRef.current) {
-      syncMetronomeGridRef.current(x, isUserScrollingRef.current);
-      if (isUserScrollingRef.current) {
-        setUserScrollX(x);
-      }
+    syncMetronomeGridRef.current(x, isUserScrollingRef.current);
+    if (isUserScrollingRef.current) {
+      setUserScrollX(x);
     }
     if (trimGestureActiveRef.current) {
       return;
@@ -3693,10 +3732,21 @@ function WaveformViewComponent({
     let pendingBufferScrollX = 0;
     let appState: string = AppState.currentState;
 
+    let lastEmittedCenti = -1;
+    const emitLiveTime = (time: number) => {
+      const centi = Math.floor(Math.max(0, time) * 100);
+      if (centi === lastEmittedCenti) {
+        return;
+      }
+      lastEmittedCenti = centi;
+      onLiveTimelineTimeRef.current?.(time);
+    };
+
     const syncScrollToPlaybackTime = () => {
       const time = getPlaybackTimeRef.current?.() ?? currentTimeRef.current;
       const x = timeToScrollX(time, contentWidth, layoutPixelsPerSecond);
       scrollOffsetRef.current = x;
+      emitLiveTime(time);
       scrollRef.current?.scrollTo({
         x,
         animated: false,
@@ -3717,6 +3767,7 @@ function WaveformViewComponent({
       }
       const time = getPlaybackTimeRef.current?.() ?? currentTimeRef.current;
       const x = timeToScrollX(time, contentWidth, layoutPixelsPerSecond);
+      emitLiveTime(time);
       // Android: skip no-op scrollTo for sub-pixel deltas (expensive ScrollView).
       // Still refresh the audio clock every frame; iOS always scrollTo as before.
       const skipScrollTo =
@@ -3779,29 +3830,139 @@ function WaveformViewComponent({
     };
   }, []);
 
+  // Android recording: park ScrollView at 0 and slide content via translateX.
+  // Enter/exit only — contentWidth growth must not restart this effect.
+  useLayoutEffect(() => {
+    if (!followRecordingScroll) {
+      return;
+    }
+    clearUserScrollMomentumTimeout();
+    isUserScrollingRef.current = false;
+    setIsUserScrolling(false);
+    if (Platform.OS === 'android') {
+      const time = getRecordingTimeRef.current?.() ?? currentTimeRef.current;
+      const pps = layoutPixelsPerSecondRef.current;
+      const x = recordingTimeToScrollX(time, contentWidthRef.current, pps);
+      scrollRef.current?.scrollTo({ x: 0, animated: false });
+      recordingClockTimeSV.value = time;
+      recordingPpsSV.value = pps;
+      recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
+      recordingClockActiveSV.value = true;
+      recordingFrameCallback.setActive(true);
+      cancelAnimation(recordingFollowTranslateXSV);
+      recordingFollowTranslateXSV.value = -x;
+      scrollOffsetRef.current = x;
+    }
+    return () => {
+      if (Platform.OS !== 'android') {
+        return;
+      }
+      const time = getRecordingTimeRef.current?.() ?? currentTimeRef.current;
+      const x = recordingTimeToScrollX(
+        time,
+        contentWidthRef.current,
+        layoutPixelsPerSecondRef.current
+      );
+      recordingClockActiveSV.value = false;
+      recordingFrameCallback.setActive(false);
+      cancelAnimation(recordingFollowTranslateXSV);
+      recordingFollowTranslateXSV.value = 0;
+      scrollOffsetRef.current = x;
+      scrollRef.current?.scrollTo({ x, animated: false });
+      syncMetronomeGridRef.current(x);
+    };
+  }, [followRecordingScroll]);
+
   useEffect(() => {
     if (!followRecordingScroll || viewportWidth <= 0) {
       return;
     }
 
+    const useTranslateFollow = Platform.OS === 'android';
+    const anchorIntervalMs = 100;
     let raf = 0;
     let bufferSyncRaf = 0;
     let pendingBufferScrollX = 0;
+    let lastEmittedCenti = -1;
+    let lastAnchorMs = 0;
     let appState: string = AppState.currentState;
 
-    const syncRecordingScroll = () => {
+    const emitLiveTime = (time: number) => {
+      const centi = Math.floor(Math.max(0, time) * 100);
+      if (centi === lastEmittedCenti) {
+        return;
+      }
+      lastEmittedCenti = centi;
+      onLiveTimelineTimeRef.current?.(time);
+    };
+
+    const enableRecordingClock = (time: number, pps: number) => {
+      recordingClockTimeSV.value = time;
+      recordingPpsSV.value = pps;
+      recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
+      recordingClockActiveSV.value = true;
+      recordingFrameCallback.setActive(true);
+    };
+
+    const disableRecordingClock = () => {
+      recordingClockActiveSV.value = false;
+      recordingFrameCallback.setActive(false);
+    };
+
+    const snapRecordingTranslate = (x: number) => {
+      cancelAnimation(recordingFollowTranslateXSV);
+      recordingFollowTranslateXSV.value = -x;
+    };
+
+    const applyRecordingFollowX = (
+      time: number,
+      x: number,
+      frameMs: number,
+      snap: boolean
+    ) => {
+      scrollOffsetRef.current = x;
+      emitLiveTime(time);
+      if (!useTranslateFollow) {
+        scrollRef.current?.scrollTo({ x, animated: false });
+        return;
+      }
+      const pps = layoutPixelsPerSecondRef.current;
+      if (snap) {
+        enableRecordingClock(time, pps);
+        snapRecordingTranslate(x);
+        return;
+      }
+      if (frameMs - lastAnchorMs >= anchorIntervalMs) {
+        lastAnchorMs = frameMs;
+        recordingClockTimeSV.value = time;
+        recordingPpsSV.value = pps;
+        recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
+      }
+    };
+
+    const syncRecordingScroll = (enableClock: boolean) => {
       const time = getRecordingTimeRef.current?.() ?? currentTimeRef.current;
       const x = recordingTimeToScrollX(
         time,
         contentWidthRef.current,
-        layoutPixelsPerSecond
+        layoutPixelsPerSecondRef.current
       );
-      scrollOffsetRef.current = x;
-      scrollRef.current?.scrollTo({ x, animated: false });
+      if (!useTranslateFollow) {
+        scrollOffsetRef.current = x;
+        emitLiveTime(time);
+        scrollRef.current?.scrollTo({ x, animated: false });
+      } else if (enableClock) {
+        applyRecordingFollowX(time, x, 0, true);
+      } else {
+        scrollOffsetRef.current = x;
+        emitLiveTime(time);
+        disableRecordingClock();
+        snapRecordingTranslate(x);
+      }
       syncMetronomeGridRef.current(x);
     };
 
-    const tick = () => {
+    const tick = (frameMs: number) => {
       // App Switcher / background: stop scroll RAF; capture keeps running.
       if (appState !== 'active') {
         raf = 0;
@@ -3813,29 +3974,22 @@ function WaveformViewComponent({
         return;
       }
       const time = getRecordingTimeRef.current?.() ?? currentTimeRef.current;
+      const pps = layoutPixelsPerSecondRef.current;
       const nextLayoutDuration = getLayoutDuration(
         Math.max(durationRef.current, time),
         time,
         viewportWidthRef.current,
         true,
-        layoutPixelsPerSecond
+        pps
       );
       if (nextLayoutDuration !== followLayoutDurationRef.current) {
         followLayoutDurationRef.current = nextLayoutDuration;
         setFollowLayoutDuration(nextLayoutDuration);
       }
-      const x = recordingTimeToScrollX(
-        time,
-        contentWidthRef.current,
-        layoutPixelsPerSecond
-      );
-      scrollOffsetRef.current = x;
-      // Scroll first; coalesce React viewport/grid updates onto the next frame so
-      // bar remounts never land in the same frame as scrollTo (reads as shake).
-      scrollRef.current?.scrollTo({
-        x,
-        animated: false,
-      });
+      const x = recordingTimeToScrollX(time, contentWidthRef.current, pps);
+      // iOS scrollTo every frame. Android only refreshes the audio anchor;
+      // useFrameCallback owns translateX.
+      applyRecordingFollowX(time, x, frameMs, false);
       pendingBufferScrollX = x;
       if (bufferSyncRaf === 0) {
         bufferSyncRaf = requestAnimationFrame(() => {
@@ -3849,24 +4003,33 @@ function WaveformViewComponent({
     const subscription = AppState.addEventListener('change', (nextState) => {
       appState = nextState;
       if (nextState === 'active') {
-        syncRecordingScroll();
+        syncRecordingScroll(true);
         if (raf === 0) {
           raf = requestAnimationFrame(tick);
         }
-      } else if (raf !== 0) {
-        cancelAnimationFrame(raf);
-        raf = 0;
-        if (bufferSyncRaf !== 0) {
-          cancelAnimationFrame(bufferSyncRaf);
-          bufferSyncRaf = 0;
+      } else {
+        if (useTranslateFollow) {
+          disableRecordingClock();
+        }
+        if (raf !== 0) {
+          cancelAnimationFrame(raf);
+          raf = 0;
+          if (bufferSyncRaf !== 0) {
+            cancelAnimationFrame(bufferSyncRaf);
+            bufferSyncRaf = 0;
+          }
         }
       }
     });
 
     if (appState === 'active') {
+      if (useTranslateFollow) {
+        const time = getRecordingTimeRef.current?.() ?? currentTimeRef.current;
+        enableRecordingClock(time, layoutPixelsPerSecondRef.current);
+      }
       raf = requestAnimationFrame(tick);
     } else {
-      syncRecordingScroll();
+      syncRecordingScroll(false);
     }
 
     return () => {
@@ -3875,8 +4038,14 @@ function WaveformViewComponent({
       if (bufferSyncRaf !== 0) {
         cancelAnimationFrame(bufferSyncRaf);
       }
+      if (useTranslateFollow) {
+        disableRecordingClock();
+        cancelAnimation(recordingFollowTranslateXSV);
+      }
     };
-  }, [followRecordingScroll, contentWidth, viewportWidth, layoutPixelsPerSecond]);
+    // viewportWidth starts the loop after layout; contentWidth/pps stay on refs
+    // so headroom growth does not restart the RAF mid-take.
+  }, [followRecordingScroll, viewportWidth]);
 
   useEffect(() => {
     if (followRecordingScroll) {
@@ -3977,7 +4146,12 @@ function WaveformViewComponent({
         onScrollEndDrag={handleScrollEndDrag}
         onMomentumScrollEnd={handleMomentumScrollEnd}
         style={styles.scrollView}>
-        <View style={[styles.scrollContent, { width: totalContentWidth || viewportWidth }]}>
+        <Animated.View
+          style={[
+            styles.scrollContent,
+            { width: totalContentWidth || viewportWidth },
+            recordingFollowTranslateStyle,
+          ]}>
           {loopBarConfig && loopScrollHelpers ? (
             <LoopRegionBar
               bandWidth={bandWidth}
@@ -4089,7 +4263,7 @@ function WaveformViewComponent({
               );
             })}
           </View>
-        </View>
+        </Animated.View>
       </GHScrollView>
       {showZoomButton ? (
         <View
@@ -4173,6 +4347,7 @@ function areWaveformViewPropsEqual(prev: Props, next: Props): boolean {
     prev.isPlaying !== next.isPlaying ||
     prev.getPlaybackTime !== next.getPlaybackTime ||
     prev.getRecordingTime !== next.getRecordingTime ||
+    prev.onLiveTimelineTime !== next.onLiveTimelineTime ||
     prev.onSeek !== next.onSeek ||
     prev.onPlaybackScrubStart !== next.onPlaybackScrubStart ||
     prev.onPlaybackScrubEnd !== next.onPlaybackScrubEnd ||

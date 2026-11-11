@@ -392,6 +392,11 @@ type MemoEditorTimeLabelProps = {
   disabled: boolean;
   style: StyleProp<TextStyle>;
   onPress: (currentLabel: string) => void;
+  /**
+   * Android recording: register a sink for WaveformView follow-clock labels
+   * (avoids re-rendering the whole editor every centisecond).
+   */
+  liveRecordingLabelSinkRef?: MutableRefObject<((label: string) => void) | null>;
 };
 
 function formatEditorTimeLabel(
@@ -440,8 +445,8 @@ function MemoEditorTimeLabelIos({
 }
 
 /**
- * Android: RAF reads the audio clock while playing/recording so hundredths tick
- * smoothly; store currentTime is coarse-only when idle.
+ * Android: recording label comes from WaveformView follow clock; playback uses
+ * local RAF + getPlaybackTime; idle uses store currentTime.
  */
 function MemoEditorTimeLabelAndroid({
   memoId,
@@ -450,6 +455,7 @@ function MemoEditorTimeLabelAndroid({
   disabled,
   style,
   onPress,
+  liveRecordingLabelSinkRef,
 }: MemoEditorTimeLabelProps) {
   const engine = useAudioEngine();
   const clock = useAudioEngineSelector(
@@ -478,8 +484,8 @@ function MemoEditorTimeLabelAndroid({
     }
   );
 
-  const live =
-    clock.isPlaying || (pendingRecordingLayout && clock.isRecording);
+  const recordingLive = pendingRecordingLayout && clock.isRecording;
+  const playbackLive = clock.isPlaying && !recordingLive;
 
   const idleLabel = (() => {
     if (pendingRecordingLayout) {
@@ -496,23 +502,31 @@ function MemoEditorTimeLabelAndroid({
   const [label, setLabel] = useState(idleLabel);
 
   useEffect(() => {
-    if (live) {
+    if (recordingLive || playbackLive) {
       return;
     }
     setLabel(idleLabel);
-  }, [live, idleLabel]);
+  }, [recordingLive, playbackLive, idleLabel]);
 
   useEffect(() => {
-    if (!live) {
+    if (!recordingLive || !liveRecordingLabelSinkRef) {
+      return;
+    }
+    liveRecordingLabelSinkRef.current = (next) => {
+      setLabel((prev) => (prev === next ? prev : next));
+    };
+    return () => {
+      liveRecordingLabelSinkRef.current = null;
+    };
+  }, [recordingLive, liveRecordingLabelSinkRef]);
+
+  useEffect(() => {
+    if (!playbackLive) {
       return;
     }
     let raf = 0;
     const tick = () => {
-      const seconds =
-        pendingRecordingLayout && clock.isRecording
-          ? recordingStartTimeRef.current + engine.getRecordingDuration()
-          : engine.getPlaybackTime();
-      const next = formatDurationWithTenths(seconds);
+      const next = formatDurationWithTenths(engine.getPlaybackTime());
       setLabel((prev) => (prev === next ? prev : next));
       raf = requestAnimationFrame(tick);
     };
@@ -520,13 +534,7 @@ function MemoEditorTimeLabelAndroid({
     return () => {
       cancelAnimationFrame(raf);
     };
-  }, [
-    live,
-    clock.isRecording,
-    pendingRecordingLayout,
-    recordingStartTimeRef,
-    engine,
-  ]);
+  }, [playbackLive, engine]);
 
   return (
     <Pressable
@@ -4838,6 +4846,20 @@ function MemoEditorInner({
     () => recordingStartTime.current + engine.getRecordingDuration(),
     [engine]
   );
+  /** Android: WaveformView follow clock → time label (no editor shell re-render). */
+  const liveRecordingLabelSinkRef = useRef<((label: string) => void) | null>(null);
+  const handleLiveTimelineTime = useCallback(
+    (time: number) => {
+      if (Platform.OS !== 'android') {
+        return;
+      }
+      if (!engine.getState().isRecording) {
+        return;
+      }
+      liveRecordingLabelSinkRef.current?.(formatDurationWithTenths(time));
+    },
+    [engine]
+  );
   const handleWaveformSeek = useCallback(
     (time: number) => {
       if (!engine.getState().isRecording) {
@@ -6124,6 +6146,7 @@ function MemoEditorInner({
               trackLoopOverlay={trackLoopOverlay}
               metronome={metronomeSettings}
               saveProcessing={isPersistingTake}
+              onLiveTimelineTime={handleLiveTimelineTime}
               onSeek={handleWaveformSeek}
               onPlaybackScrubStart={handlePlaybackScrubStart}
               onPlaybackScrubEnd={handlePlaybackScrubEnd}
@@ -6182,6 +6205,7 @@ function MemoEditorInner({
                 </View>
                 <MemoEditorTimeLabel
                   disabled={isRecording}
+                  liveRecordingLabelSinkRef={liveRecordingLabelSinkRef}
                   memoId={memo?.id}
                   pendingRecordingLayout={pendingRecordingLayout}
                   recordingStartTimeRef={recordingStartTime}

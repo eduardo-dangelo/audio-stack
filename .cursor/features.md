@@ -6,11 +6,18 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Recording UI audio clock
+- Status: evolving
+- What: Android recording follow slides timeline via translateX from `getRecordingTime`; timer uses the same follow clock; live bars use peak duration only (no clock stretch).
+- Paths: `src/components/WaveformView.tsx`, `src/components/MemoEditor.tsx`
+- Invariants: Android capture parks ScrollView at 0 and moves translateX from a UI-thread clock anchored to `getRecordingTime` (max 1s extrapolation, anchor ~100ms); enter/exit/background snap translateX and disable the frame callback; follow RAF does not restart on contentWidth; iOS recording still `scrollTo`; Android recording label from `onLiveTimelineTime`; live duration is latency-trimmed peak preview only.
+- Updated: 2026-11-11
+
 ### Playback UI audio clock
 - Status: evolving
 - What: Editor timer/playhead follow the audio clock via RAF; store `currentTime` stays coarse (~50ms) without advance capping.
 - Paths: `src/audio/MemoAudioEngine.ts`, `src/components/MemoEditor.tsx`, `src/components/WaveformView.tsx`
-- Invariants: Engine emits raw elapsed time (no max-advance); Android time label RAF + `getPlaybackTime`/`getRecordingDuration` while live; iOS label stays store-driven; Android follow RAF skips `scrollTo` when `|Δx| < 0.5`.
+- Invariants: Engine emits raw elapsed time (no max-advance); Android playback label RAF + `getPlaybackTime`; iOS label stays store-driven; Android playback follow skips `scrollTo` when `|Δx| < 0.5`; auto-follow does not overwrite scrollOffset from onScroll.
 - Updated: 2026-11-11
 
 ### Android UI jank
