@@ -6,6 +6,20 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Android builtin mic pin
+- Status: evolving
+- What: Expo plugin makes Android `setInputDevice` real so headphones-on recording uses the phone mic via Oboe `setDeviceId`.
+- Paths: `plugins/withAndroidBuiltinMicPin.js`, `src/audio/audioInputRouting.ts`
+- Invariants: Preferred input id stored in MediaSessionManager; pinned capture opens Shared mono 44.1kHz AAudio (not Exclusive) so duplex stack does not break the WAV converter; `pinBuiltInMicrophone` unchanged in JS; needs native Android rebuild after plugin apply.
+- Updated: 2026-11-11
+
+### Android headphone detection
+- Status: evolving
+- What: Normalize Android `availableOutputs` type strings (and iOS categories) so wired/BT unlock metronome clicks and skip the stack headphones warning.
+- Paths: `src/audio/headphoneDetection.ts`, `src/audio/audioInputRouting.ts`
+- Invariants: Android uses `availableOutputs` + type→category map (`currentOutputs` empty); `some(headphone)` not speaker-only; AppState + 2s Android poll; route snapshot prefers BuiltInMic when `currentInputs` empty and HFP only from primary categories; `ALLOW_METRONOME_WITHOUT_HEADPHONES` stays false.
+- Updated: 2026-11-11
+
 ### Android Material buttons
 - Status: evolving
 - What: Android header/transport use flat Material IconButton + TextButton chrome; iOS keeps glass circles.

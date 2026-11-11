@@ -57,9 +57,17 @@ export function PrecountButton({ mode, onCycle, disabled = false }: Props) {
     onCycle();
   };
 
+  // sound: filled 4 · silent: mute on Android, outline 4 on iOS · off: outline/count 4
+  const iconName =
+    mode === 'sound'
+      ? '4.circle.fill'
+      : mode === 'silent' && isAndroid
+        ? 'speaker.slash'
+        : '4.circle';
+
   const content = (
     <AppSymbol
-      name={mode === 'sound' ? '4.circle.fill' : '4.circle'}
+      name={iconName}
       size={isAndroid ? ANDROID_SYMBOL : 18}
       tintColor={iconTint}
     />

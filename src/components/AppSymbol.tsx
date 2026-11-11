@@ -44,6 +44,7 @@ const SF_TO_ANDROID: Record<string, AndroidSymbol> = {
 
   '4.circle': 'looks_4',
   '4.circle.fill': 'looks_4',
+  'speaker.slash': 'volume_off',
 };
 
 type Props = {

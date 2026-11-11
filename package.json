@@ -51,7 +51,7 @@
     "start": "expo start",
     "ios": "expo run:ios",
     "android": "expo run:android",
-    "postinstall": "node plugins/withEndLiveActivitiesOnTerminate.js",
+    "postinstall": "node plugins/withEndLiveActivitiesOnTerminate.js && node plugins/withAndroidBuiltinMicPin.js",
     "prebuild:ios": "expo prebuild --platform ios && node scripts/strip-push-entitlement.js",
     "prebuild:android": "expo prebuild --platform android",
     "deploy-landing": "gh-pages -d landing -b gh-pages",

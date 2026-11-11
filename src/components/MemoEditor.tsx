@@ -1783,7 +1783,10 @@ function MemoEditorInner({
         }
         const n = 4 - i;
         setPrecountNumber(n);
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        // Android: numeral + optional click is enough; skip per-beat vibration.
+        if (Platform.OS !== 'android') {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
         if (mode === 'sound') {
           const clickPromise = engine.playMetronomeClick({ accent: n === 4 }).catch(() => {
             // Click is best-effort during precount.

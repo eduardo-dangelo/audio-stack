@@ -1,5 +1,11 @@
 import { AudioManager } from 'react-native-audio-api';
+import { AppState, Platform } from 'react-native';
 
+import {
+  getNormalizedOutputCategories,
+  pickPrimaryOutputCategory,
+  resolveDeviceCategory,
+} from '@/src/audio/headphoneDetection';
 import {
   classifyCueOutputRoute,
   classifyMonitorPath,
@@ -23,10 +29,56 @@ export type RouteSnapshot = {
   isHfpActive: boolean;
 };
 
-function firstCategory(
-  devices: { category: string }[] | undefined
+type DeviceLike = {
+  id: string;
+  category?: string;
+  type?: string;
+  name?: string;
+};
+
+function firstNormalizedCategory(
+  devices: DeviceLike[] | undefined
 ): string | null {
-  return devices?.[0]?.category ?? null;
+  if (!devices?.length) {
+    return null;
+  }
+  for (const device of devices) {
+    const category = resolveDeviceCategory(device);
+    if (category) {
+      return category;
+    }
+  }
+  return null;
+}
+
+/**
+ * Active input category for the session.
+ * iOS: prefer `currentInputs`.
+ * Android: `currentInputs` is empty — prefer BuiltInMic (pin target), not the
+ * first listed headset mic which is often present when headphones are plugged in.
+ */
+function resolveInputCategory(
+  currentInputs: DeviceLike[] | undefined,
+  availableInputs: DeviceLike[] | undefined
+): string | null {
+  const current = firstNormalizedCategory(currentInputs);
+  if (current) {
+    return current;
+  }
+
+  const available = availableInputs ?? [];
+  for (const device of available) {
+    if (resolveDeviceCategory(device) === 'BuiltInMic') {
+      return 'BuiltInMic';
+    }
+  }
+  for (const device of available) {
+    const category = resolveDeviceCategory(device);
+    if (category && !BLUETOOTH_INPUT_CATEGORIES.has(category)) {
+      return category;
+    }
+  }
+  return firstNormalizedCategory(available);
 }
 
 export async function findBuiltInMicrophone(): Promise<{
@@ -34,18 +86,20 @@ export async function findBuiltInMicrophone(): Promise<{
   category: string;
 } | null> {
   const devices = await AudioManager.getDevicesInfo();
-  const inputs = devices.availableInputs ?? [];
+  const inputs = (devices.availableInputs ?? []) as DeviceLike[];
 
-  const builtIn = inputs.find((device) => device.category === 'BuiltInMic');
+  const builtIn = inputs.find(
+    (device) => resolveDeviceCategory(device) === 'BuiltInMic'
+  );
   if (builtIn) {
-    return { id: builtIn.id, category: builtIn.category };
+    return { id: builtIn.id, category: 'BuiltInMic' };
   }
 
-  const fallback = inputs.find(
-    (device) => !BLUETOOTH_INPUT_CATEGORIES.has(device.category)
-  );
-  if (fallback) {
-    return { id: fallback.id, category: fallback.category };
+  for (const device of inputs) {
+    const category = resolveDeviceCategory(device);
+    if (category && !BLUETOOTH_INPUT_CATEGORIES.has(category)) {
+      return { id: device.id, category };
+    }
   }
 
   return null;
@@ -61,15 +115,18 @@ export async function pinBuiltInMicrophone(): Promise<void> {
 
 export async function getActiveRouteSnapshot(): Promise<RouteSnapshot> {
   const devices = await AudioManager.getDevicesInfo();
-  const inputCategory = firstCategory(devices.currentInputs);
-  const outputCategory = firstCategory(devices.currentOutputs);
+  const inputCategory = resolveInputCategory(
+    devices.currentInputs as DeviceLike[] | undefined,
+    devices.availableInputs as DeviceLike[] | undefined
+  );
+  const outputCategories = await getNormalizedOutputCategories();
+  const outputCategory = pickPrimaryOutputCategory(outputCategories);
   const sessionSampleRate = Math.round(AudioManager.getDevicePreferredSampleRate());
 
+  // Only the resolved primary categories — listing SCO among availableOutputs
+  // must not block stack on Android.
   const isHfpActive =
-    inputCategory === 'BluetoothHFP' ||
-    outputCategory === 'BluetoothHFP' ||
-    (devices.currentInputs ?? []).some((d) => d.category === 'BluetoothHFP') ||
-    (devices.currentOutputs ?? []).some((d) => d.category === 'BluetoothHFP');
+    inputCategory === 'BluetoothHFP' || outputCategory === 'BluetoothHFP';
 
   return {
     inputCategory,
@@ -161,10 +218,23 @@ export function subscribeCueOutputRoute(
   const subscription = AudioManager.addSystemEventListener('routeChange', () => {
     refresh();
   });
+  const appSub = AppState.addEventListener('change', (state) => {
+    if (state === 'active') {
+      refresh();
+    }
+  });
+  let interval: ReturnType<typeof setInterval> | undefined;
+  if (Platform.OS === 'android') {
+    interval = setInterval(refresh, 2000);
+  }
 
   return () => {
     cancelled = true;
     subscription?.remove();
+    appSub.remove();
+    if (interval) {
+      clearInterval(interval);
+    }
   };
 }
 
@@ -186,9 +256,22 @@ export function subscribeMonitorPath(
   const subscription = AudioManager.addSystemEventListener('routeChange', () => {
     refresh();
   });
+  const appSub = AppState.addEventListener('change', (state) => {
+    if (state === 'active') {
+      refresh();
+    }
+  });
+  let interval: ReturnType<typeof setInterval> | undefined;
+  if (Platform.OS === 'android') {
+    interval = setInterval(refresh, 2000);
+  }
 
   return () => {
     cancelled = true;
     subscription?.remove();
+    appSub.remove();
+    if (interval) {
+      clearInterval(interval);
+    }
   };
 }

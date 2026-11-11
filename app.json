@@ -152,6 +152,7 @@
       "./plugins/stripWidgetsPushEntitlement.js",
       "./plugins/stripAppIconAppiconset.js",
       "./plugins/withEndLiveActivitiesOnTerminate.js",
+      "./plugins/withAndroidBuiltinMicPin.js",
       "./plugins/withIosPodDeploymentTarget.js",
       "./plugins/withIosSceneLifecycle.js",
       "expo-iap"
