@@ -5,7 +5,6 @@ import type { SFSymbol } from 'sf-symbols-typescript';
 import { SymbolView } from 'expo-symbols';
 import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import {
-  ActionSheetIOS,
   ActivityIndicator,
   Alert,
   Modal,
@@ -220,6 +219,7 @@ import {
 import { sideColumnIconItem, useDuoSideColumn } from '@/src/hooks/useDuoSideColumn';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 import { formatDurationWithTenths } from '@/src/utils/format';
+import { showActionSheet } from '@/src/utils/showActionSheet';
 
 const RECORDING_START_STUCK_MESSAGE = 'Something went wrong, please try again';
 const RECORDING_START_ERROR_DISMISS_MS = 5000;
@@ -5171,7 +5171,7 @@ function MemoEditorInner({
       return;
     }
 
-    ActionSheetIOS.showActionSheetWithOptions(
+    showActionSheet(
       {
         options: ['Stack', 'Replace', 'Cancel'],
         cancelButtonIndex: 2,

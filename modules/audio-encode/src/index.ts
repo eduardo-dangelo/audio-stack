@@ -24,7 +24,7 @@ export async function encodeWavToM4a(inputUri: string, outputUri: string): Promi
   const module = getModule();
   if (!module?.isAvailable()) {
     throw new Error(
-      'M4A encoding is not available. Rebuild the app with npx expo run:ios so the AudioEncode native module is linked.'
+      'M4A encoding is not available on this platform yet. On iOS, rebuild with npx expo run:ios. On Android, export WAV for now.'
     );
   }
 

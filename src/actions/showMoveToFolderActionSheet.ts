@@ -1,7 +1,6 @@
-import { ActionSheetIOS } from 'react-native';
-
 import { listFolders } from '@/src/storage/folderStore';
 import { moveMemoToFolder } from '@/src/storage/memoStore';
+import { showActionSheet } from '@/src/utils/showActionSheet';
 
 export async function showMoveToFolderActionSheet(
   memoId: string,
@@ -18,7 +17,7 @@ export async function showMoveToFolderActionSheet(
   const cancelIndex = options.length - 1;
   const removeIndex = currentFolderId ? options.indexOf('Remove from Folder') : -1;
 
-  ActionSheetIOS.showActionSheetWithOptions(
+  showActionSheet(
     {
       title: 'Move to Folder',
       options,

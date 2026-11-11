@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Android first APK
+- Status: evolving
+- What: Expo Android platform config + stubs so a debug APK can launch beside the existing iOS app.
+- Paths: `app.json`, `src/utils/showActionSheet.ts`, `src/widgets/RecordingLiveActivity.android.tsx`, `src/actions/shareMemo.ts`
+- Invariants: iOS StoreKit/Live Activities unchanged; Android uses Alert sheets; M4A/multi-share/project native modules remain iOS-only; Live Activity is a no-op on Android.
+- Updated: 2026-11-11
+
 ### Landing brand icon
 - Status: evolving
 - What: Landing header/footer/favicon use the App Icon headphones + waveform mark (light/dark).

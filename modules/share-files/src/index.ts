@@ -32,7 +32,7 @@ export async function shareFilesAsync(uris: string[]): Promise<void> {
   const module = getModule();
   if (!module?.isAvailable()) {
     throw new Error(
-      'Multi-file share is not available. Rebuild the app with npx expo run:ios so the ShareFiles native module is linked.'
+      'Multi-file share is not available on this platform yet. On iOS, rebuild with npx expo run:ios.'
     );
   }
 

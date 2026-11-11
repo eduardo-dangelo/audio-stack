@@ -1,6 +1,6 @@
 import * as Sharing from 'expo-sharing';
 import { stampProjectTypeAsync } from 'project-document-picker';
-import { ActionSheetIOS, Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { shareFilesAsync } from 'share-files';
 
 import {
@@ -15,6 +15,7 @@ import {
   type ExportFormat,
 } from '@/src/storage/memoStore';
 import { hasRecording, type Memo } from '@/src/storage/types';
+import { showActionSheet } from '@/src/utils/showActionSheet';
 
 export type ShareMemoOptions = {
   layerId?: string;
@@ -24,8 +25,13 @@ export type ShareMemoOptions = {
   onExportFinished?: () => void;
 };
 
-const AUDIO_FORMATS = ['m4a', 'wav'] as const;
+const AUDIO_FORMATS_IOS = ['m4a', 'wav'] as const;
+const AUDIO_FORMATS_ANDROID = ['wav'] as const;
 const PROJECT_FORMAT_LABEL = 'Project (.aud)';
+
+function getAudioFormats(): readonly ('m4a' | 'wav')[] {
+  return Platform.OS === 'android' ? AUDIO_FORMATS_ANDROID : AUDIO_FORMATS_IOS;
+}
 
 function getShareMimeType(format: ExportFormat): string {
   if (format === 'aud') {
@@ -42,7 +48,7 @@ function getShareUti(format: ExportFormat): string {
 }
 
 async function stampProjectFileIfNeeded(uri: string, format: ExportFormat): Promise<void> {
-  if (format !== 'aud') {
+  if (format !== 'aud' || Platform.OS !== 'ios') {
     return;
   }
   await stampProjectTypeAsync(uri);
@@ -69,12 +75,14 @@ function showFormatPicker(
   }
 
   // Plus and Pro both pick a format; Plus wav/aud is gated in the callback.
+  // Android: WAV only until M4A native encode exists.
+  const audioFormats = getAudioFormats();
   const sheetOptions = includeProject
-    ? ([...AUDIO_FORMATS, PROJECT_FORMAT_LABEL, 'Cancel'] as const)
-    : ([...AUDIO_FORMATS, 'Cancel'] as const);
+    ? ([...audioFormats, PROJECT_FORMAT_LABEL, 'Cancel'] as const)
+    : ([...audioFormats, 'Cancel'] as const);
   const cancelIndex = sheetOptions.indexOf('Cancel');
 
-  ActionSheetIOS.showActionSheetWithOptions(
+  showActionSheet(
     {
       title: 'Choose format…',
       options: [...sheetOptions],
@@ -161,6 +169,27 @@ async function exportAndShareMany(
       uris.push(file.uri);
     }
 
+    if (Platform.OS === 'android') {
+      // Multi-file native share is iOS-only for now; export the first file via the system sheet.
+      if (!(await Sharing.isAvailableAsync())) {
+        throw new Error('Sharing is not available on this device.');
+      }
+      const first = uris[0];
+      if (!first) {
+        throw new Error('Export file was not created.');
+      }
+      if (uris.length > 1) {
+        Alert.alert(
+          'Exported first recording',
+          'Multi-file share is not available on Android yet. Sharing the first selected recording.'
+        );
+      }
+      await Sharing.shareAsync(first, {
+        mimeType: getShareMimeType(format),
+      });
+      return;
+    }
+
     await shareFilesAsync(uris);
   } finally {
     options?.onExportFinished?.();
@@ -195,6 +224,11 @@ export function shareMemo(memo: Memo, options?: ShareMemoOptions): void {
 
   if (!canExportAnything(getEffectiveTierSync())) {
     requestUpgrade('export');
+    return;
+  }
+
+  if (options?.format === 'm4a' && Platform.OS === 'android') {
+    Alert.alert('Unavailable', 'M4A export is not available on Android yet. Choose WAV.');
     return;
   }
 

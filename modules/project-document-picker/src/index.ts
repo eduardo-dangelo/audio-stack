@@ -40,7 +40,7 @@ function requireAvailableModule(): ProjectDocumentPickerNativeModule {
   const module = getModule();
   if (!module?.isAvailable()) {
     throw new Error(
-      'Project import is not available. Rebuild the app with npx expo run:ios so the ProjectDocumentPicker native module is linked.'
+      'Project import is not available on this platform yet. On iOS, rebuild with npx expo run:ios.'
     );
   }
   return module;
