@@ -1,4 +1,6 @@
-import { ActionSheetIOS, Alert, Platform } from 'react-native';
+import { ActionSheetIOS, Platform } from 'react-native';
+
+import { presentAndroidActionSheet } from '@/src/components/AndroidActionSheetHost';
 
 type ActionSheetOptions = {
   title?: string;
@@ -8,7 +10,7 @@ type ActionSheetOptions = {
 };
 
 /**
- * iOS ActionSheet; Android Alert buttons (good enough for first Android milestone).
+ * iOS ActionSheet; Android vertical list modal (Alert buttons lay out horizontally).
  */
 export function showActionSheet(
   sheet: ActionSheetOptions,
@@ -27,21 +29,11 @@ export function showActionSheet(
     return;
   }
 
-  const buttons = sheet.options.map((text, index) => {
-    const isCancel = index === sheet.cancelButtonIndex;
-    const isDestructive = index === sheet.destructiveButtonIndex;
-    return {
-      text,
-      style: isCancel
-        ? ('cancel' as const)
-        : isDestructive
-          ? ('destructive' as const)
-          : ('default' as const),
-      onPress: () => onSelect(index),
-    };
-  });
-
-  Alert.alert(sheet.title ?? 'Choose an option', undefined, buttons, {
-    cancelable: true,
+  presentAndroidActionSheet({
+    title: sheet.title,
+    options: sheet.options,
+    cancelButtonIndex: sheet.cancelButtonIndex,
+    destructiveButtonIndex: sheet.destructiveButtonIndex,
+    onSelect,
   });
 }

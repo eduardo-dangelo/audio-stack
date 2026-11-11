@@ -11,6 +11,7 @@ import type { VoiceMemosColorScheme } from '@/constants/VoiceMemosColors';
 import { AudioEngineProvider } from '@/src/audio/AudioEngineContext';
 import { BillingProvider } from '@/src/billing';
 import { memoAudioEngine } from '@/src/audio/MemoAudioEngine';
+import { AndroidActionSheetHost } from '@/src/components/AndroidActionSheetHost';
 import { ImportSuccessHost } from '@/src/components/ImportSuccessDialog';
 import { LowBatteryWarningHost } from '@/src/components/LowBatteryWarningHost';
 import { UpgradeCelebrationHost } from '@/src/components/UpgradeCelebration';
@@ -212,6 +213,7 @@ export default function RootLayout() {
             <BillingProvider>
               <ThemeAppearanceSync />
               {/* Host before navigator so its layout effect registers before route effects. */}
+              <AndroidActionSheetHost />
               <ImportSuccessHost />
               <LowBatteryWarningHost />
               <UpgradeCelebrationHost />

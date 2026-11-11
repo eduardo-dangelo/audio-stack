@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Android action sheet list
+- Status: evolving
+- What: Android choice sheets (export format, stack/replace, move folder) use a vertical list modal instead of horizontal Alert buttons.
+- Paths: `src/utils/showActionSheet.ts`, `src/components/AndroidActionSheetHost.tsx`, `app/_layout.tsx`
+- Invariants: iOS ActionSheetIOS unchanged; cancel row secondary + divider; destructive uses recordRed; confirm Alerts stay Alert.alert.
+- Updated: 2026-11-11
+
 ### Android builtin mic pin
 - Status: evolving
 - What: Expo plugin makes Android `setInputDevice` real so headphones-on recording uses the phone mic via Oboe `setDeviceId`.
