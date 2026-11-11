@@ -15,7 +15,7 @@
       "supportsTablet": true,
       "appleTeamId": "JD2R9CV986",
       "bundleIdentifier": "com.eduardodangelo.voicememosplus",
-      "buildNumber": "27",
+      "buildNumber": "28",
       "userInterfaceStyle": "automatic",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Audio Stack needs microphone access to record audio.",

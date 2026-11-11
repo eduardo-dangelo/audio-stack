@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Landing brand icon
+- Status: evolving
+- What: Landing header/footer/favicon use the App Icon headphones + waveform mark (light/dark).
+- Paths: `landing/assets/icon.png`, `landing/assets/icon-dark.png`, `landing/index.html`, `landing/privacy.html`
+- Invariants: Light mark is black on white–gray fill; dark mark is white on `#0F0F0F`; theme-logo swaps via `data-light-src` / `data-dark-src`.
+- Updated: 2026-11-09
+
 ### Scroll Settings into view
 - Status: evolving
 - What: Opening Settings from the home gear scrolls the list so the Settings header is visible.
