@@ -1,7 +1,6 @@
 import * as Haptics from 'expo-haptics';
-import { SymbolView } from 'expo-symbols';
-import { useEffect, useLayoutEffect, useState } from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { Modal, Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   ZoomIn,
@@ -11,46 +10,49 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
-import type { SFSymbol } from 'sf-symbols-typescript';
 
 import {
   registerUpgradeCelebration,
   type CelebrationTier,
 } from '@/src/billing/celebrationBridge';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import { UpgradeWelcomeModal } from '@/src/components/UpgradeWelcomeModal';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
-const PARTICLE_COUNT = 16;
+const PARTICLE_COUNT_IOS = 16;
+const PARTICLE_COUNT_ANDROID = 8;
 const CELEBRATION_MS = 1600;
 
 const PRO_STAR_PATH =
   'M7.50 0.30L9.29 5.03L14.35 5.28L10.40 8.44L11.73 13.32L7.50 10.55L3.27 13.32L4.60 8.44L0.65 5.28L5.71 5.03Z';
 
-const PARTICLE_SYMBOLS: SFSymbol[] = [
+const PARTICLE_SYMBOLS = [
   'sparkles',
   'star.fill',
   'crown.fill',
   'waveform',
   'seal.fill',
-];
+] as const;
 
 type ParticleSpec = {
   id: number;
-  symbol: SFSymbol;
+  symbol: (typeof PARTICLE_SYMBOLS)[number];
   angle: number;
   distance: number;
   delay: number;
   size: number;
 };
 
-const PARTICLES: ParticleSpec[] = Array.from({ length: PARTICLE_COUNT }, (_, id) => ({
-  id,
-  symbol: PARTICLE_SYMBOLS[id % PARTICLE_SYMBOLS.length]!,
-  angle: (id / PARTICLE_COUNT) * Math.PI * 2 + (id % 3) * 0.12,
-  distance: 90 + (id % 5) * 28,
-  delay: 40 + (id % 8) * 35,
-  size: 16 + (id % 4) * 3,
-}));
+function buildParticles(count: number): ParticleSpec[] {
+  return Array.from({ length: count }, (_, id) => ({
+    id,
+    symbol: PARTICLE_SYMBOLS[id % PARTICLE_SYMBOLS.length]!,
+    angle: (id / count) * Math.PI * 2 + (id % 3) * 0.12,
+    distance: 90 + (id % 5) * 28,
+    delay: 40 + (id % 8) * 35,
+    size: 16 + (id % 4) * 3,
+  }));
+}
 
 function BurstParticle({
   spec,
@@ -85,7 +87,7 @@ function BurstParticle({
 
   return (
     <Animated.View style={[styles.particle, style]}>
-      <SymbolView name={{ ios: spec.symbol }} size={spec.size} tintColor={tint} />
+      <AppSymbol name={spec.symbol} size={spec.size} tintColor={tint} />
     </Animated.View>
   );
 }
@@ -119,6 +121,13 @@ type Props = {
 
 function UpgradeCelebrationOverlay({ tier, onFinished }: Props) {
   const colors = useVoiceMemosColors();
+  const particles = useMemo(
+    () =>
+      buildParticles(
+        Platform.OS === 'android' ? PARTICLE_COUNT_ANDROID : PARTICLE_COUNT_IOS
+      ),
+    []
+  );
 
   useEffect(() => {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -129,29 +138,40 @@ function UpgradeCelebrationOverlay({ tier, onFinished }: Props) {
 
   const tint = tier === 'pro' ? '#4C96FF' : colors.accent;
   const labelColor = tier === 'pro' ? '#2B7FFF' : colors.accent;
+  const badge = (
+    <>
+      <AppSymbol name="lock.open.fill" size={22} tintColor={labelColor} />
+      <View style={styles.tierRow}>
+        {tier === 'pro' ? (
+          <ProStarMark size={18} />
+        ) : (
+          <AppSymbol name="sparkles" size={18} tintColor={labelColor} />
+        )}
+        <Text style={[styles.badgeText, { color: labelColor }]}>
+          {tier === 'pro' ? 'Pro' : 'Plus'}
+        </Text>
+      </View>
+    </>
+  );
 
   return (
     <Modal animationType="none" transparent visible statusBarTranslucent>
       <View pointerEvents="none" style={styles.backdrop}>
         <View style={styles.burstOrigin}>
-          {PARTICLES.map((spec) => (
+          {particles.map((spec) => (
             <BurstParticle key={spec.id} spec={spec} tint={tint} />
           ))}
-          <Animated.View
-            entering={ZoomIn.springify().damping(12).stiffness(160)}
-            style={[styles.badge, { backgroundColor: colors.sheetBackground }]}>
-            <SymbolView name={{ ios: 'lock.open.fill' }} size={22} tintColor={labelColor} />
-            <View style={styles.tierRow}>
-              {tier === 'pro' ? (
-                <ProStarMark size={18} />
-              ) : (
-                <SymbolView name={{ ios: 'sparkles' }} size={18} tintColor={labelColor} />
-              )}
-              <Text style={[styles.badgeText, { color: labelColor }]}>
-                {tier === 'pro' ? 'Pro' : 'Plus'}
-              </Text>
+          {Platform.OS === 'android' ? (
+            <View style={[styles.badge, { backgroundColor: colors.sheetBackground }]}>
+              {badge}
             </View>
-          </Animated.View>
+          ) : (
+            <Animated.View
+              entering={ZoomIn.springify().damping(12).stiffness(160)}
+              style={[styles.badge, { backgroundColor: colors.sheetBackground }]}>
+              {badge}
+            </Animated.View>
+          )}
         </View>
       </View>
     </Modal>

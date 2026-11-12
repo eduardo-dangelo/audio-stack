@@ -1,7 +1,6 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
-import { SymbolView } from 'expo-symbols';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
 
@@ -12,6 +11,7 @@ import {
   welcomeUnlocksForTier,
   type WelcomeUnlock,
 } from '@/src/billing/welcomeUnlocks';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import {
   LIST_ITEM_ENTER,
   LIST_ITEM_EXIT,
@@ -60,6 +60,20 @@ function ProTierMark() {
   );
 }
 
+/** Android: SvgText matches Pro metrics; accent fill (no gradient). */
+function PlusTierMark({ accentColor }: { accentColor: string }) {
+  return (
+    <>
+      <AppSymbol name="sparkles" size={15} tintColor={accentColor} />
+      <Svg width={36} height={16} viewBox="0 0 36 16">
+        <SvgText fill={accentColor} fontSize={15} fontWeight="600" x={0} y={13.2}>
+          Plus
+        </SvgText>
+      </Svg>
+    </>
+  );
+}
+
 export function UpgradeWelcomeModal({ visible, tier, onClose }: UpgradeWelcomeModalProps) {
   const colors = useVoiceMemosColors();
   const colorScheme = useColorScheme();
@@ -75,7 +89,7 @@ export function UpgradeWelcomeModal({ visible, tier, onClose }: UpgradeWelcomeMo
 
   return (
     <Modal
-      animationType={useGlass ? 'none' : 'fade'}
+      animationType={Platform.OS === 'android' || useGlass ? 'none' : 'fade'}
       transparent
       visible={visible}
       onRequestClose={onClose}>
@@ -95,13 +109,11 @@ export function UpgradeWelcomeModal({ visible, tier, onClose }: UpgradeWelcomeMo
               <View style={styles.tierMark}>
                 {tier === 'pro' ? (
                   <ProTierMark />
+                ) : Platform.OS === 'android' ? (
+                  <PlusTierMark accentColor={colors.accent} />
                 ) : (
                   <>
-                    <SymbolView
-                      name={{ ios: 'sparkles' }}
-                      size={15}
-                      tintColor={colors.accent}
-                    />
+                    <AppSymbol name="sparkles" size={15} tintColor={colors.accent} />
                     <Text style={[styles.tierMarkLabel, { color: colors.accent }]}>
                       Plus
                     </Text>
@@ -196,10 +208,10 @@ function UnlockRow({
 }) {
   const content = (
     <>
-      <SymbolView name={{ ios: item.symbol }} size={16} tintColor={accentColor} />
+      <AppSymbol name={item.symbol} size={16} tintColor={accentColor} />
       <Text style={styles.rowLabel}>{item.label}</Text>
       {disclosure ? (
-        <SymbolView name={{ ios: disclosure }} size={12} tintColor={secondaryColor} />
+        <AppSymbol name={disclosure} size={12} tintColor={secondaryColor} />
       ) : null}
     </>
   );

@@ -54,12 +54,12 @@ async function applyProWelcomeTheme(): Promise<void> {
   await setThemePreference(PRO_WELCOME_THEME);
 }
 
-/** Theme (Pro) + jackpot in one beat after entitlements are live. */
+/** Jackpot first so the burst is not blocked on theme persistence. */
 async function celebrateUpgrade(tier: 'plus' | 'pro'): Promise<void> {
+  requestUpgradeCelebration(tier);
   if (tier === 'pro') {
     await applyProWelcomeTheme();
   }
-  requestUpgradeCelebration(tier);
 }
 
 function hasActiveProSubscription(

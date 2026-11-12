@@ -14,6 +14,8 @@ const SF_TO_ANDROID: Record<string, AndroidSymbol> = {
   'gearshape.fill': 'settings',
   'folder.badge.plus': 'create_new_folder',
   'chevron.left': 'arrow_back',
+  'chevron.right': 'chevron_right',
+  'chevron.down': 'expand_more',
   'square.and.arrow.up': 'ios_share',
   'square.and.arrow.down': 'file_download',
   pencil: 'edit',
@@ -23,6 +25,7 @@ const SF_TO_ANDROID: Record<string, AndroidSymbol> = {
   trash: 'delete',
   'sidebar.left': 'view_sidebar',
   'arrow.up.left.and.arrow.down.right': 'open_in_full',
+  xmark: 'close',
 
   scissors: 'content_cut',
   'arrow.left.and.right': 'swap_horiz',
@@ -51,16 +54,27 @@ const SF_TO_ANDROID: Record<string, AndroidSymbol> = {
   'music.note': 'music_note',
   folder: 'folder',
   'square.stack.3d.down.right': 'layers',
+  'square.stack.3d.up': 'layers',
   'speaker.wave.2': 'volume_up',
   headphones: 'headphones',
   lock: 'lock',
   'lock.open': 'lock_open',
+  'lock.open.fill': 'lock_open',
   'rectangle.expand.vertical': 'unfold_more',
   'rectangle.compress.vertical': 'unfold_less',
   'arrow.clockwise': 'refresh',
   'arrow.uturn.backward': 'undo',
   'checkmark.circle.fill': 'check_circle',
   circle: 'radio_button_unchecked',
+
+  // Paywall / celebration
+  sparkles: 'auto_awesome',
+  'star.fill': 'star',
+  'crown.fill': 'workspace_premium',
+  'seal.fill': 'verified',
+  paintbrush: 'brush',
+  repeat: 'repeat',
+  doc: 'description',
 };
 
 type Props = {

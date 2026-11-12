@@ -1,7 +1,7 @@
-import { SymbolView } from 'expo-symbols';
 import { useMemo, useRef, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -20,6 +20,7 @@ import {
 } from '@/src/billing/capabilities';
 import { setRibbonSkew } from '@/src/billing/effectiveTierStore';
 import type { TierId, UpgradeReason } from '@/src/billing/types';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import { useDuoSideColumn } from '@/src/hooks/useDuoSideColumn';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
@@ -163,13 +164,7 @@ function FeatureCell({
   colors: ReturnType<typeof useVoiceMemosColors>;
 }) {
   if (value === true) {
-    return (
-      <SymbolView
-        name={{ ios: 'checkmark' as SFSymbol }}
-        size={13}
-        tintColor={colors.accent}
-      />
-    );
+    return <AppSymbol name="checkmark" size={13} tintColor={colors.accent} />;
   }
   if (value === false) {
     return <Text style={styles.cellMuted}>–</Text>;
@@ -225,15 +220,16 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
       title: 'Plus',
       price: plusPriceLabel,
       symbol: 'sparkles',
-      // Plus when upgrading from Lite for a reason that is not Pro-only.
+      // Plus when upgrading from Lite for a reason that is not Pro-only,
+      // or when Settings opens plans with no feature context.
       recommended:
         effectiveTier === 'lite' &&
-        reason != null &&
-        reason !== 'exportFormat' &&
-        reason !== 'themes' &&
-        reason !== 'pitch' &&
-        reason !== 'duplicate' &&
-        reason !== 'loop',
+        (reason == null ||
+          (reason !== 'exportFormat' &&
+            reason !== 'themes' &&
+            reason !== 'pitch' &&
+            reason !== 'duplicate' &&
+            reason !== 'loop')),
     },
     pro: {
       title: 'Pro',
@@ -244,7 +240,8 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
         reason === 'themes' ||
         reason === 'pitch' ||
         reason === 'duplicate' ||
-        reason === 'loop',
+        reason === 'loop' ||
+        (reason == null && effectiveTier === 'plus'),
     },
   };
 
@@ -320,8 +317,8 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
             const titleRow = (
               <View style={styles.tierTitleRow}>
                 {tierMeta[tier].symbol ? (
-                  <SymbolView
-                    name={{ ios: tierMeta[tier].symbol }}
+                  <AppSymbol
+                    name={tierMeta[tier].symbol!}
                     size={13}
                     tintColor={tier === 'pro' ? PRO_STAR_TINT : colors.accent}
                   />
@@ -371,8 +368,8 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
                 index < FEATURES.length - 1 ? styles.featureRowBorder : null,
               ]}>
               <View style={styles.labelCol}>
-                <SymbolView
-                  name={{ ios: feature.symbol }}
+                <AppSymbol
+                  name={feature.symbol}
                   size={12}
                   tintColor={highlighted ? colors.accent : colors.secondaryText}
                 />
@@ -465,7 +462,7 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
           onPress={onClose}
           hitSlop={12}
           style={styles.closeButton}>
-          <SymbolView name={{ ios: 'xmark' }} size={16} tintColor={colors.secondaryText} />
+          <AppSymbol name="xmark" size={16} tintColor={colors.secondaryText} />
         </Pressable>
       </View>
 
@@ -564,12 +561,12 @@ function useStyles(
           color: colors.secondaryText,
         },
         closeButton: {
-          width: 30,
-          height: 30,
-          borderRadius: 15,
+          width: Platform.OS === 'android' ? 48 : 30,
+          height: Platform.OS === 'android' ? 48 : 30,
+          borderRadius: Platform.OS === 'android' ? 0 : 15,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: mutedCol,
+          backgroundColor: Platform.OS === 'android' ? 'transparent' : mutedCol,
         },
         table: {
           borderRadius: 12,

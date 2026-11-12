@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Paywall Android polish
+- Status: evolving
+- What: Android paywall uses AppSymbol chrome; upgrade burst shows Material particles; Settings/plans recommends the next tier when no feature reason.
+- Paths: `src/components/PaywallModal.tsx`, `src/components/AppSymbol.tsx`, `src/components/UpgradeCelebration.tsx`, `src/components/UpgradeWelcomeModal.tsx`, `src/billing/BillingProvider.tsx`, `app/index.tsx`
+- Invariants: Android close is flat 48dp (no glass circle); feature ticks/icons via AppSymbol; Android burst uses 8 particles and a static tier badge (no ZoomIn); iOS badge still springs; celebration starts before Quiet Light write; no-reason paywall recommends Plus for Lite and Pro for Plus; Android Plus mark uses AppSymbol + SvgText (15/600 like Pro, accent fill); iOS Plus keeps Text; welcome unlock rows use AppSymbol; Android welcome Modal has no fade.
+- Updated: 2026-11-12
+
 ### Recording UI audio clock
 - Status: evolving
 - What: Android recording follow slides timeline via translateX from `getRecordingTime`; timer uses the same follow clock; live bars use peak duration only (no clock stretch).

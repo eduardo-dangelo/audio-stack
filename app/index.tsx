@@ -22,6 +22,7 @@ import Svg, { Defs, LinearGradient, Path, Stop, Text as SvgText } from 'react-na
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { memoAudioEngine } from '@/src/audio/MemoAudioEngine';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import { FloatingHeaderButton } from '@/src/components/FloatingHeaderButton';
 import {
   GroupedListRow,
@@ -97,6 +98,20 @@ function ProTierMark() {
   );
 }
 
+/** Android: SvgText matches Pro metrics; accent fill (no gradient). */
+function PlusTierMark({ accentColor }: { accentColor: string }) {
+  return (
+    <>
+      <AppSymbol name="sparkles" size={15} tintColor={accentColor} />
+      <Svg width={36} height={16} viewBox="0 0 36 16">
+        <SvgText fill={accentColor} fontSize={15} fontWeight="600" x={0} y={13.2}>
+          Plus
+        </SvgText>
+      </Svg>
+    </>
+  );
+}
+
 function HomeTierMark({
   tier,
   accentColor,
@@ -121,9 +136,11 @@ function HomeTierMark({
       style={rowStyle}>
       {tier === 'pro' ? (
         <ProTierMark />
+      ) : Platform.OS === 'android' ? (
+        <PlusTierMark accentColor={accentColor} />
       ) : (
         <>
-          <SymbolView name={{ ios: 'sparkles' }} size={15} tintColor={accentColor} />
+          <AppSymbol name="sparkles" size={15} tintColor={accentColor} />
           <Text style={[labelStyle, { color: accentColor }]}>Plus</Text>
         </>
       )}
