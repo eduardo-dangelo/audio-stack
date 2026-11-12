@@ -1,8 +1,22 @@
 import { useMemo } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeOut, ZoomIn } from 'react-native-reanimated';
+import {
+  ActivityIndicator,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
+
+const numeralEntering =
+  Platform.OS === 'ios'
+    ? ZoomIn.duration(180).springify().damping(18)
+    : FadeIn.duration(120);
+const numeralExiting = Platform.OS === 'ios' ? FadeOut.duration(90) : FadeOut.duration(120);
 
 type Props = {
   visible: boolean;
@@ -49,8 +63,8 @@ export function PrecountOverlay({
         ) : count !== null ? (
           <Animated.View
             key={count}
-            entering={ZoomIn.duration(180).springify().damping(18)}
-            exiting={FadeOut.duration(90)}
+            entering={numeralEntering}
+            exiting={numeralExiting}
             pointerEvents="none"
             style={styles.numeralWrap}>
             <Text style={styles.numeral}>{count}</Text>

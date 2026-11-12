@@ -1,7 +1,7 @@
 import { Stack, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
@@ -63,8 +63,8 @@ function RootNavigator() {
   const screenOptions = useMemo(() => buildHeaderOptions(colors), [colors]);
 
   const memoScreenOptions = useMemo(() => {
-    if (isRegularWidth) {
-      // Deep links / unexpected pushes on tablet: full-screen card, not form sheet.
+    // Android + regular-width: card. iOS phone: form sheet.
+    if (Platform.OS === 'android' || isRegularWidth) {
       return {
         title: '',
         presentation: 'card' as const,

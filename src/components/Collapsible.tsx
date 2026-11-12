@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
+import { LayoutChangeEvent, Platform, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -12,7 +12,7 @@ type Props = {
   children: React.ReactNode;
 };
 
-const DURATION_MS = 180;
+const DURATION_MS = Platform.OS === 'android' ? 120 : 180;
 
 export function Collapsible({ expanded, children }: Props) {
   const contentHeight = useSharedValue(0);

@@ -13,7 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import Animated, { FadeInUp, FadeOutDown } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { promptImportFile } from '@/src/actions/importAudio';
@@ -25,7 +25,11 @@ import {
   FloatingHeaderButton,
   type FloatingHeaderIcon,
 } from '@/src/components/FloatingHeaderButton';
-import { LIST_ITEM_TRANSITION } from '@/src/components/listTransitions';
+import {
+  FAB_ENTER,
+  FAB_EXIT,
+  LIST_ITEM_TRANSITION,
+} from '@/src/components/listTransitions';
 import {
   RecordFabCluster,
   type RecordFabSettings,
@@ -651,8 +655,8 @@ export function RecordingsList({
       {showRecordButton && !selectionMode && selectedMemoId == null ? (
         <Animated.View
           pointerEvents="box-none"
-          entering={FadeInUp.springify().damping(24).stiffness(280)}
-          exiting={FadeOutDown.duration(180)}
+          entering={FAB_ENTER}
+          exiting={FAB_EXIT}
           style={StyleSheet.absoluteFill}>
           <RecordFabCluster
             bottomOffset={32 + (isSidebar ? 0 : insets.bottom)}

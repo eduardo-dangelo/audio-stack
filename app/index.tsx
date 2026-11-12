@@ -12,12 +12,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import Animated, {
-  FadeIn,
-  FadeOut,
-  LinearTransition,
-  ZoomIn,
-} from 'react-native-reanimated';
+import Animated, { LinearTransition, ZoomIn } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
 
 import { useColorScheme } from '@/components/useColorScheme';
@@ -30,6 +25,13 @@ import {
   GroupedListSection,
   GroupedListSectionHeader,
 } from '@/src/components/GroupedList';
+import {
+  ENABLE_LAYOUT_TRANSITIONS,
+  LIST_ITEM_ENTER,
+  LIST_ITEM_EXIT,
+  SHORT_FADE_IN,
+  SHORT_FADE_OUT,
+} from '@/src/components/listTransitions';
 import { NamePromptDialog } from '@/src/components/NamePromptDialog';
 import {
   canCreateFolder,
@@ -130,9 +132,13 @@ function HomeTierMark({
     <Animated.View
       key={tier}
       entering={
-        animate ? ZoomIn.springify().damping(13).stiffness(170) : undefined
+        animate
+          ? Platform.OS === 'ios'
+            ? ZoomIn.springify().damping(13).stiffness(170)
+            : SHORT_FADE_IN
+          : undefined
       }
-      exiting={FadeOut.duration(160)}
+      exiting={SHORT_FADE_OUT}
       style={rowStyle}>
       {tier === 'pro' ? (
         <ProTierMark />
@@ -588,9 +594,11 @@ export default function FoldersHomeScreen() {
 
         {showSettings ? (
           <Animated.View
-            entering={FadeIn.duration(220)}
-            exiting={FadeOut.duration(160)}
-            layout={LinearTransition.duration(220)}>
+            entering={LIST_ITEM_ENTER}
+            exiting={LIST_ITEM_EXIT}
+            layout={
+              ENABLE_LAYOUT_TRANSITIONS ? LinearTransition.duration(220) : undefined
+            }>
             <View
               ref={settingsHeaderRef}
               collapsable={false}
@@ -614,7 +622,7 @@ export default function FoldersHomeScreen() {
                 <Switch value={overrideEnabled} onValueChange={toggleOverride} />
               </View>
               {overrideEnabled ? (
-                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(140)}>
+                <Animated.View entering={LIST_ITEM_ENTER} exiting={LIST_ITEM_EXIT}>
                   {INLINE_EDITOR_THEMES.map((theme) => {
                     const selected = themePreference === theme.id;
                     const locked = lockedThemeIds.has(theme.id);
