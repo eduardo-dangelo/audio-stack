@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Android splash wordmark
+- Status: evolving
+- What: Android splash uses a uniformly scaled full mark (original proportions) so it fits the system circular mask; iOS keeps the full splash.
+- Paths: `app.json`, `assets/images/splash-icon-android.png`, `assets/images/splash-icon-android-dark.png`
+- Invariants: Android splash assets are uniform full-mark scale centered for the circle; iOS still uses `splash-icon.png` / dark; `expo prebuild --platform android` required after asset changes before rebuild.
+- Updated: 2026-11-12
+
 ### Paywall Android polish
 - Status: evolving
 - What: Android paywall uses AppSymbol chrome; upgrade burst shows Material particles; Settings/plans recommends the next tier when no feature reason.

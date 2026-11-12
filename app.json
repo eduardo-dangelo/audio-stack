@@ -137,6 +137,14 @@
           "dark": {
             "image": "./assets/images/splash-icon-dark.png",
             "backgroundColor": "#0F0F0F"
+          },
+          "android": {
+            "image": "./assets/images/splash-icon-android.png",
+            "imageWidth": 200,
+            "dark": {
+              "image": "./assets/images/splash-icon-android-dark.png",
+              "backgroundColor": "#0F0F0F"
+            }
           }
         }
       ],
