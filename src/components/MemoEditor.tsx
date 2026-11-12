@@ -445,8 +445,8 @@ function MemoEditorTimeLabelIos({
 }
 
 /**
- * Android: recording label comes from WaveformView follow clock; playback uses
- * local RAF + getPlaybackTime; idle uses store currentTime.
+ * Android: live label from WaveformView follow clock (record + playback);
+ * idle uses store currentTime.
  */
 function MemoEditorTimeLabelAndroid({
   memoId,
@@ -457,7 +457,6 @@ function MemoEditorTimeLabelAndroid({
   onPress,
   liveRecordingLabelSinkRef,
 }: MemoEditorTimeLabelProps) {
-  const engine = useAudioEngine();
   const clock = useAudioEngineSelector(
     (state) => {
       const isActive = memoId != null && state.memoId === memoId;
@@ -486,6 +485,7 @@ function MemoEditorTimeLabelAndroid({
 
   const recordingLive = pendingRecordingLayout && clock.isRecording;
   const playbackLive = clock.isPlaying && !recordingLive;
+  const followLive = recordingLive || playbackLive;
 
   const idleLabel = (() => {
     if (pendingRecordingLayout) {
@@ -502,14 +502,14 @@ function MemoEditorTimeLabelAndroid({
   const [label, setLabel] = useState(idleLabel);
 
   useEffect(() => {
-    if (recordingLive || playbackLive) {
+    if (followLive) {
       return;
     }
     setLabel(idleLabel);
-  }, [recordingLive, playbackLive, idleLabel]);
+  }, [followLive, idleLabel]);
 
   useEffect(() => {
-    if (!recordingLive || !liveRecordingLabelSinkRef) {
+    if (!followLive || !liveRecordingLabelSinkRef) {
       return;
     }
     liveRecordingLabelSinkRef.current = (next) => {
@@ -518,23 +518,7 @@ function MemoEditorTimeLabelAndroid({
     return () => {
       liveRecordingLabelSinkRef.current = null;
     };
-  }, [recordingLive, liveRecordingLabelSinkRef]);
-
-  useEffect(() => {
-    if (!playbackLive) {
-      return;
-    }
-    let raf = 0;
-    const tick = () => {
-      const next = formatDurationWithTenths(engine.getPlaybackTime());
-      setLabel((prev) => (prev === next ? prev : next));
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(raf);
-    };
-  }, [playbackLive, engine]);
+  }, [followLive, liveRecordingLabelSinkRef]);
 
   return (
     <Pressable
@@ -4854,14 +4838,15 @@ function MemoEditorInner({
     () => recordingStartTime.current + engine.getRecordingDuration(),
     [engine]
   );
-  /** Android: WaveformView follow clock → time label (no editor shell re-render). */
+  /** Android: WaveformView follow clock → time label (record + playback). */
   const liveRecordingLabelSinkRef = useRef<((label: string) => void) | null>(null);
   const handleLiveTimelineTime = useCallback(
     (time: number) => {
       if (Platform.OS !== 'android') {
         return;
       }
-      if (!engine.getState().isRecording) {
+      const state = engine.getState();
+      if (!state.isRecording && !state.isPlaying) {
         return;
       }
       liveRecordingLabelSinkRef.current?.(formatDurationWithTenths(time));

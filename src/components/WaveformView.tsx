@@ -43,10 +43,10 @@ import {
   applyPinchDeltaToTrackZoom,
   clampTimelinePixelsPerSecond,
   clampTimelineTrackZoom,
+  getInitialTimelinePixelsPerSecond,
   getTimelineZoomBounds,
   getTimelineZoomDisplayMultipliers,
   getTimelineZoomMultiplierBounds,
-  getInitialTimelinePixelsPerSecond,
   isTimelineZoomAtDefault,
   pixelsPerSecondFromZoomMultiplier,
   TIMELINE_DEFAULT_PIXELS_PER_SECOND,
@@ -68,8 +68,8 @@ import {
   WAVEFORM_PIXELS_PER_SECOND,
 } from '@/src/audio/waveform';
 import { FloatingHeaderButton } from '@/src/components/FloatingHeaderButton';
-import { LoopColumnOverlay } from '@/src/components/LoopColumnOverlay';
 import { TRACK_ROW_ENTER, TRACK_ROW_EXIT } from '@/src/components/listTransitions';
+import { LoopColumnOverlay } from '@/src/components/LoopColumnOverlay';
 import {
   LOOP_EXPAND_DURATION_MS,
   LOOP_EXPAND_EASING,
@@ -79,10 +79,6 @@ import {
   type LoopOverlayConfig,
   type LoopPreviewState,
 } from '@/src/components/LoopRegionBar';
-import {
-  PROCESSING_BAR_HEIGHT,
-  ProcessingProgressBar,
-} from '@/src/components/ProcessingProgressBar';
 import {
   buildMetronomeGridLines,
   getFollowBarPaintTimeRange,
@@ -97,21 +93,25 @@ import {
   type MetronomeGridBuffer,
 } from '@/src/components/MetronomeGridOverlay';
 import {
+  PROCESSING_BAR_HEIGHT,
+  ProcessingProgressBar,
+} from '@/src/components/ProcessingProgressBar';
+import { TimelineZoomDialog } from '@/src/components/TimelineZoomDialog';
+import {
   TrackFadeOverlay,
   type FadeOverlayConfig,
   type FadeRegionState,
 } from '@/src/components/track-editor/TrackFadeOverlay';
-import { TimelineZoomDialog } from '@/src/components/TimelineZoomDialog';
+import { WaveformBarsSvg } from '@/src/components/WaveformBarsSvg';
 import {
   appendWaveformBarRect,
   getVisibleBarIndexRange,
   getVisibleMarkerSeconds,
   waveformBarHeightPx,
 } from '@/src/components/waveformViewport';
-import { WaveformBarsSvg } from '@/src/components/WaveformBarsSvg';
+import { useIsRegularWidth } from '@/src/hooks/useIsRegularWidth';
 import type { MetronomeSettings } from '@/src/storage/types';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
-import { useIsRegularWidth } from '@/src/hooks/useIsRegularWidth';
 import { formatMarkerTime } from '@/src/utils/format';
 
 export type { FadeOverlayConfig, FadeRegionState };
@@ -2364,7 +2364,10 @@ function WaveformViewComponent({
   onLiveTimelineTimeRef.current = onLiveTimelineTime;
   const currentTimeRef = useRef(currentTime);
   currentTimeRef.current = currentTime;
-  /** Android recording follow: slide content under fixed playhead (avoid scrollTo thrash). */
+  /**
+   * Android follow clock (recording + playback): slide content under the fixed
+   * playhead via UI-thread translateX. JS only refreshes sparse audio anchors.
+   */
   const recordingFollowTranslateXSV = useSharedValue(0);
   const recordingClockActiveSV = useSharedValue(false);
   const recordingClockTimeSV = useSharedValue(0);
@@ -3525,6 +3528,20 @@ function WaveformViewComponent({
     clearUserScrollMomentumTimeout();
     isUserScrollingRef.current = true;
     setIsUserScrolling(true);
+    // Android playback translate → native scroll handoff before pause flips isPlaying.
+    if (
+      Platform.OS === 'android' &&
+      isPlayingRef.current &&
+      !followRecordingScrollRef.current &&
+      recordingClockActiveSV.value
+    ) {
+      const x = scrollOffsetRef.current;
+      recordingClockActiveSV.value = false;
+      recordingFrameCallback.setActive(false);
+      cancelAnimation(recordingFollowTranslateXSV);
+      recordingFollowTranslateXSV.value = 0;
+      scrollRef.current?.scrollTo({ x, animated: false });
+    }
     if (isPlayingRef.current) {
       resumeAfterScrubRef.current = true;
       onPlaybackScrubStartRef.current?.();
@@ -3709,8 +3726,10 @@ function WaveformViewComponent({
     });
   }, [scrollX, viewportWidth, followRecordingScroll, isPlaying, gestureOverlay, layoutPixelsPerSecond]);
 
+  // iOS playback: JS RAF + scrollTo. Android playback uses the translate clock below.
   useEffect(() => {
     if (
+      Platform.OS === 'android' ||
       followRecordingScroll ||
       !isPlaying ||
       duration <= 0 ||
@@ -3768,20 +3787,13 @@ function WaveformViewComponent({
       const time = getPlaybackTimeRef.current?.() ?? currentTimeRef.current;
       const x = timeToScrollX(time, contentWidth, layoutPixelsPerSecond);
       emitLiveTime(time);
-      // Android: skip no-op scrollTo for sub-pixel deltas (expensive ScrollView).
-      // Still refresh the audio clock every frame; iOS always scrollTo as before.
-      const skipScrollTo =
-        Platform.OS === 'android' &&
-        Math.abs(x - scrollOffsetRef.current) < 0.5;
       scrollOffsetRef.current = x;
       // Scroll first; coalesce React viewport/grid updates onto the next frame so
       // bar remounts never land in the same frame as scrollTo (reads as shake).
-      if (!skipScrollTo) {
-        scrollRef.current?.scrollTo({
-          x,
-          animated: false,
-        });
-      }
+      scrollRef.current?.scrollTo({
+        x,
+        animated: false,
+      });
       pendingBufferScrollX = x;
       if (bufferSyncRaf === 0) {
         bufferSyncRaf = requestAnimationFrame(() => {
@@ -3823,6 +3835,201 @@ function WaveformViewComponent({
       }
     };
   }, [isPlaying, followRecordingScroll, duration, contentWidth, viewportWidth, layoutPixelsPerSecond]);
+
+  // Android playback: park ScrollView at 0 and slide via the shared UI-thread clock.
+  useLayoutEffect(() => {
+    const useAndroidPlaybackTranslate =
+      Platform.OS === 'android' && isPlaying && !followRecordingScroll;
+    if (!useAndroidPlaybackTranslate) {
+      return;
+    }
+    clearUserScrollMomentumTimeout();
+    isUserScrollingRef.current = false;
+    setIsUserScrolling(false);
+    const time = getPlaybackTimeRef.current?.() ?? currentTimeRef.current;
+    const pps = layoutPixelsPerSecondRef.current;
+    const x = timeToScrollX(time, contentWidthRef.current, pps);
+    scrollRef.current?.scrollTo({ x: 0, animated: false });
+    recordingClockTimeSV.value = time;
+    recordingPpsSV.value = pps;
+    recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
+    recordingClockActiveSV.value = true;
+    recordingFrameCallback.setActive(true);
+    cancelAnimation(recordingFollowTranslateXSV);
+    recordingFollowTranslateXSV.value = -x;
+    scrollOffsetRef.current = x;
+    return () => {
+      const restoreTime = getPlaybackTimeRef.current?.() ?? currentTimeRef.current;
+      const restoreX = timeToScrollX(
+        restoreTime,
+        contentWidthRef.current,
+        layoutPixelsPerSecondRef.current
+      );
+      recordingClockActiveSV.value = false;
+      recordingFrameCallback.setActive(false);
+      cancelAnimation(recordingFollowTranslateXSV);
+      recordingFollowTranslateXSV.value = 0;
+      scrollOffsetRef.current = restoreX;
+      scrollRef.current?.scrollTo({ x: restoreX, animated: false });
+      syncMetronomeGridRef.current(restoreX);
+    };
+  }, [isPlaying, followRecordingScroll]);
+
+  // Android playback: sparse getPlaybackTime anchors; useFrameCallback owns motion.
+  // viewportWidth starts the loop; contentWidth/pps stay on refs (no mid-play restart).
+  useEffect(() => {
+    if (
+      Platform.OS !== 'android' ||
+      followRecordingScroll ||
+      !isPlaying ||
+      duration <= 0 ||
+      viewportWidth <= 0
+    ) {
+      return;
+    }
+
+    clearUserScrollMomentumTimeout();
+    isUserScrollingRef.current = false;
+    setIsUserScrolling(false);
+
+    const anchorIntervalMs = 50;
+    let raf = 0;
+    let bufferSyncRaf = 0;
+    let pendingBufferScrollX = 0;
+    let lastEmittedCenti = -1;
+    let lastAudioSampleMs = 0;
+    let labelAnchorTime = 0;
+    let labelAnchorWallMs = 0;
+    let appState: string = AppState.currentState;
+
+    const emitLiveTime = (time: number) => {
+      const centi = Math.floor(Math.max(0, time) * 100);
+      if (centi === lastEmittedCenti) {
+        return;
+      }
+      lastEmittedCenti = centi;
+      onLiveTimelineTimeRef.current?.(time);
+    };
+
+    const displayTimeAt = (frameMs: number) =>
+      labelAnchorTime +
+      Math.min(1, Math.max(0, (frameMs - labelAnchorWallMs) / 1000));
+
+    const enablePlaybackClock = (time: number, pps: number, frameMs: number) => {
+      labelAnchorTime = time;
+      labelAnchorWallMs = frameMs;
+      lastAudioSampleMs = frameMs;
+      recordingClockTimeSV.value = time;
+      recordingPpsSV.value = pps;
+      recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
+      recordingClockActiveSV.value = true;
+      recordingFrameCallback.setActive(true);
+    };
+
+    const disablePlaybackClock = () => {
+      recordingClockActiveSV.value = false;
+      recordingFrameCallback.setActive(false);
+    };
+
+    const snapPlaybackTranslate = (x: number) => {
+      cancelAnimation(recordingFollowTranslateXSV);
+      recordingFollowTranslateXSV.value = -x;
+    };
+
+    const samplePlaybackAudio = (frameMs: number, force: boolean) => {
+      if (!force && frameMs - lastAudioSampleMs < anchorIntervalMs) {
+        return;
+      }
+      const time = getPlaybackTimeRef.current?.() ?? currentTimeRef.current;
+      const pps = layoutPixelsPerSecondRef.current;
+      labelAnchorTime = time;
+      labelAnchorWallMs = frameMs;
+      lastAudioSampleMs = frameMs;
+      recordingClockTimeSV.value = time;
+      recordingPpsSV.value = pps;
+      recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
+      scrollOffsetRef.current = timeToScrollX(time, contentWidthRef.current, pps);
+    };
+
+    const syncPlaybackScroll = (enableClock: boolean) => {
+      const time = getPlaybackTimeRef.current?.() ?? currentTimeRef.current;
+      const pps = layoutPixelsPerSecondRef.current;
+      const x = timeToScrollX(time, contentWidthRef.current, pps);
+      scrollOffsetRef.current = x;
+      if (enableClock) {
+        enablePlaybackClock(time, pps, 0);
+        snapPlaybackTranslate(x);
+        emitLiveTime(time);
+      } else {
+        emitLiveTime(time);
+        disablePlaybackClock();
+        snapPlaybackTranslate(x);
+      }
+      syncMetronomeGridRef.current(x);
+    };
+
+    const tick = (frameMs: number) => {
+      if (appState !== 'active') {
+        raf = 0;
+        return;
+      }
+      if (isUserScrollingRef.current) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      samplePlaybackAudio(frameMs, false);
+      const displayTime = displayTimeAt(frameMs);
+      emitLiveTime(displayTime);
+      pendingBufferScrollX = scrollOffsetRef.current;
+      if (bufferSyncRaf === 0) {
+        bufferSyncRaf = requestAnimationFrame(() => {
+          bufferSyncRaf = 0;
+          syncMetronomeGridRef.current(pendingBufferScrollX);
+        });
+      }
+      raf = requestAnimationFrame(tick);
+    };
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      appState = nextState;
+      if (nextState === 'active') {
+        syncPlaybackScroll(true);
+        if (raf === 0) {
+          raf = requestAnimationFrame(tick);
+        }
+      } else {
+        disablePlaybackClock();
+        if (raf !== 0) {
+          cancelAnimationFrame(raf);
+          raf = 0;
+          if (bufferSyncRaf !== 0) {
+            cancelAnimationFrame(bufferSyncRaf);
+            bufferSyncRaf = 0;
+          }
+        }
+      }
+    });
+
+    if (appState === 'active') {
+      const time = getPlaybackTimeRef.current?.() ?? currentTimeRef.current;
+      const pps = layoutPixelsPerSecondRef.current;
+      enablePlaybackClock(time, pps, 0);
+      snapPlaybackTranslate(timeToScrollX(time, contentWidthRef.current, pps));
+      raf = requestAnimationFrame(tick);
+    } else {
+      syncPlaybackScroll(false);
+    }
+
+    return () => {
+      subscription.remove();
+      cancelAnimationFrame(raf);
+      if (bufferSyncRaf !== 0) {
+        cancelAnimationFrame(bufferSyncRaf);
+      }
+      disablePlaybackClock();
+      cancelAnimation(recordingFollowTranslateXSV);
+    };
+  }, [isPlaying, followRecordingScroll, duration, viewportWidth]);
 
   useEffect(() => {
     return () => {
@@ -3879,12 +4086,14 @@ function WaveformViewComponent({
     }
 
     const useTranslateFollow = Platform.OS === 'android';
-    const anchorIntervalMs = 100;
+    const anchorIntervalMs = 0.01;
     let raf = 0;
     let bufferSyncRaf = 0;
     let pendingBufferScrollX = 0;
     let lastEmittedCenti = -1;
-    let lastAnchorMs = 0;
+    let lastAudioSampleMs = 0;
+    let labelAnchorTime = 0;
+    let labelAnchorWallMs = 0;
     let appState: string = AppState.currentState;
 
     const emitLiveTime = (time: number) => {
@@ -3896,7 +4105,14 @@ function WaveformViewComponent({
       onLiveTimelineTimeRef.current?.(time);
     };
 
-    const enableRecordingClock = (time: number, pps: number) => {
+    const displayTimeAt = (frameMs: number) =>
+      labelAnchorTime +
+      Math.min(1, Math.max(0, (frameMs - labelAnchorWallMs) / 1000));
+
+    const enableRecordingClock = (time: number, pps: number, frameMs: number) => {
+      labelAnchorTime = time;
+      labelAnchorWallMs = frameMs;
+      lastAudioSampleMs = frameMs;
       recordingClockTimeSV.value = time;
       recordingPpsSV.value = pps;
       recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
@@ -3914,6 +4130,23 @@ function WaveformViewComponent({
       recordingFollowTranslateXSV.value = -x;
     };
 
+    const sampleRecordingAudio = (frameMs: number, force: boolean) => {
+      if (!force && frameMs - lastAudioSampleMs < anchorIntervalMs) {
+        return getRecordingTimeRef.current?.() ?? currentTimeRef.current;
+      }
+      const time = getRecordingTimeRef.current?.() ?? currentTimeRef.current;
+      const pps = layoutPixelsPerSecondRef.current;
+      labelAnchorTime = time;
+      labelAnchorWallMs = frameMs;
+      lastAudioSampleMs = frameMs;
+      if (useTranslateFollow) {
+        recordingClockTimeSV.value = time;
+        recordingPpsSV.value = pps;
+        recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
+      }
+      return time;
+    };
+
     const applyRecordingFollowX = (
       time: number,
       x: number,
@@ -3921,23 +4154,19 @@ function WaveformViewComponent({
       snap: boolean
     ) => {
       scrollOffsetRef.current = x;
-      emitLiveTime(time);
       if (!useTranslateFollow) {
+        emitLiveTime(time);
         scrollRef.current?.scrollTo({ x, animated: false });
         return;
       }
       const pps = layoutPixelsPerSecondRef.current;
       if (snap) {
-        enableRecordingClock(time, pps);
+        enableRecordingClock(time, pps, frameMs);
         snapRecordingTranslate(x);
+        emitLiveTime(time);
         return;
       }
-      if (frameMs - lastAnchorMs >= anchorIntervalMs) {
-        lastAnchorMs = frameMs;
-        recordingClockTimeSV.value = time;
-        recordingPpsSV.value = pps;
-        recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
-      }
+      emitLiveTime(displayTimeAt(frameMs));
     };
 
     const syncRecordingScroll = (enableClock: boolean) => {
@@ -3973,7 +4202,9 @@ function WaveformViewComponent({
         raf = requestAnimationFrame(tick);
         return;
       }
-      const time = getRecordingTimeRef.current?.() ?? currentTimeRef.current;
+      const time = useTranslateFollow
+        ? sampleRecordingAudio(frameMs, false)
+        : getRecordingTimeRef.current?.() ?? currentTimeRef.current;
       const pps = layoutPixelsPerSecondRef.current;
       const nextLayoutDuration = getLayoutDuration(
         Math.max(durationRef.current, time),
@@ -3987,7 +4218,7 @@ function WaveformViewComponent({
         setFollowLayoutDuration(nextLayoutDuration);
       }
       const x = recordingTimeToScrollX(time, contentWidthRef.current, pps);
-      // iOS scrollTo every frame. Android only refreshes the audio anchor;
+      // iOS scrollTo every frame. Android sparse audio anchors + extrapolated label;
       // useFrameCallback owns translateX.
       applyRecordingFollowX(time, x, frameMs, false);
       pendingBufferScrollX = x;
@@ -4025,7 +4256,7 @@ function WaveformViewComponent({
     if (appState === 'active') {
       if (useTranslateFollow) {
         const time = getRecordingTimeRef.current?.() ?? currentTimeRef.current;
-        enableRecordingClock(time, layoutPixelsPerSecondRef.current);
+        enableRecordingClock(time, layoutPixelsPerSecondRef.current, 0);
       }
       raf = requestAnimationFrame(tick);
     } else {
