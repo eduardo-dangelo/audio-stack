@@ -264,6 +264,11 @@ function areMemoEditorEngineSlicesEqual(
   }
 
   if (a.isRecording || b.isRecording) {
+    // Android label/follow use the waveform clock sink; peaks refresh via
+    // LiveRecordingWaveform — skip ~20Hz shell re-renders from recordingDuration.
+    if (Platform.OS === 'android') {
+      return true;
+    }
     return a.recordingDuration === b.recordingDuration;
   }
 
@@ -4896,7 +4901,13 @@ function MemoEditorInner({
     isStoppingRecordingRef.current = true;
     setIsStoppingRecording(true);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    void stopAndSaveActiveRecording();
+    void (async () => {
+      // Let stopping chrome paint before sync recorder.stop / peak trim.
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+      await stopAndSaveActiveRecording();
+    })();
   };
 
   const beginRecording = async (mode: 'replace' | 'stack') => {

@@ -4086,7 +4086,7 @@ function WaveformViewComponent({
     }
 
     const useTranslateFollow = Platform.OS === 'android';
-    const anchorIntervalMs = 0.01;
+    const anchorIntervalMs = 50;
     let raf = 0;
     let bufferSyncRaf = 0;
     let pendingBufferScrollX = 0;

@@ -24,8 +24,8 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: Android recording follow slides timeline via translateX from `getRecordingTime`; timer uses the same follow clock; live bars use peak duration only (no clock stretch).
 - Paths: `src/components/WaveformView.tsx`, `src/components/MemoEditor.tsx`
-- Invariants: Android capture parks ScrollView at 0 and moves translateX from a UI-thread clock anchored to `getRecordingTime` (max 1s extrapolation, anchor ~50ms); enter/exit/background snap translateX and disable the frame callback; follow RAF does not restart on contentWidth; iOS recording still `scrollTo`; Android recording label from `onLiveTimelineTime`; live duration is latency-trimmed peak preview only.
-- Updated: 2026-11-11
+- Invariants: Android capture parks ScrollView at 0 and moves translateX from a UI-thread clock anchored to `getRecordingTime` (max 1s extrapolation, anchor ~50ms); enter/exit/background snap translateX and disable the frame callback; follow RAF does not restart on contentWidth; iOS recording still `scrollTo`; Android recording label from `onLiveTimelineTime`; Android MemoEditor skips `recordingDuration` shell re-renders during capture (peaks via LiveRecordingWaveform); live duration is latency-trimmed peak preview only.
+- Updated: 2026-11-12
 
 ### Playback UI audio clock
 - Status: evolving
@@ -37,8 +37,8 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 ### Android UI jank
 - Status: evolving
 - What: Cut Android JS-thread load from per-row Modals and triple route polls; use short opacity fades instead of iOS layout/springs.
-- Paths: `src/components/listTransitions.ts`, `src/components/RecordingsList.tsx`, `src/components/RecordingRow.tsx`, `src/components/Collapsible.tsx`, `app/_layout.tsx`, `src/components/MemoOptionsMenu.tsx`
-- Invariants: IconActionSheet mounts only while open; editor uses one `subscribeEditorAudioRoutes` poll; home headphones poll unchanged; Android uses ~120ms opacity fades (no LinearTransition/itemLayoutAnimation/springs); Android memo uses card not formSheet; Collapsible ~120ms on Android; Android editor footer uses inset floor + 24dp extra gap; Android reserves footer while loading and mounts waveform only when layoutReady; playhead hidden until viewport laid out; tool-strip icons 18 on Android.
+- Paths: `src/components/listTransitions.ts`, `src/components/RecordingsList.tsx`, `src/components/RecordingRow.tsx`, `src/components/Collapsible.tsx`, `app/_layout.tsx`, `src/components/MemoOptionsMenu.tsx`, `src/components/MemoEditor.tsx`, `src/components/PlaybackControls.tsx`
+- Invariants: IconActionSheet mounts only while open; editor uses one `subscribeEditorAudioRoutes` poll; home headphones poll unchanged; Android uses ~120ms opacity fades (no LinearTransition/itemLayoutAnimation/springs); Android memo uses card not formSheet; Collapsible ~120ms on Android; Android editor footer uses inset floor + 24dp extra gap; Android reserves footer while loading and mounts waveform only when layoutReady; playhead hidden until viewport laid out; tool-strip icons 18 on Android; Android editor does not re-render on every `recordingDuration` tick during capture; stop yields a frame before sync `stopRecorderCapture`.
 - Updated: 2026-11-12
 
 ### Android editor more menu

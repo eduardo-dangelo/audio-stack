@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppSymbol } from '@/src/components/AppSymbol';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
@@ -68,13 +68,19 @@ export function PlaybackControls({
         {isRecording ? (
           <Pressable
             accessibilityLabel="Stop recording"
+            android_ripple={
+              Platform.OS === 'android'
+                ? { color: 'rgba(255,255,255,0.25)', borderless: false, foreground: true }
+                : undefined
+            }
             disabled={stopDisabled}
             hitSlop={12}
             onPress={onStopRecording}
-            style={[
+            style={({ pressed }) => [
               styles.stopButton,
               compact && styles.stopButtonCompact,
               stopRecordingDisabled && !isStoppingRecording && styles.recordDisabled,
+              pressed && !stopDisabled && styles.controlPressed,
             ]}>
             <View style={[styles.stopSquare, compact && styles.stopSquareCompact]} />
           </Pressable>
