@@ -1,8 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, Platform, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
 import { colorDesaturatedWithAlpha } from '@/constants/VoiceMemosColors';
@@ -40,7 +44,8 @@ const PAN_ACTIVE_OFFSET_X = 8;
 const PAN_FAIL_OFFSET_Y = 24;
 const TAP_MAX_DISTANCE = 10;
 const SCRUB_ENGINE_THROTTLE_MS = 32;
-const SCRUB_UI_THROTTLE_MS = 32;
+const SCRUB_ENGINE_THROTTLE_ANDROID_MS = 100;
+const isAndroid = Platform.OS === 'android';
 
 type MiniTrack = {
   id: string;
@@ -57,12 +62,6 @@ type MiniTrack = {
   loopCount?: number;
 };
 
-type LaneBarGeometry = {
-  left: number;
-  height: number;
-  barTime: number;
-};
-
 type LaneGeometry = {
   id: string;
   left: number;
@@ -73,7 +72,7 @@ type LaneGeometry = {
   isLooped: boolean;
   loopCount?: number;
   activeColorKey: string;
-  bars: LaneBarGeometry[];
+  fullPath: string;
 };
 
 type Props = {
@@ -127,6 +126,14 @@ function timeFromX(x: number, width: number, duration: number): number {
   return ratio * duration;
 }
 
+function clampPlayheadX(x: number, width: number): number {
+  'worklet';
+  if (width <= 0) {
+    return 0;
+  }
+  return Math.max(0, Math.min(width, x));
+}
+
 export function MiniWaveformTracks({
   memo,
   currentTime,
@@ -139,7 +146,6 @@ export function MiniWaveformTracks({
   const colors = useVoiceMemosColors();
   const styles = useStyles(colors);
   const [width, setWidth] = useState(0);
-  const [scrubTime, setScrubTime] = useState<number | null>(null);
   const tracks = useMemo(() => buildMiniTracks(memo), [memo]);
   const widthRef = useRef(width);
   const durationRef = useRef(duration);
@@ -150,7 +156,10 @@ export function MiniWaveformTracks({
   const scrubActiveRef = useRef(false);
   const scrubTimeRef = useRef<number | null>(null);
   const lastEngineSeekAtRef = useRef(0);
-  const lastScrubUiAtRef = useRef(0);
+
+  const playheadXSV = useSharedValue(0);
+  const widthSV = useSharedValue(0);
+  const lastAndroidSeekMsSV = useSharedValue(0);
 
   widthRef.current = width;
   durationRef.current = duration;
@@ -158,6 +167,7 @@ export function MiniWaveformTracks({
   onScrubStartRef.current = onScrubStart;
   onScrubEndRef.current = onScrubEnd;
   onPressRef.current = onPress;
+  widthSV.value = width;
 
   const pushEngineSeek = (time: number, force: boolean) => {
     const now = Date.now();
@@ -168,26 +178,18 @@ export function MiniWaveformTracks({
     onSeekRef.current(time);
   };
 
-  const pushScrubUi = (time: number, force: boolean) => {
-    const now = Date.now();
-    if (!force && now - lastScrubUiAtRef.current < SCRUB_UI_THROTTLE_MS) {
-      return;
-    }
-    lastScrubUiAtRef.current = now;
-    setScrubTime(time);
-  };
-
+  /** iOS: update playhead SV + 32ms seeks (tint follows playhead via clip). */
   const applyScrubX = (x: number, force: boolean) => {
-    const time = timeFromX(x, widthRef.current, durationRef.current);
+    const clampedX = Math.max(0, Math.min(widthRef.current, x));
+    const time = timeFromX(clampedX, widthRef.current, durationRef.current);
     scrubTimeRef.current = time;
-    pushScrubUi(time, force);
+    playheadXSV.value = clampedX;
     pushEngineSeek(time, force);
   };
 
   const handlePanStart = (x: number) => {
     scrubActiveRef.current = true;
     lastEngineSeekAtRef.current = 0;
-    lastScrubUiAtRef.current = 0;
     onScrubStartRef.current?.();
     applyScrubX(x, true);
   };
@@ -210,43 +212,117 @@ export function MiniWaveformTracks({
     }
     onScrubEndRef.current?.();
     scrubTimeRef.current = null;
-    setScrubTime(null);
+  };
+
+  /** Android: playhead already moved on UI thread; JS only seeks. */
+  const handleAndroidPanStart = (x: number) => {
+    scrubActiveRef.current = true;
+    lastEngineSeekAtRef.current = 0;
+    onScrubStartRef.current?.();
+    const time = timeFromX(x, widthRef.current, durationRef.current);
+    scrubTimeRef.current = time;
+    onSeekRef.current(time);
+  };
+
+  const handleAndroidSeek = (x: number) => {
+    if (!scrubActiveRef.current) {
+      return;
+    }
+    const time = timeFromX(x, widthRef.current, durationRef.current);
+    scrubTimeRef.current = time;
+    onSeekRef.current(time);
+  };
+
+  const handleAndroidPanEnd = (x: number) => {
+    if (!scrubActiveRef.current) {
+      return;
+    }
+    scrubActiveRef.current = false;
+    const time = timeFromX(x, widthRef.current, durationRef.current);
+    scrubTimeRef.current = null;
+    onSeekRef.current(time);
+    onScrubEndRef.current?.();
   };
 
   const handleTap = () => {
     onPressRef.current?.();
   };
 
-  const gesture = useMemo(
-    () =>
-      Gesture.Exclusive(
+  const gesture = useMemo(() => {
+    const tap = Gesture.Tap()
+      .maxDistance(TAP_MAX_DISTANCE)
+      .onEnd(() => {
+        'worklet';
+        runOnJS(handleTap)();
+      });
+
+    if (isAndroid) {
+      return Gesture.Exclusive(
         Gesture.Pan()
           .activeOffsetX([-PAN_ACTIVE_OFFSET_X, PAN_ACTIVE_OFFSET_X])
           .failOffsetY([-PAN_FAIL_OFFSET_Y, PAN_FAIL_OFFSET_Y])
           .onStart((event) => {
-            runOnJS(handlePanStart)(event.x);
+            'worklet';
+            const x = clampPlayheadX(event.x, widthSV.value);
+            playheadXSV.value = x;
+            lastAndroidSeekMsSV.value = Date.now();
+            runOnJS(handleAndroidPanStart)(x);
           })
           .onUpdate((event) => {
-            runOnJS(handlePanUpdate)(event.x);
+            'worklet';
+            const x = clampPlayheadX(event.x, widthSV.value);
+            playheadXSV.value = x;
+            const now = Date.now();
+            if (now - lastAndroidSeekMsSV.value >= SCRUB_ENGINE_THROTTLE_ANDROID_MS) {
+              lastAndroidSeekMsSV.value = now;
+              runOnJS(handleAndroidSeek)(x);
+            }
           })
-          .onEnd(() => {
-            runOnJS(handlePanEnd)();
+          .onEnd((event) => {
+            'worklet';
+            const x = clampPlayheadX(event.x, widthSV.value);
+            playheadXSV.value = x;
+            runOnJS(handleAndroidPanEnd)(x);
           })
-          .onFinalize((_event, success) => {
+          .onFinalize((event, success) => {
+            'worklet';
             if (!success) {
-              runOnJS(handlePanEnd)();
+              const x = clampPlayheadX(event.x, widthSV.value);
+              playheadXSV.value = x;
+              runOnJS(handleAndroidPanEnd)(x);
             }
           }),
-        Gesture.Tap()
-          .maxDistance(TAP_MAX_DISTANCE)
-          .onEnd(() => {
-            runOnJS(handleTap)();
-          })
-      ),
+        tap
+      );
+    }
+
+    return Gesture.Exclusive(
+      Gesture.Pan()
+        .activeOffsetX([-PAN_ACTIVE_OFFSET_X, PAN_ACTIVE_OFFSET_X])
+        .failOffsetY([-PAN_FAIL_OFFSET_Y, PAN_FAIL_OFFSET_Y])
+        .onStart((event) => {
+          'worklet';
+          runOnJS(handlePanStart)(event.x);
+        })
+        .onUpdate((event) => {
+          'worklet';
+          runOnJS(handlePanUpdate)(event.x);
+        })
+        .onEnd(() => {
+          'worklet';
+          runOnJS(handlePanEnd)();
+        })
+        .onFinalize((_event, success) => {
+          'worklet';
+          if (!success) {
+            runOnJS(handlePanEnd)();
+          }
+        }),
+      tap
+    );
     // Handlers close over refs; gesture instance is stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
-    []
-  );
+  }, []);
 
   const onLayout = (event: LayoutChangeEvent) => {
     const next = Math.round(event.nativeEvent.layout.width);
@@ -255,15 +331,12 @@ export function MiniWaveformTracks({
     }
   };
 
-  const playheadTime = scrubTime ?? currentTime;
-  const barStepTime = width > 0 && duration > 0 ? (BAR_STEP / width) * duration : 0;
-  // Keep played coloring; only skip redundant bar style rebuilds within the same bar.
-  // Playhead still uses full-precision playheadTime above.
-  const rawColorTime = scrubTime ?? currentTime;
-  const colorTime =
-    barStepTime > 0 ? Math.floor(rawColorTime / barStepTime) * barStepTime : rawColorTime;
+  if (!scrubActiveRef.current && width > 0 && duration > 0) {
+    playheadXSV.value =
+      Math.max(0, Math.min(1, currentTime / duration)) * width;
+  }
 
-  // Peak/bar geometry only — do not depend on colorTime (scrub must not re-sample peaks).
+  // Static geometry + one full SVG path per lane (no scrub/time dependency).
   const laneGeometry = useMemo((): LaneGeometry[] | null => {
     if (tracks.length === 0 || duration <= 0 || width <= 0) {
       return null;
@@ -278,7 +351,7 @@ export function MiniWaveformTracks({
       const barCount = Math.max(0, Math.floor(trackWidth / BAR_STEP));
       const barsPerCycle = barsPerCycleAtPps(track.cycleDuration, effectivePps, BAR_STEP);
       const cycleBarCount = Math.max(1, Math.floor(barsPerCycle));
-      const bars: LaneBarGeometry[] = [];
+      let fullPath = '';
       for (let index = 0; index < barCount; index++) {
         const peakIndex = loopPeakIndex(index, barsPerCycle, cycleBarCount);
         const peak = normalizePeakAt(track.peaks, cycleBarCount, peakIndex);
@@ -287,11 +360,13 @@ export function MiniWaveformTracks({
           scaled <= 0.01
             ? 1
             : Math.max(1.5, Math.min(maxBarHeight, scaled * maxBarHeight));
-        bars.push({
-          left: index * BAR_STEP,
-          height: barHeight,
-          barTime: ((left + index * BAR_STEP) / width) * duration,
-        });
+        fullPath = appendWaveformBarRect(
+          fullPath,
+          index * BAR_STEP,
+          (LANE_HEIGHT - barHeight) / 2,
+          WAVEFORM_BAR_WIDTH,
+          barHeight
+        );
       }
 
       return {
@@ -305,53 +380,91 @@ export function MiniWaveformTracks({
         loopCount: track.loopCount,
         activeColorKey:
           track.isMuted || track.isSoloedOut ? '__waveformBar__' : track.color,
-        bars,
+        fullPath,
       };
     });
   }, [tracks, width, duration]);
 
-  const lanePaths = useMemo(() => {
-    if (!laneGeometry) {
-      return null;
-    }
-    return laneGeometry.map((lane) => {
-      let playedPath = '';
-      let unplayedPath = '';
-      for (const bar of lane.bars) {
-        const top = (LANE_HEIGHT - bar.height) / 2;
-        if (bar.barTime < colorTime) {
-          playedPath = appendWaveformBarRect(
-            playedPath,
-            bar.left,
-            top,
-            WAVEFORM_BAR_WIDTH,
-            bar.height
-          );
-        } else {
-          unplayedPath = appendWaveformBarRect(
-            unplayedPath,
-            bar.left,
-            top,
-            WAVEFORM_BAR_WIDTH,
-            bar.height
-          );
-        }
-      }
-      return { id: lane.id, playedPath, unplayedPath };
-    });
-  }, [laneGeometry, colorTime]);
+  const playheadAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: playheadXSV.value }],
+  }));
+
+  const playedTintClipStyle = useAnimatedStyle(() => ({
+    width: playheadXSV.value,
+  }));
 
   if (tracks.length === 0 || duration <= 0) {
     return null;
   }
 
   const totalHeight = tracks.length * LANE_HEIGHT;
-  const playheadLeft =
-    width > 0 ? Math.max(0, Math.min(1, playheadTime / duration)) * width : 0;
 
-  const pathById = new Map(lanePaths?.map((entry) => [entry.id, entry]) ?? []);
+  const renderLaneWaveform = (lane: LaneGeometry, fill: string) => {
+    if (lane.trackWidth <= 0 || !lane.fullPath) {
+      return null;
+    }
+    return (
+      <View
+        style={[
+          styles.barsRow,
+          { left: lane.left, width: lane.trackWidth, height: LANE_HEIGHT },
+        ]}>
+        <Svg height={LANE_HEIGHT} width={Math.max(1, lane.trackWidth)}>
+          <Path d={lane.fullPath} fill={fill} />
+        </Svg>
+      </View>
+    );
+  };
 
-  const lanes =
+  const renderLaneBadges = (lane: LaneGeometry) => {
+    if (lane.trackWidth <= 0) {
+      return null;
+    }
+    return (
+      <View
+        pointerEvents="none"
+        style={[
+          styles.floatingStatusRow,
+          { left: lane.left + 4, maxWidth: Math.max(0, lane.trackWidth - 8) },
+        ]}>
+        {lane.isMuted ? (
+          <View style={[styles.inlineBadge, styles.mutedBadge]}>
+            <Text style={styles.mutedBadgeText}>M</Text>
+          </View>
+        ) : null}
+        {lane.isSoloed ? (
+          <View style={[styles.inlineBadge, styles.soloBadge]}>
+            <Text style={styles.soloBadgeText}>S</Text>
+          </View>
+        ) : null}
+        {lane.isLocked ? (
+          <View style={styles.inlineLock}>
+            <SymbolView
+              name={{ ios: 'lock.fill' }}
+              size={11}
+              tintColor={colors.lockBadge}
+            />
+          </View>
+        ) : null}
+        {lane.isLooped ? (
+          <View style={[styles.inlineLock, styles.inlineLoop]}>
+            <SymbolView
+              name={{ ios: 'repeat' }}
+              size={11}
+              tintColor={colors.lockBadge}
+            />
+            {lane.loopCount != null && lane.loopCount > 1 ? (
+              <Text style={[styles.loopCountText, { color: colors.lockBadge }]}>
+                {lane.loopCount}×
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
+  const unplayedLanes =
     laneGeometry == null
       ? null
       : laneGeometry.map((lane) => {
@@ -364,7 +477,6 @@ export function MiniWaveformTracks({
             UNPLAYED_SATURATION,
             UNPLAYED_ALPHA
           );
-          const paths = pathById.get(lane.id);
           return (
             <View
               key={lane.id}
@@ -375,67 +487,45 @@ export function MiniWaveformTracks({
                   backgroundColor: colors.waveformBandBackground,
                 },
               ]}>
-              {lane.trackWidth > 0 ? (
-                <View
-                  style={[
-                    styles.barsRow,
-                    { left: lane.left, width: lane.trackWidth, height: LANE_HEIGHT },
-                  ]}>
-                  <Svg height={LANE_HEIGHT} width={Math.max(1, lane.trackWidth)}>
-                    {paths?.unplayedPath ? (
-                      <Path d={paths.unplayedPath} fill={unplayedColor} />
-                    ) : null}
-                    {paths?.playedPath ? (
-                      <Path d={paths.playedPath} fill={activeColor} />
-                    ) : null}
-                  </Svg>
-                </View>
-              ) : null}
-              {lane.trackWidth > 0 ? (
-                <View
-                  pointerEvents="none"
-                  style={[
-                    styles.floatingStatusRow,
-                    { left: lane.left + 4, maxWidth: Math.max(0, lane.trackWidth - 8) },
-                  ]}>
-                  {lane.isMuted ? (
-                    <View style={[styles.inlineBadge, styles.mutedBadge]}>
-                      <Text style={styles.mutedBadgeText}>M</Text>
-                    </View>
-                  ) : null}
-                  {lane.isSoloed ? (
-                    <View style={[styles.inlineBadge, styles.soloBadge]}>
-                      <Text style={styles.soloBadgeText}>S</Text>
-                    </View>
-                  ) : null}
-                  {lane.isLocked ? (
-                    <View style={styles.inlineLock}>
-                      <SymbolView
-                        name={{ ios: 'lock.fill' }}
-                        size={11}
-                        tintColor={colors.lockBadge}
-                      />
-                    </View>
-                  ) : null}
-                  {lane.isLooped ? (
-                    <View style={[styles.inlineLock, styles.inlineLoop]}>
-                      <SymbolView
-                        name={{ ios: 'repeat' }}
-                        size={11}
-                        tintColor={colors.lockBadge}
-                      />
-                      {lane.loopCount != null && lane.loopCount > 1 ? (
-                        <Text style={[styles.loopCountText, { color: colors.lockBadge }]}>
-                          {lane.loopCount}×
-                        </Text>
-                      ) : null}
-                    </View>
-                  ) : null}
-                </View>
-              ) : null}
+              {renderLaneWaveform(lane, unplayedColor)}
             </View>
           );
         });
+
+  const playedLanes =
+    laneGeometry == null
+      ? null
+      : laneGeometry.map((lane) => {
+          const activeColor =
+            lane.activeColorKey === '__waveformBar__'
+              ? colors.waveformBar
+              : lane.activeColorKey;
+          return (
+            <View
+              key={`played-${lane.id}`}
+              style={[
+                styles.lane,
+                {
+                  height: LANE_HEIGHT,
+                  backgroundColor: colors.waveformBandBackground,
+                },
+              ]}>
+              {renderLaneWaveform(lane, activeColor)}
+            </View>
+          );
+        });
+
+  const badgeLanes =
+    laneGeometry == null
+      ? null
+      : laneGeometry.map((lane) => (
+          <View
+            key={`badges-${lane.id}`}
+            pointerEvents="none"
+            style={[styles.lane, { height: LANE_HEIGHT }]}>
+            {renderLaneBadges(lane)}
+          </View>
+        ));
 
   return (
     <GestureDetector gesture={gesture}>
@@ -445,15 +535,35 @@ export function MiniWaveformTracks({
         importantForAccessibility="yes"
         style={[styles.container, { height: totalHeight }]}
         onLayout={onLayout}>
-        <View style={[styles.lanesClip, { height: totalHeight }]}>{lanes}</View>
+        <View style={[styles.lanesClip, { height: totalHeight }]}>
+          {unplayedLanes}
+          {width > 0 ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.playedTintClip,
+                { height: totalHeight },
+                playedTintClipStyle,
+              ]}>
+              <View style={{ width, height: totalHeight }}>{playedLanes}</View>
+            </Animated.View>
+          ) : null}
+          <View pointerEvents="none" style={styles.badgeOverlay}>
+            {badgeLanes}
+          </View>
+        </View>
         {width > 0 ? (
-          <View
+          <Animated.View
             pointerEvents="none"
-            style={[styles.playhead, { left: playheadLeft, height: totalHeight }]}>
+            style={[
+              styles.playhead,
+              { height: totalHeight },
+              playheadAnimatedStyle,
+            ]}>
             <View style={styles.playheadCapTop} />
             <View style={styles.playheadLine} />
             <View style={styles.playheadCapBottom} />
-          </View>
+          </Animated.View>
         ) : null}
       </View>
     </GestureDetector>
@@ -474,6 +584,17 @@ function useStyles(colors: ReturnType<typeof useVoiceMemosColors>) {
           width: '100%',
           overflow: 'hidden',
           borderRadius: 6,
+        },
+        playedTintClip: {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          overflow: 'hidden',
+          zIndex: 2,
+        },
+        badgeOverlay: {
+          ...StyleSheet.absoluteFillObject,
+          zIndex: 6,
         },
         lane: {
           width: '100%',
@@ -573,6 +694,7 @@ function useStyles(colors: ReturnType<typeof useVoiceMemosColors>) {
         playhead: {
           position: 'absolute',
           top: 0,
+          left: 0,
           width: PLAYHEAD_LINE_WIDTH,
           marginLeft: -PLAYHEAD_LINE_WIDTH / 2,
           alignItems: 'center',
