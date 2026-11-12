@@ -1,10 +1,9 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
-import { SymbolView } from 'expo-symbols';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import type { SFSymbol } from 'sf-symbols-typescript';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
 const useGlass = isGlassEffectAPIAvailable();
@@ -85,8 +84,8 @@ export function RecordingPromptDialog({
         <DialogCard styles={styles} colorScheme={colorScheme}>
           <View style={styles.titleRow}>
             {titleIconName ? (
-              <SymbolView
-                name={{ ios: titleIconName as SFSymbol }}
+              <AppSymbol
+                name={titleIconName}
                 size={compact ? 16 : 18}
                 tintColor={titleIconColor}
               />
@@ -95,8 +94,8 @@ export function RecordingPromptDialog({
           </View>
           {heroIcon ? (
             <View style={styles.iconWrap}>
-              <SymbolView
-                name={{ ios: heroIcon as SFSymbol }}
+              <AppSymbol
+                name={heroIcon}
                 size={compact ? 44 : 56}
                 tintColor={colors.text}
               />
@@ -113,10 +112,8 @@ export function RecordingPromptDialog({
                 event.stopPropagation();
                 setDontShowAgain((current) => !current);
               }}>
-              <SymbolView
-                name={{
-                  ios: (dontShowAgain ? 'checkmark.circle.fill' : 'circle') as SFSymbol,
-                }}
+              <AppSymbol
+                name={dontShowAgain ? 'checkmark.circle.fill' : 'circle'}
                 size={20}
                 tintColor={dontShowAgain ? colors.accent : colors.secondaryText}
               />

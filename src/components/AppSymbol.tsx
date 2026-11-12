@@ -67,6 +67,12 @@ const SF_TO_ANDROID: Record<string, AndroidSymbol> = {
   'checkmark.circle.fill': 'check_circle',
   circle: 'radio_button_unchecked',
 
+  // RecordingPromptDialog
+  'exclamationmark.triangle.fill': 'warning',
+  'info.circle.fill': 'info',
+  'gauge.with.dots.needle.33percent': 'speed',
+  'battery.25': 'battery_2_bar',
+
   // Paywall / celebration
   sparkles: 'auto_awesome',
   'star.fill': 'star',
