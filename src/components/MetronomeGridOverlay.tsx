@@ -9,6 +9,8 @@ import {
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
 export {
+  ANDROID_RECORDING_PAINT_BUFFER_VIEWPORTS,
+  ANDROID_RECORDING_PAINT_VALIDITY_MARGIN_VIEWPORTS,
   buildMetronomeGridLines,
   FOLLOW_BAR_PAINT_OVERSCAN_VIEWPORTS,
   getFollowBarPaintTimeRange,
@@ -19,6 +21,8 @@ export {
   METRONOME_GRID_BUFFER_VIEWPORTS,
   METRONOME_GRID_PLAYBACK_BUFFER_VIEWPORTS,
   PLACEHOLDER_TIMELINE_DURATION_SEC,
+  RECORDING_BAR_PAINT_BUFFER_VIEWPORTS,
+  RECORDING_BAR_PAINT_VALIDITY_MARGIN_VIEWPORTS,
   resolvePlaybackBarPaintRange,
   resolveRecordingBarPaintRange,
   shouldReseedPlaybackViewport,

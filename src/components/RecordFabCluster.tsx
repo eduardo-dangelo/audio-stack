@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
+import { useAudioEngineSelector } from '@/src/audio/AudioEngineContext';
 import {
   ALLOW_METRONOME_WITHOUT_HEADPHONES,
   isHeadphonesConnected,
@@ -79,10 +80,17 @@ export function RecordFabCluster({
   const [metronomeSettingsVisible, setMetronomeSettingsVisible] = useState(false);
   // null until first headphone probe — avoid demoting clicks while status is unknown.
   const [headphonesConnected, setHeadphonesConnected] = useState<boolean | null>(null);
+  const isRecording = useAudioEngineSelector((state) => state.isRecording);
   const precountRef = useRef(precount);
   precountRef.current = precount;
 
-  useEffect(() => subscribeHeadphonesConnected(setHeadphonesConnected), []);
+  useEffect(
+    () =>
+      subscribeHeadphonesConnected(setHeadphonesConnected, {
+        androidPoll: !isRecording,
+      }),
+    [isRecording]
+  );
 
   // Clicks require headphones. Unplug (or cold start without HP) → grid-only.
   // Never restore clicks when headphones reconnect.

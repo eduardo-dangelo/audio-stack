@@ -229,9 +229,15 @@ export async function getEditorAudioRouteUiState(): Promise<EditorAudioRouteUiSt
   }
 }
 
+type EditorAudioRouteSubscribeOptions = {
+  /** Android 2s poll; pause while recording to avoid capture hitches. Default true. */
+  androidPoll?: boolean;
+};
+
 /** Editor route UI: one refresh path (and one Android poll) for HP + cue + monitor. */
 export function subscribeEditorAudioRoutes(
-  onChange: (state: EditorAudioRouteUiState) => void
+  onChange: (state: EditorAudioRouteUiState) => void,
+  options?: EditorAudioRouteSubscribeOptions
 ): () => void {
   let cancelled = false;
 
@@ -253,7 +259,7 @@ export function subscribeEditorAudioRoutes(
     }
   });
   let interval: ReturnType<typeof setInterval> | undefined;
-  if (Platform.OS === 'android') {
+  if (Platform.OS === 'android' && options?.androidPoll !== false) {
     interval = setInterval(refresh, 2000);
   }
 

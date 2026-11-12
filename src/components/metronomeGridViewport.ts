@@ -119,6 +119,14 @@ export const RECORDING_BAR_PAINT_BUFFER_VIEWPORTS = METRONOME_GRID_PLAYBACK_BUFF
 /** Invalidate before the tight follow overscan (0.2) would show blank bars. */
 export const RECORDING_BAR_PAINT_VALIDITY_MARGIN_VIEWPORTS = 1;
 
+/**
+ * Android recording only: tight overscan so N stacked Svg bitmaps stay ~viewport-sized
+ * on long takes (iOS keeps RECORDING_BAR_PAINT_* above).
+ */
+export const ANDROID_RECORDING_PAINT_BUFFER_VIEWPORTS = 0.5;
+
+export const ANDROID_RECORDING_PAINT_VALIDITY_MARGIN_VIEWPORTS = 0.25;
+
 export function resolveRecordingBarPaintRange(
   buffer: MetronomeGridBuffer | null,
   scrollX: number,

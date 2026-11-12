@@ -5464,12 +5464,16 @@ function MemoEditorInner({
 
   useEffect(
     () =>
-      subscribeEditorAudioRoutes((route) => {
-        setHeadphonesConnected(route.headphonesConnected);
-        setCueOutputRoute(route.cueOutputRoute);
-        setMonitorPath(route.monitorPath);
-      }),
-    []
+      subscribeEditorAudioRoutes(
+        (route) => {
+          setHeadphonesConnected(route.headphonesConnected);
+          setCueOutputRoute(route.cueOutputRoute);
+          setMonitorPath(route.monitorPath);
+        },
+        // Android: pause 2s device poll during capture (event-driven refresh remains).
+        { androidPoll: !isRecording }
+      ),
+    [isRecording]
   );
 
   // Clicks require headphones. Unplug (or open with clicks on and no HP) → grid-only.

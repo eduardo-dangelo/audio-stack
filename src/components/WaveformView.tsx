@@ -80,6 +80,8 @@ import {
   type LoopPreviewState,
 } from '@/src/components/LoopRegionBar';
 import {
+  ANDROID_RECORDING_PAINT_BUFFER_VIEWPORTS,
+  ANDROID_RECORDING_PAINT_VALIDITY_MARGIN_VIEWPORTS,
   buildMetronomeGridLines,
   getFollowBarPaintTimeRange,
   getMetronomeGridBufferRange,
@@ -87,6 +89,8 @@ import {
   METRONOME_GRID_BUFFER_VIEWPORTS,
   METRONOME_GRID_PLAYBACK_BUFFER_VIEWPORTS,
   MetronomeTrackGrid,
+  RECORDING_BAR_PAINT_BUFFER_VIEWPORTS,
+  RECORDING_BAR_PAINT_VALIDITY_MARGIN_VIEWPORTS,
   resolvePlaybackBarPaintRange,
   resolveRecordingBarPaintRange,
   shouldReseedPlaybackViewport,
@@ -129,6 +133,8 @@ const TIMELINE_HEADROOM_SECONDS = 30;
 const LAYOUT_DURATION_STEP_SECONDS = 30;
 /** Min interval between React viewport/grid commits while auto-scrolling. */
 const VIEWPORT_COMMIT_MIN_MS = 200;
+/** Android recording: throttle live Svg path rebuilds (playhead stays on UI clock). */
+const ANDROID_LIVE_BAR_PAINT_THROTTLE_MS = 300;
 const TRIM_SIDE_BORDER = 16;
 const TRIM_SIDE_BORDER_EXPANDED = 24;
 const TRIM_EDGE_BORDER = 2;
@@ -1749,7 +1755,7 @@ const ExpandedTrackWaveformRow = memo(function ExpandedTrackWaveformRow({
     visibleBars.startIndex,
     volumeScale,
   ]);
-  const liveBarPaint = useMemo(() => {
+  const liveBarPaintRaw = useMemo(() => {
     if (!liveRecording || visibleLiveBars.endIndex <= visibleLiveBars.startIndex || bodyHeight <= 0) {
       return { originX: 0, width: 0, path: '' };
     }
@@ -1777,6 +1783,26 @@ const ExpandedTrackWaveformRow = memo(function ExpandedTrackWaveformRow({
     visibleLiveBars.endIndex,
     visibleLiveBars.startIndex,
   ]);
+  const androidLivePaintAtRef = useRef(0);
+  const androidLivePaintHeldRef = useRef(liveBarPaintRaw);
+  const liveBarPaint = useMemo(() => {
+    if (Platform.OS !== 'android') {
+      return liveBarPaintRaw;
+    }
+    const now = Date.now();
+    const held = androidLivePaintHeldRef.current;
+    const windowChanged =
+      held.originX !== liveBarPaintRaw.originX || held.width !== liveBarPaintRaw.width;
+    if (
+      windowChanged ||
+      now - androidLivePaintAtRef.current >= ANDROID_LIVE_BAR_PAINT_THROTTLE_MS
+    ) {
+      androidLivePaintAtRef.current = now;
+      androidLivePaintHeldRef.current = liveBarPaintRaw;
+      return liveBarPaintRaw;
+    }
+    return held;
+  }, [liveBarPaintRaw]);
   const headerLongPressEnabled =
     Boolean(trackLoopOverlay) &&
     trackLoopOverlay?.editable !== false &&
@@ -2146,19 +2172,27 @@ const ExpandedTrackWaveformRow = memo(function ExpandedTrackWaveformRow({
             <View
               style={[
                 styles.barsRow,
-                {
-                  position: 'absolute',
-                  left: sidePadding + liveTrackOffset,
-                  top: bodyTop,
-                  height: bodyHeight,
-                  width: liveTrackWidth,
-                },
+                Platform.OS === 'android' && liveBarPaint.width > 0
+                  ? {
+                      position: 'absolute',
+                      left: sidePadding + liveTrackOffset + liveBarPaint.originX,
+                      top: bodyTop,
+                      height: bodyHeight,
+                      width: liveBarPaint.width,
+                    }
+                  : {
+                      position: 'absolute',
+                      left: sidePadding + liveTrackOffset,
+                      top: bodyTop,
+                      height: bodyHeight,
+                      width: liveTrackWidth,
+                    },
               ]}>
               {liveBarPaint.path ? (
                 <WaveformBarsSvg
                   color={colors.recordRed}
                   height={bodyHeight}
-                  originX={liveBarPaint.originX}
+                  originX={Platform.OS === 'android' ? 0 : liveBarPaint.originX}
                   path={liveBarPaint.path}
                   width={liveBarPaint.width}
                 />
@@ -2642,11 +2676,20 @@ function WaveformViewComponent({
     const pps = layoutPixelsPerSecondRef.current;
     const vpWidth = viewportWidthRef.current;
     const gridDuration = Math.max(durationRef.current, layoutDurationRef.current);
+    const androidRecordingPaint =
+      Platform.OS === 'android' && followRecordingScrollRef.current;
     const bufferViewports = autoScrollingRef.current
-      ? METRONOME_GRID_PLAYBACK_BUFFER_VIEWPORTS
+      ? androidRecordingPaint
+        ? ANDROID_RECORDING_PAINT_BUFFER_VIEWPORTS
+        : METRONOME_GRID_PLAYBACK_BUFFER_VIEWPORTS
       : METRONOME_GRID_BUFFER_VIEWPORTS;
     // Wider validity margin while auto-scrolling so React bar remounts are rare.
-    const validityMarginViewports = autoScrollingRef.current ? 1.5 : 0.5;
+    // Android recording uses a tight window so N stacked Svg bitmaps stay cheap.
+    const validityMarginViewports = autoScrollingRef.current
+      ? androidRecordingPaint
+        ? ANDROID_RECORDING_PAINT_VALIDITY_MARGIN_VIEWPORTS
+        : 1.5
+      : 0.5;
     const now = Date.now();
     const throttleCommits =
       autoScrollingRef.current &&
@@ -4092,8 +4135,6 @@ function WaveformViewComponent({
     let pendingBufferScrollX = 0;
     let lastEmittedCenti = -1;
     let lastAudioSampleMs = 0;
-    let labelAnchorTime = 0;
-    let labelAnchorWallMs = 0;
     let appState: string = AppState.currentState;
 
     const emitLiveTime = (time: number) => {
@@ -4105,13 +4146,7 @@ function WaveformViewComponent({
       onLiveTimelineTimeRef.current?.(time);
     };
 
-    const displayTimeAt = (frameMs: number) =>
-      labelAnchorTime +
-      Math.min(1, Math.max(0, (frameMs - labelAnchorWallMs) / 1000));
-
     const enableRecordingClock = (time: number, pps: number, frameMs: number) => {
-      labelAnchorTime = time;
-      labelAnchorWallMs = frameMs;
       lastAudioSampleMs = frameMs;
       recordingClockTimeSV.value = time;
       recordingPpsSV.value = pps;
@@ -4136,13 +4171,13 @@ function WaveformViewComponent({
       }
       const time = getRecordingTimeRef.current?.() ?? currentTimeRef.current;
       const pps = layoutPixelsPerSecondRef.current;
-      labelAnchorTime = time;
-      labelAnchorWallMs = frameMs;
       lastAudioSampleMs = frameMs;
       if (useTranslateFollow) {
         recordingClockTimeSV.value = time;
         recordingPpsSV.value = pps;
         recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
+        // Android: label at ~50ms anchor cadence (not every RAF/centisecond).
+        emitLiveTime(time);
       }
       return time;
     };
@@ -4159,14 +4194,12 @@ function WaveformViewComponent({
         scrollRef.current?.scrollTo({ x, animated: false });
         return;
       }
-      const pps = layoutPixelsPerSecondRef.current;
+      // Android: translateX is UI-thread; label emits from sampleRecordingAudio (~50ms).
       if (snap) {
-        enableRecordingClock(time, pps, frameMs);
+        enableRecordingClock(time, layoutPixelsPerSecondRef.current, frameMs);
         snapRecordingTranslate(x);
         emitLiveTime(time);
-        return;
       }
-      emitLiveTime(displayTimeAt(frameMs));
     };
 
     const syncRecordingScroll = (enableClock: boolean) => {
@@ -4298,11 +4331,18 @@ function WaveformViewComponent({
         0,
         (getRecordingTimeRef.current?.() ?? currentTime) * layoutPixelsPerSecond
       );
+      const androidRecordingPaint = Platform.OS === 'android';
       const next = resolveRecordingBarPaintRange(
         recordingBarPaintBufferRef.current,
         recordingScrollX,
         viewportWidth,
-        layoutPixelsPerSecond
+        layoutPixelsPerSecond,
+        androidRecordingPaint
+          ? ANDROID_RECORDING_PAINT_BUFFER_VIEWPORTS
+          : RECORDING_BAR_PAINT_BUFFER_VIEWPORTS,
+        androidRecordingPaint
+          ? ANDROID_RECORDING_PAINT_VALIDITY_MARGIN_VIEWPORTS
+          : RECORDING_BAR_PAINT_VALIDITY_MARGIN_VIEWPORTS
       );
       recordingBarPaintBufferRef.current = next;
       return next;

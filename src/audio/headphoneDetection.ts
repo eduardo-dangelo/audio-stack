@@ -170,9 +170,15 @@ export function subscribeHeadphoneDisconnect(onDisconnect: () => void): () => vo
   };
 }
 
+type HeadphonesSubscribeOptions = {
+  /** Android 2s poll; pause while recording to avoid capture hitches. Default true. */
+  androidPoll?: boolean;
+};
+
 /** Initial check + live updates whenever the audio route changes. */
 export function subscribeHeadphonesConnected(
-  onChange: (connected: boolean) => void
+  onChange: (connected: boolean) => void,
+  options?: HeadphonesSubscribeOptions
 ): () => void {
   let cancelled = false;
 
@@ -196,7 +202,7 @@ export function subscribeHeadphonesConnected(
 
   // Android lacks a reliable headset routeChange — poll while subscribed.
   let interval: ReturnType<typeof setInterval> | undefined;
-  if (Platform.OS === 'android') {
+  if (Platform.OS === 'android' && options?.androidPoll !== false) {
     interval = setInterval(refresh, 2000);
   }
 
