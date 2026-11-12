@@ -1,4 +1,3 @@
-import { SymbolView } from 'expo-symbols';
 import { forwardRef, useMemo } from 'react';
 import {
   Pressable,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import { useDuoSideColumn } from '@/src/hooks/useDuoSideColumn';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
@@ -114,8 +114,8 @@ export function GroupedListRow({
   const rowStyle = [styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast];
   const body = (
     <>
-      <SymbolView
-        name={{ ios: icon }}
+      <AppSymbol
+        name={icon}
         size={22}
         tintColor={destructive ? colors.recordRed : colors.accent}
       />
@@ -123,7 +123,7 @@ export function GroupedListRow({
       {accessory}
       {showCount ? <Text style={styles.count}>{count}</Text> : null}
       {showChevron && onPress ? (
-        <SymbolView name={{ ios: 'chevron.right' }} size={14} tintColor={colors.secondaryText} />
+        <AppSymbol name="chevron.right" size={14} tintColor={colors.secondaryText} />
       ) : null}
       {!isLast ? <View style={styles.separator} /> : null}
     </>

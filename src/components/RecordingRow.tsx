@@ -345,11 +345,7 @@ function RecordingRowComponent({
             </Text>
             {folderName ? (
               <View style={styles.folderIndicator}>
-                <SymbolView
-                  name={{ ios: 'folder' }}
-                  size={13}
-                  tintColor={colors.secondaryText}
-                />
+                <AppSymbol name="folder" size={13} tintColor={colors.secondaryText} />
                 <Text numberOfLines={1} style={styles.folderName}>
                   {folderName}
                 </Text>
