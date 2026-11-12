@@ -16,7 +16,7 @@ import {
   type StyleProp,
   type TextStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DEFAULT_TRACK_COLOR, pickRandomTrackColor } from '@/constants/VoiceMemosColors';
 import { shareMemo } from '@/src/actions/shareMemo';
@@ -701,8 +701,15 @@ function MemoEditorInner({
 }: MemoEditorInnerProps) {
   const colors = useVoiceMemosColors();
   const styles = useMemoEditorStyles(colors);
+  const insets = useSafeAreaInsets();
   const sideColumn = useDuoSideColumn();
   const isPane = presentation === 'pane';
+  const isAndroid = Platform.OS === 'android';
+  /** Clear Android system nav: inset floor + fixed extra gap beyond the bar. */
+  const footerPaddingBottom = isAndroid
+    ? Math.max(insets.bottom, 12) + 24
+    : 8;
+  const footerStyle = [styles.footer, { paddingBottom: footerPaddingBottom }];
   const record = autoRecord ? '1' : undefined;
   const navigation = useNavigation();
   const engine = useAudioEngine();
@@ -4182,7 +4189,8 @@ function MemoEditorInner({
   }, []);
 
   useEffect(() => {
-    if (!layoutReady || remountedForChromeRef.current) {
+    // Android reserves footer chrome up front — remount would flash a 0-height playhead.
+    if (Platform.OS === 'android' || !layoutReady || remountedForChromeRef.current) {
       return;
     }
     remountedForChromeRef.current = true;
@@ -6122,12 +6130,12 @@ function MemoEditorInner({
 
   return (
     <SafeAreaView
-      edges={Platform.OS === 'android' ? ['top', 'bottom'] : ['bottom']}
+      edges={isAndroid ? ['top'] : ['bottom']}
       style={styles.screen}>
       {showInBodyHeader ? <View style={styles.paneHeader}>{headerBar}</View> : null}
       <View onLayout={handleContentLayout} style={styles.content}>
         <View style={styles.tracksArea}>
-          {showEditorContent ? (
+          {(isAndroid ? layoutReady && showEditorContent : showEditorContent) ? (
             <LiveRecordingWaveform
               key={waveformLayoutKey}
               currentTime={waveformCurrentTime}
@@ -6192,7 +6200,7 @@ function MemoEditorInner({
               />
             ) : null}
 
-            <View style={styles.footer}>
+            <View style={footerStyle}>
               <View style={styles.timeDisplay}>
                 <View style={styles.timeDisplaySide}>
                   <MetronomeButton
@@ -6252,6 +6260,15 @@ function MemoEditorInner({
               />
             </View>
           </>
+        ) : isAndroid ? (
+          <View
+            pointerEvents="none"
+            style={[
+              footerStyle,
+              // Outer height ≈ paddingTop + time + gap + controls + paddingBottom.
+              { minHeight: 108 + footerPaddingBottom },
+            ]}
+          />
         ) : null}
       </View>
       <TrackColorPicker

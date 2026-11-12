@@ -4292,11 +4292,13 @@ function WaveformViewComponent({
         onClose={() => setZoomDialogVisible(false)}
         onReset={handleZoomDialogReset}
       />
-      <View pointerEvents="none" style={[styles.fixedPlayhead, { height: playheadHeight }]}>
-        <View style={styles.playheadCapTop} />
-        <View style={styles.playheadLine} />
-        <View style={styles.playheadCapBottom} />
-      </View>
+      {viewportHeight > 0 ? (
+        <View pointerEvents="none" style={[styles.fixedPlayhead, { height: playheadHeight }]}>
+          <View style={styles.playheadCapTop} />
+          <View style={styles.playheadLine} />
+          <View style={styles.playheadCapBottom} />
+        </View>
+      ) : null}
     </View>
     </WaveformThemeContext.Provider>
   );

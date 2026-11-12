@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { LayerEffects } from '@/src/audio/layerEffects';
 import {
@@ -71,7 +71,7 @@ export function EditorToolStrip({ activeTool, availableTools, effects, onToolCha
               style={[styles.tool, selected && styles.toolSelected]}>
               <AppSymbol
                 name={tool.symbol}
-                size={22}
+                size={Platform.OS === 'android' ? 18 : 22}
                 tintColor={iconHighlighted ? colors.accent : colors.text}
               />
               <Text
