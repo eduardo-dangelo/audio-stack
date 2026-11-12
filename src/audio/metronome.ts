@@ -883,12 +883,20 @@ export function getMetronomeGridLinesInRange(
 export function playMetronomeClick(
   context: AudioContext,
   outputGain: GainNode,
-  options: { accent?: boolean; scheduleLeadSec?: number } = {}
+  options: {
+    accent?: boolean;
+    scheduleLeadSec?: number;
+    /** Absolute AudioContext time. When set, overrides scheduleLeadSec. */
+    when?: number;
+  } = {}
 ): AudioBufferSourceNode {
   const accent = options.accent ?? false;
   const buffer = accent ? getAccentClickBuffer(context) : getNormalClickBuffer(context);
   const lead = Math.max(0, options.scheduleLeadSec ?? 0);
-  const when = context.currentTime + lead;
+  const now = context.currentTime;
+  // Past absolute times start ASAP (no extra now+lead drift).
+  const when =
+    options.when != null ? Math.max(options.when, now) : now + lead;
 
   const source = context.createBufferSource();
   source.buffer = buffer;

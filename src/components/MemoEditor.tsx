@@ -288,7 +288,8 @@ const LIVE_PEAK_BAR_STEP = WAVEFORM_BAR_WIDTH + WAVEFORM_BAR_GAP;
  */
 function previewLivePeaksForLatency(
   peaks: number[],
-  leadSec: number
+  leadSec: number,
+  options?: { showDuringLead?: boolean }
 ): { peaks: number[]; duration: number } | null {
   if (peaks.length === 0) {
     return null;
@@ -300,8 +301,18 @@ function previewLivePeaksForLatency(
     Math.round((Math.max(0, leadSec) * WAVEFORM_PIXELS_PER_SECOND) / LIVE_PEAK_BAR_STEP)
   );
   if (leadBars > 0 && peaks.length <= leadBars) {
-    // Still inside the trimmed lead — no audible/post-trim content yet.
-    return null;
+    // iOS: blank until lead clears. Android: show provisional peaks so the lane
+    // isn't empty while the metronome already runs; trim once past lead.
+    if (!options?.showDuringLead) {
+      return null;
+    }
+    return {
+      peaks,
+      duration: Math.max(
+        0.01,
+        (peaks.length * LIVE_PEAK_BAR_STEP) / WAVEFORM_PIXELS_PER_SECOND
+      ),
+    };
   }
   const previewPeaks = leadBars > 0 ? peaks.slice(leadBars) : peaks;
   return {
@@ -318,7 +329,9 @@ function injectLiveRecordingPeaks(
   peaks: number[],
   leadSec: number
 ): TrackData[] {
-  const preview = previewLivePeaksForLatency(peaks, leadSec);
+  const preview = previewLivePeaksForLatency(peaks, leadSec, {
+    showDuringLead: Platform.OS === 'android',
+  });
   if (!preview) {
     // Still in latency lead — clear duration so WaveformView cannot synthesize
     // fake bars from the shell's 0.01s placeholder + undefined peaks.
@@ -1821,9 +1834,10 @@ function MemoEditorInner({
         };
         precountDismissResolveRef.current = finish;
         clearPrecountOverlay();
-        // Android may not fire Modal onDismiss; never block arm forever.
-        // 250ms gives iOS form-sheet/Modal teardown time before monitor-mix arm.
-        setTimeout(finish, 250);
+        // Android never fires Modal onDismiss — keep timeout tiny so arm stays
+        // on the AudioContext downbeat. iOS needs ~250ms for Modal teardown.
+        const dismissTimeoutMs = Platform.OS === 'android' ? 16 : 250;
+        setTimeout(finish, dismissTimeoutMs);
       });
     } finally {
       precountDismissingRef.current = false;
@@ -1898,6 +1912,11 @@ function MemoEditorInner({
       // Snapshot audio clock in parallel with wall precount so commit can arm
       // without modal/JS wall-clock jitter (Phase B).
       const contextStart = engine.getRecordingAudioContextTime();
+      const intervalSec = intervalMs / 1000;
+      const isAndroid = Platform.OS === 'android';
+      // Leave headroom before the wall downbeat so Android can dismiss + arm
+      // while contextStart+4*interval is still in the future.
+      const androidArmLeadMs = 100;
 
       // Beats "4" → "1" — equal timing; number + click in the same turn.
       for (let i = 0; i < 4; i++) {
@@ -1908,19 +1927,33 @@ function MemoEditorInner({
         const n = 4 - i;
         setPrecountNumber(n);
         // Android: numeral + optional click is enough; skip per-beat vibration.
-        if (Platform.OS !== 'android') {
+        if (!isAndroid) {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
         if (mode === 'sound') {
-          const clickPromise = engine.playMetronomeClick({ accent: n === 4 }).catch(() => {
-            // Click is best-effort during precount.
-          });
+          const clickWhen =
+            isAndroid && contextStart != null
+              ? contextStart + i * intervalSec
+              : undefined;
+          const clickPromise = engine
+            .playMetronomeClick({
+              accent: n === 4,
+              ...(clickWhen != null ? { when: clickWhen } : {}),
+            })
+            .catch(() => {
+              // Click is best-effort during precount.
+            });
           // Await beat 4 so resume/context work finishes before the interval continues.
           if (n === 4) {
             await clickPromise;
           }
         }
-        const ok = await waitUntil(startMs + (i + 1) * intervalMs);
+        const beatDeadline = startMs + (i + 1) * intervalMs;
+        const waitDeadline =
+          isAndroid && i === 3
+            ? Math.max(Date.now(), beatDeadline - androidArmLeadMs)
+            : beatDeadline;
+        const ok = await waitUntil(waitDeadline);
         if (!ok) {
           await dismissPrecountAndWait();
           return { completed: false };
@@ -1928,23 +1961,30 @@ function MemoEditorInner({
       }
 
       // Dismiss Modal before commit — arming monitor mix while it is still up
-      // freezes the UI at "1". Wait for onDismiss (not rAF).
+      // freezes the UI at "1".
       const beat1Deadline = startMs + 4 * intervalMs;
-      await dismissPrecountAndWait();
-      // Extra frame so native Modal teardown finishes before sync monitor-mix arm.
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const plannedContextWhen =
+        contextStart != null ? contextStart + 4 * intervalSec : null;
 
-      // Map the wall downbeat onto AudioContext using the precount-start snapshot,
-      // then re-clamp against live currentTime after dismiss.
-      const nextBeatContextWhen = computePostPrecountContextWhen({
-        contextStart,
-        live: engine.getRecordingAudioContextTime(),
-        startMs,
-        beat1DeadlineMs: beat1Deadline,
-        intervalMs,
-        nowMs: Date.now(),
-        scheduleLeadSec: POST_PRECOUNT_SCHEDULE_LEAD_SEC,
-      });
+      await dismissPrecountAndWait();
+      if (!isAndroid) {
+        // Extra frame so native Modal teardown finishes before sync monitor-mix arm.
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      }
+
+      // Android: trust the AudioContext grid from precount start (still ahead after
+      // early exit + short dismiss). iOS keeps Phase B re-clamp after Modal teardown.
+      const nextBeatContextWhen = isAndroid
+        ? plannedContextWhen
+        : computePostPrecountContextWhen({
+            contextStart,
+            live: engine.getRecordingAudioContextTime(),
+            startMs,
+            beat1DeadlineMs: beat1Deadline,
+            intervalMs,
+            nowMs: Date.now(),
+            scheduleLeadSec: POST_PRECOUNT_SCHEDULE_LEAD_SEC,
+          });
 
       return {
         completed: true,
@@ -4840,7 +4880,7 @@ function MemoEditorInner({
 
   const getPlaybackTime = useCallback(() => engine.getPlaybackTime(), [engine]);
   const getRecordingTime = useCallback(
-    () => recordingStartTime.current + engine.getRecordingDuration(),
+    () => recordingStartTime.current + engine.getRecordingUiElapsed(),
     [engine]
   );
   /** Android: WaveformView follow clock → time label (record + playback). */

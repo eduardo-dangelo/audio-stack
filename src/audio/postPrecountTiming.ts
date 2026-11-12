@@ -42,5 +42,15 @@ export function computePostPrecountContextWhen(
     return plannedContextWhen;
   }
 
+  // Deadline just reached / short dismiss: live can lag the planned downbeat by a
+  // few ms while still tracking wall — keep the grid instead of immediate start.
+  if (
+    contextTrackedWall &&
+    remainingWallSec <= 0.05 &&
+    plannedContextWhen > live - CONTEXT_TRACKS_WALL_SLACK_SEC
+  ) {
+    return Math.max(plannedContextWhen, live + scheduleLeadSec);
+  }
+
   return live + Math.max(remainingWallSec, scheduleLeadSec);
 }

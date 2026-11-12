@@ -1,4 +1,4 @@
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import {
   AudioContext,
   AudioManager,
@@ -376,8 +376,11 @@ export class MemoAudioEngine {
   private playRequestId = 0;
   private activeRecordingSampleRate: number | null = null;
   private recordingUsedWavFormat = false;
-  private recordingTimer: ReturnType<typeof setInterval> | null = null;
-  /** RAF for smooth recordingDuration UI (~50ms); separate from 150ms peaks/mix tick. */
+  /** Peaks / monitor-mix tick (setTimeout chain; Android starts at ~50ms). */
+  private recordingTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Wall time when peak emits began — Android uses a faster cadence for ~1.5s. */
+  private recordingPeaksEmitStartedAtMs = 0;
+  /** RAF for smooth recordingDuration UI (~50ms); separate from peaks/mix tick. */
   private recordingUiRafId: number | null = null;
   private captureCheckpointTimer: ReturnType<typeof setInterval> | null = null;
   /** In-progress capture WAV (durable); checkpointed for mid-take recovery. */
@@ -818,6 +821,23 @@ export class MemoAudioEngine {
 
   getRecordingDuration(): number {
     return this.recorder?.getCurrentDuration() ?? this.state.recordingDuration;
+  }
+
+  /**
+   * UI follow elapsed while recording. Android uses max(file frames, cue-context
+   * elapsed) so the playhead tracks the armed metronome before Oboe frames land.
+   */
+  getRecordingUiElapsed(): number {
+    const file = this.getRecordingDuration();
+    if (Platform.OS !== 'android' || !this.state.isRecording) {
+      return file;
+    }
+    const cueWhen = this.recordingCueContextWhen;
+    if (cueWhen <= 0 || !this.context) {
+      return file;
+    }
+    const ctxElapsed = Math.max(0, this.context.currentTime - cueWhen);
+    return Math.max(file, ctxElapsed);
   }
 
   async prewarmRecordingSession(): Promise<void> {
@@ -2537,10 +2557,39 @@ export class MemoAudioEngine {
 
   private clearRecordingTimer(): void {
     if (this.recordingTimer) {
-      clearInterval(this.recordingTimer);
+      clearTimeout(this.recordingTimer);
       this.recordingTimer = null;
     }
+    this.recordingPeaksEmitStartedAtMs = 0;
     this.clearRecordingUiTimer();
+  }
+
+  /**
+   * Peak emit cadence: Android ~50ms for the first 1.5s so live bars appear with
+   * the take, then 150ms. iOS stays on 150ms throughout.
+   */
+  private recordingPeaksEmitIntervalMs(): number {
+    if (Platform.OS !== 'android' || this.recordingPeaksEmitStartedAtMs <= 0) {
+      return 150;
+    }
+    const elapsed = Date.now() - this.recordingPeaksEmitStartedAtMs;
+    return elapsed < 1500 ? 50 : 150;
+  }
+
+  private scheduleRecordingPeaksTimer(): void {
+    if (this.recordingTimer) {
+      clearTimeout(this.recordingTimer);
+      this.recordingTimer = null;
+    }
+    const delay = this.recordingPeaksEmitIntervalMs();
+    this.recordingTimer = setTimeout(() => {
+      this.recordingTimer = null;
+      if (!this.state.isRecording || !this.recorder) {
+        return;
+      }
+      this.emitRecordingProgress();
+      this.scheduleRecordingPeaksTimer();
+    }, delay);
   }
 
   private clearRecordingUiTimer(): void {
@@ -3617,7 +3666,9 @@ export class MemoAudioEngine {
   }
 
   /** One-shot click for precount (independent of metronome enabled). */
-  async playMetronomeClick(options: { accent?: boolean } = {}): Promise<void> {
+  async playMetronomeClick(
+    options: { accent?: boolean; when?: number } = {}
+  ): Promise<void> {
     if (!this.allowPrecountClicks) {
       return;
     }
@@ -3629,7 +3680,9 @@ export class MemoAudioEngine {
     gain.gain.value = this.metronomeSettings.volume / 100;
     const source = scheduleOneMetronomeClick(context, gain, {
       accent: options.accent,
-      scheduleLeadSec: PRECOUNT_CLICK_LEAD_SEC,
+      ...(options.when != null
+        ? { when: options.when }
+        : { scheduleLeadSec: PRECOUNT_CLICK_LEAD_SEC }),
     });
     this.metronomeSources.push(source);
     source.onEnded = () => {
@@ -4044,6 +4097,7 @@ export class MemoAudioEngine {
           0,
           bufferEndSec - channelData.length / callbackConfig.sampleRate
         );
+        const prevLen = this.recordingPeaksBuffer.length;
         this.recordingPeaksBuffer = accumulatePeaksFromSamples(
           channelData,
           bufferStartSec,
@@ -4060,6 +4114,14 @@ export class MemoAudioEngine {
             sampleRate: callbackConfig.sampleRate,
             eventWhen: when,
           });
+        }
+        // Android: push peaks as soon as the buffer grows (don't wait for the tick).
+        if (
+          Platform.OS === 'android' &&
+          this.state.isRecording &&
+          this.recordingPeaksBuffer.length !== prevLen
+        ) {
+          this.emitRecordingProgress();
         }
       }
     );
@@ -4513,11 +4575,10 @@ export class MemoAudioEngine {
       );
     }
 
-    // 150ms balances live waveform growth vs JS wakeups on long stacked takes.
+    // Peaks/mix tick: Android ~50ms for the first 1.5s, then 150ms (iOS 150ms).
     // Smooth timer hundredths come from startRecordingUiTimer (~50ms RAF).
-    this.recordingTimer = setInterval(() => {
-      this.emitRecordingProgress();
-    }, 150);
+    this.recordingPeaksEmitStartedAtMs = Date.now();
+    this.scheduleRecordingPeaksTimer();
     this.startRecordingUiTimer();
 
     if (monitorMix && this.playbackContextStartWhen > 0) {

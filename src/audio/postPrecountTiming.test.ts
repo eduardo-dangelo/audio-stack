@@ -98,4 +98,21 @@ describe('computePostPrecountContextWhen', () => {
       11.85 + POST_PRECOUNT_SCHEDULE_LEAD_SEC
     );
   });
+
+  it('keeps grid when deadline just reached and live is near planned', () => {
+    const startMs = 1_000;
+    const planned = 10 + FOUR_BEATS_MS / 1000;
+    const live = planned - 0.005;
+    const input = baseInput({
+      contextStart: 10,
+      live,
+      startMs,
+      beat1DeadlineMs: startMs + FOUR_BEATS_MS,
+      nowMs: startMs + FOUR_BEATS_MS + 10,
+    });
+    assert.equal(
+      computePostPrecountContextWhen(input),
+      Math.max(planned, live + POST_PRECOUNT_SCHEDULE_LEAD_SEC)
+    );
+  });
 });
