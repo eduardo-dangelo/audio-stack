@@ -4940,7 +4940,9 @@ function MemoEditorInner({
     }
     isStoppingRecordingRef.current = true;
     setIsStoppingRecording(true);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS !== 'android') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     void (async () => {
       // Let stopping chrome paint before sync recorder.stop / peak trim.
       await new Promise<void>((resolve) => {
@@ -5292,9 +5294,11 @@ function MemoEditorInner({
         }
         clearPostPrecountWatchdog();
         clearPrecountOverlay();
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {
-          // Best-effort — never abort a live take for haptics failure.
-        });
+        if (Platform.OS !== 'android') {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {
+            // Best-effort — never abort a live take for haptics failure.
+          });
+        }
       } catch (error) {
         clearPostPrecountWatchdog();
         if (stuckRecoveryRef.current) {
