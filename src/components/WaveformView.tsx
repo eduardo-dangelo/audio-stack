@@ -4166,8 +4166,10 @@ function WaveformViewComponent({
     };
 
     const sampleRecordingAudio = (frameMs: number, force: boolean) => {
+      // Between anchors callers should skip this entirely on Android; keep a
+      // cheap early return without native clock reads if force is false.
       if (!force && frameMs - lastAudioSampleMs < anchorIntervalMs) {
-        return getRecordingTimeRef.current?.() ?? currentTimeRef.current;
+        return currentTimeRef.current;
       }
       const time = getRecordingTimeRef.current?.() ?? currentTimeRef.current;
       const pps = layoutPixelsPerSecondRef.current;
@@ -4232,6 +4234,15 @@ function WaveformViewComponent({
       }
       // Keep scheduling while scrubbing — an early return would kill the loop.
       if (isUserScrollingRef.current) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      // Android: between ~50ms anchors, UI-thread translate continues from the
+      // last clock sample — skip native reads, layout math, and buffer sync.
+      if (
+        useTranslateFollow &&
+        frameMs - lastAudioSampleMs < anchorIntervalMs
+      ) {
         raf = requestAnimationFrame(tick);
         return;
       }

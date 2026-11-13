@@ -385,6 +385,8 @@ type LiveRecordingWaveformProps = {
   latencyLeadSec?: number;
   tracks: TrackData[];
 } & Omit<ComponentProps<typeof WaveformView>, 'tracks'>;
+const ANDROID_LIVE_PEAKS_THROTTLE_MS = 120;
+
 /** Subscribes only to live peaks so MemoEditor shell can ignore peak identity. */
 function LiveRecordingWaveform({
   isRecording,
@@ -393,12 +395,57 @@ function LiveRecordingWaveform({
   ...waveformProps
 }: LiveRecordingWaveformProps) {
   const recordingPeaks = useAudioEngineSelector((state) => state.recordingPeaks);
+  // Android: throttle WaveformView re-renders (~120ms); Svg path already throttles ~300ms.
+  const [androidPeaks, setAndroidPeaks] = useState(recordingPeaks);
+  const lastAndroidPeaksApplyMsRef = useRef(0);
+  const pendingAndroidPeaksRef = useRef(recordingPeaks);
+  const androidPeaksThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !isRecording) {
+      lastAndroidPeaksApplyMsRef.current = 0;
+      setAndroidPeaks(recordingPeaks);
+      return;
+    }
+    const now = Date.now();
+    if (
+      lastAndroidPeaksApplyMsRef.current === 0 ||
+      now - lastAndroidPeaksApplyMsRef.current >= ANDROID_LIVE_PEAKS_THROTTLE_MS
+    ) {
+      lastAndroidPeaksApplyMsRef.current = now;
+      setAndroidPeaks(recordingPeaks);
+      return;
+    }
+    pendingAndroidPeaksRef.current = recordingPeaks;
+    if (androidPeaksThrottleRef.current != null) {
+      return;
+    }
+    const delay =
+      ANDROID_LIVE_PEAKS_THROTTLE_MS - (now - lastAndroidPeaksApplyMsRef.current);
+    androidPeaksThrottleRef.current = setTimeout(() => {
+      androidPeaksThrottleRef.current = null;
+      lastAndroidPeaksApplyMsRef.current = Date.now();
+      setAndroidPeaks(pendingAndroidPeaksRef.current);
+    }, delay);
+  }, [isRecording, recordingPeaks]);
+
+  useEffect(() => {
+    return () => {
+      if (androidPeaksThrottleRef.current != null) {
+        clearTimeout(androidPeaksThrottleRef.current);
+        androidPeaksThrottleRef.current = null;
+      }
+    };
+  }, []);
+
+  const peaksForInject =
+    Platform.OS === 'android' && isRecording ? androidPeaks : recordingPeaks;
   const tracksWithPeaks = useMemo(() => {
     if (!isRecording) {
       return tracks;
     }
-    return injectLiveRecordingPeaks(tracks, recordingPeaks, latencyLeadSec);
-  }, [isRecording, latencyLeadSec, recordingPeaks, tracks]);
+    return injectLiveRecordingPeaks(tracks, peaksForInject, latencyLeadSec);
+  }, [isRecording, latencyLeadSec, peaksForInject, tracks]);
 
   return <WaveformView {...waveformProps} isRecording={isRecording} tracks={tracksWithPeaks} />;
 }
@@ -4939,15 +4986,24 @@ function MemoEditorInner({
       return;
     }
     isStoppingRecordingRef.current = true;
-    setIsStoppingRecording(true);
+    // Android: local Stop chrome in PlaybackControls; shell isStopping set in stopAndSave.
     if (Platform.OS !== 'android') {
+      setIsStoppingRecording(true);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     void (async () => {
-      // Let stopping chrome paint before sync recorder.stop / peak trim.
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => resolve());
-      });
+      // Quiet peak/UI emits before sync recorder.stop (Android Stop is onPressIn).
+      engine.suspendRecordingUiEmits();
+      if (Platform.OS === 'android') {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 0);
+        });
+      } else {
+        // Let stopping chrome paint before sync recorder.stop / peak trim.
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        });
+      }
       await stopAndSaveActiveRecording();
     })();
   };

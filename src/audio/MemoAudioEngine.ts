@@ -380,6 +380,10 @@ export class MemoAudioEngine {
   private recordingTimer: ReturnType<typeof setTimeout> | null = null;
   /** Wall time when peak emits began — Android uses a faster cadence for ~1.5s. */
   private recordingPeaksEmitStartedAtMs = 0;
+  /** Wall time of last Android peak emit (dedupe timer vs onAudioReady). */
+  private lastRecordingPeaksEmitAtMs = 0;
+  /** Stop path: freeze peak/UI emits immediately while capture still tears down. */
+  private recordingUiEmitsSuspended = false;
   /** RAF for smooth recordingDuration UI (~50ms); separate from peaks/mix tick. */
   private recordingUiRafId: number | null = null;
   private captureCheckpointTimer: ReturnType<typeof setInterval> | null = null;
@@ -838,6 +842,17 @@ export class MemoAudioEngine {
     }
     const ctxElapsed = Math.max(0, this.context.currentTime - cueWhen);
     return Math.max(file, ctxElapsed);
+  }
+
+  /**
+   * Android stop: clear peak/UI emit timers immediately so the JS thread can
+   * run recorder.stop without competing with live-bar traffic. Final progress
+   * emit in stopRecorderCapture still runs.
+   */
+  suspendRecordingUiEmits(): void {
+    this.recordingUiEmitsSuspended = true;
+    this.clearRecordingTimer();
+    this.clearRecordingUiTimer();
   }
 
   async prewarmRecordingSession(): Promise<void> {
@@ -2566,14 +2581,14 @@ export class MemoAudioEngine {
 
   /**
    * Peak emit cadence: Android ~50ms for the first 1.5s so live bars appear with
-   * the take, then 150ms. iOS stays on 150ms throughout.
+   * the take, then ~100ms (onAudioReady also pushes; timer is a backstop). iOS 150ms.
    */
   private recordingPeaksEmitIntervalMs(): number {
     if (Platform.OS !== 'android' || this.recordingPeaksEmitStartedAtMs <= 0) {
       return 150;
     }
     const elapsed = Date.now() - this.recordingPeaksEmitStartedAtMs;
-    return elapsed < 1500 ? 50 : 150;
+    return elapsed < 1500 ? 50 : 100;
   }
 
   private scheduleRecordingPeaksTimer(): void {
@@ -2581,13 +2596,30 @@ export class MemoAudioEngine {
       clearTimeout(this.recordingTimer);
       this.recordingTimer = null;
     }
+    if (this.recordingUiEmitsSuspended) {
+      return;
+    }
     const delay = this.recordingPeaksEmitIntervalMs();
     this.recordingTimer = setTimeout(() => {
       this.recordingTimer = null;
-      if (!this.state.isRecording || !this.recorder) {
+      if (
+        !this.state.isRecording ||
+        !this.recorder ||
+        this.recordingUiEmitsSuspended
+      ) {
+        return;
+      }
+      // Android: skip timer tick when onAudioReady already emitted recently.
+      if (
+        Platform.OS === 'android' &&
+        this.lastRecordingPeaksEmitAtMs > 0 &&
+        Date.now() - this.lastRecordingPeaksEmitAtMs < 40
+      ) {
+        this.scheduleRecordingPeaksTimer();
         return;
       }
       this.emitRecordingProgress();
+      this.lastRecordingPeaksEmitAtMs = Date.now();
       this.scheduleRecordingPeaksTimer();
     }, delay);
   }
@@ -2601,10 +2633,18 @@ export class MemoAudioEngine {
 
   /**
    * Smooth hundredths on the main timer during capture (matches playback UI rate).
-   * Peaks + monitor-mix stay on the coarser 150ms interval.
+   * Peaks + monitor-mix stay on the coarser interval. Android shell ignores
+   * recordingDuration during capture (follow-clock label + peak emits), so skip
+   * the RAF loop after the initial emit.
    */
   private startRecordingUiTimer(): void {
     this.clearRecordingUiTimer();
+    if (this.recorder) {
+      this.emit({ recordingDuration: this.recorder.getCurrentDuration() });
+    }
+    if (Platform.OS === 'android') {
+      return;
+    }
     let lastUiUpdateMs = 0;
 
     const tick = (frameMs: number) => {
@@ -2624,9 +2664,6 @@ export class MemoAudioEngine {
       this.recordingUiRafId = requestAnimationFrame(tick);
     };
 
-    if (this.recorder) {
-      this.emit({ recordingDuration: this.recorder.getCurrentDuration() });
-    }
     this.recordingUiRafId = requestAnimationFrame(tick);
   }
 
@@ -4116,12 +4153,26 @@ export class MemoAudioEngine {
           });
         }
         // Android: push peaks as soon as the buffer grows (don't wait for the tick).
+        // After the early window, cap ~100ms so timer + onAudioReady don't double-fire.
         if (
           Platform.OS === 'android' &&
           this.state.isRecording &&
+          !this.recordingUiEmitsSuspended &&
           this.recordingPeaksBuffer.length !== prevLen
         ) {
+          const now = Date.now();
+          const inEarlyWindow =
+            this.recordingPeaksEmitStartedAtMs > 0 &&
+            now - this.recordingPeaksEmitStartedAtMs < 1500;
+          if (
+            !inEarlyWindow &&
+            this.lastRecordingPeaksEmitAtMs > 0 &&
+            now - this.lastRecordingPeaksEmitAtMs < 100
+          ) {
+            return;
+          }
           this.emitRecordingProgress();
+          this.lastRecordingPeaksEmitAtMs = now;
         }
       }
     );
@@ -4575,8 +4626,10 @@ export class MemoAudioEngine {
       );
     }
 
-    // Peaks/mix tick: Android ~50ms for the first 1.5s, then 150ms (iOS 150ms).
-    // Smooth timer hundredths come from startRecordingUiTimer (~50ms RAF).
+    // Peaks/mix tick: Android ~50ms for the first 1.5s, then ~100ms (iOS 150ms).
+    // Smooth timer hundredths come from startRecordingUiTimer (~50ms RAF on iOS).
+    this.recordingUiEmitsSuspended = false;
+    this.lastRecordingPeaksEmitAtMs = 0;
     this.recordingPeaksEmitStartedAtMs = Date.now();
     this.scheduleRecordingPeaksTimer();
     this.startRecordingUiTimer();

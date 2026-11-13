@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppSymbol } from '@/src/components/AppSymbol';
@@ -49,7 +49,33 @@ export function PlaybackControls({
   const colors = useVoiceMemosColors();
   const styles = useStyles(colors);
   const progress = duration > 0 ? currentTime / duration : 0;
-  const stopDisabled = stopRecordingDisabled || isStoppingRecording;
+  const isAndroid = Platform.OS === 'android';
+  // Android: local pending chrome so Stop feedback does not wait on MemoEditor re-render.
+  const [stopPending, setStopPending] = useState(false);
+  const stopFiredRef = useRef(false);
+  // iOS still disables on shell isStoppingRecording; Android keeps Pressable enabled for ripple.
+  const stopDisabled = isAndroid
+    ? stopRecordingDisabled
+    : stopRecordingDisabled || isStoppingRecording;
+  const stopChromeActive = stopPending || isStoppingRecording;
+
+  useEffect(() => {
+    if (!isRecording) {
+      stopFiredRef.current = false;
+      setStopPending(false);
+    }
+  }, [isRecording]);
+
+  const fireStop = () => {
+    if (stopFiredRef.current || stopRecordingDisabled || !onStopRecording) {
+      return;
+    }
+    stopFiredRef.current = true;
+    if (isAndroid) {
+      setStopPending(true);
+    }
+    onStopRecording();
+  };
 
   return (
     <View style={styles.container}>
@@ -69,18 +95,19 @@ export function PlaybackControls({
           <Pressable
             accessibilityLabel="Stop recording"
             android_ripple={
-              Platform.OS === 'android'
+              isAndroid
                 ? { color: 'rgba(255,255,255,0.25)', borderless: false, foreground: true }
                 : undefined
             }
             disabled={stopDisabled}
             hitSlop={12}
-            onPress={onStopRecording}
+            onPressIn={isAndroid ? fireStop : undefined}
+            onPress={fireStop}
             style={({ pressed }) => [
               styles.stopButton,
               compact && styles.stopButtonCompact,
-              stopRecordingDisabled && !isStoppingRecording && styles.recordDisabled,
-              pressed && !stopDisabled && styles.controlPressed,
+              (stopRecordingDisabled || stopChromeActive) && styles.recordDisabled,
+              (pressed || stopChromeActive) && !stopRecordingDisabled && styles.controlPressed,
             ]}>
             <View style={[styles.stopSquare, compact && styles.stopSquareCompact]} />
           </Pressable>
