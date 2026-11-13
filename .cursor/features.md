@@ -93,9 +93,9 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 ### Android first APK
 - Status: evolving
 - What: Expo Android platform config + stubs so a debug APK can launch beside the existing iOS app.
-- Paths: `app.json`, `src/utils/showActionSheet.ts`, `src/widgets/RecordingLiveActivity.android.tsx`, `src/actions/shareMemo.ts`
-- Invariants: iOS StoreKit/Live Activities unchanged; Android uses Alert sheets; M4A/multi-share/project native modules remain iOS-only; Live Activity is a no-op on Android.
-- Updated: 2026-11-11
+- Paths: `app.json`, `src/utils/showActionSheet.ts`, `src/widgets/RecordingLiveActivity.android.tsx`, `src/actions/shareMemo.ts`, `assets/images/icon.png`, `assets/images/android-icon-foreground.png`, `assets/images/android-icon-background.png`, `assets/images/android-icon-monochrome.png`
+- Invariants: iOS StoreKit/Live Activities unchanged; Android uses Alert sheets; M4A/multi-share/project native modules remain iOS-only; Live Activity is a no-op on Android; Android launcher adaptive icons use the headphones + waveform mark (same as iOS/landing, not red Expo placeholders); `expo prebuild --platform android` required after icon asset changes before rebuild.
+- Updated: 2026-11-13
 
 ### Landing brand icon
 - Status: evolving
