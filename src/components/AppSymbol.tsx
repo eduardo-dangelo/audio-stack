@@ -79,6 +79,7 @@ const SF_TO_ANDROID: Record<string, AndroidSymbol> = {
   'crown.fill': 'workspace_premium',
   'seal.fill': 'verified',
   paintbrush: 'brush',
+  paintpalette: 'palette',
   repeat: 'repeat',
   doc: 'description',
 };

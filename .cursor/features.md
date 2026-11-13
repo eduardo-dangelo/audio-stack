@@ -87,8 +87,8 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: Material icon mapping via AppSymbol; MemoEditor in-body header on Android formSheet.
 - Paths: `src/components/AppSymbol.tsx`, `src/components/FloatingHeaderButton.tsx`, `src/components/MemoEditor.tsx`, `src/components/track-editor/EditorToolStrip.tsx`
-- Invariants: iOS SF Symbols unchanged; Android uses Material names + text fallback; editor header shows More/title/Done in-body on Android; toolbar tools keep accent tint when selected/applied.
-- Updated: 2026-11-11
+- Invariants: iOS SF Symbols unchanged; Android uses Material names + text fallback; track menu Change Color maps `paintpalette` → `palette`; editor header shows More/title/Done in-body on Android; toolbar tools keep accent tint when selected/applied.
+- Updated: 2026-11-13
 
 ### Android first APK
 - Status: evolving
