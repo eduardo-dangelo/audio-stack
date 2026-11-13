@@ -10,8 +10,8 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: Android precount clicks and recording start arm on the AudioContext grid from `contextStart`; iOS keeps Modal dismiss wait + Phase B re-clamp.
 - Paths: `src/components/MemoEditor.tsx`, `src/audio/MemoAudioEngine.ts`, `src/audio/metronome.ts`, `src/audio/postPrecountTiming.ts`, `src/components/PrecountOverlay.tsx`
-- Invariants: Android sound precount schedules clicks at `contextStart + n*interval`; Android leaves ~100ms before wall downbeat then dismisses in ~16ms and arms `contextStart+4*interval`; iOS still waits Modal onDismiss (~250ms) then `computePostPrecountContextWhen`; Android precount numerals have no enter/exit fade; live bars sync via early peak emits + progressive lead preview (see Recording UI audio clock).
-- Updated: 2026-11-12
+- Invariants: Android sound precount schedules clicks at `contextStart + n*interval`; Android leaves ~100ms before wall downbeat then dismisses in ~16ms and arms `contextStart+4*interval`; iOS still waits Modal onDismiss (~250ms) then `computePostPrecountContextWhen`; Android precount numerals have no enter/exit fade; live bars sync via early peak emits + UI-clock bar count (see Recording UI audio clock).
+- Updated: 2026-11-13
 
 ### Android splash wordmark
 - Status: evolving
@@ -31,8 +31,8 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: Android recording follow slides timeline via translateX from `getRecordingTime`; timer uses the same follow clock; live bars use peak duration only (no clock stretch).
 - Paths: `src/components/WaveformView.tsx`, `src/components/MemoEditor.tsx`, `src/components/metronomeGridViewport.ts`, `src/audio/MemoAudioEngine.ts`
-- Invariants: Android capture parks ScrollView at 0 and moves translateX from a UI-thread clock anchored to `getRecordingTime` (max 1s extrapolation, anchor ~50ms); enter/exit/background snap translateX and disable the frame callback; follow RAF does not restart on contentWidth; between anchors Android follow RAF reschedules without native clock/layout/buffer work; iOS recording still `scrollTo`; Android recording label from `onLiveTimelineTime` at ~50ms anchors; Android MemoEditor skips `recordingDuration` shell re-renders during capture (peaks via LiveRecordingWaveform, applied ~120ms); Android recording paint overscan ~0.5vp/side (iOS keeps wide buffers); Android live Svg sized to paint buffer and path-throttled ~300ms; Android early peak emits ~50ms for 1.5s + onAudioReady (steady ~100ms, timer skips if emit within ~40ms); Android skips recordingDuration RAF loop after initial emit; Android live preview paints during latency lead then trims; Android follow elapsed is max(fileDuration, cue-context); iOS live preview still blanks until lead clears.
-- Updated: 2026-11-12
+- Invariants: Android capture parks ScrollView at 0 and moves translateX from a UI-thread clock anchored to `getRecordingTime` (max 1s extrapolation, anchor ~50ms); enter/exit/background snap translateX and disable the frame callback; follow RAF does not restart on contentWidth; between anchors Android follow RAF reschedules without native clock/layout/buffer work; iOS recording still `scrollTo`; Android recording label from `onLiveTimelineTime` at ~50ms anchors; Android MemoEditor skips `recordingDuration` shell re-renders during capture (peaks via LiveRecordingWaveform, applied ~120ms); Android recording paint overscan ~0.5vp/side (iOS keeps wide buffers); Android live Svg sized to paint buffer and path-throttled ~300ms; Android early peak emits ~50ms for 1.5s + onAudioReady (steady ~100ms, timer skips if emit within ~40ms); Android skips recordingDuration RAF loop after initial emit; Android live preview is untrimmed and bar count follows UI elapsed (post-save latency trim unchanged); Android follow elapsed is max(fileDuration, cue-context); iOS live preview still blanks until lead clears.
+- Updated: 2026-11-13
 
 ### Playback UI audio clock
 - Status: evolving

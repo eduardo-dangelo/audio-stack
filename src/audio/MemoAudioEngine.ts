@@ -3526,7 +3526,11 @@ export class MemoAudioEngine {
       this.extendMonitorMixSchedule(scheduleTimelineNow);
     }
 
-    const barCount = this.recordingPeakBarCount(duration);
+    // Android: grow live bars to the playhead clock (max file/cue); missing
+    // samples paint as min-height. iOS stays on file duration.
+    const barDuration =
+      Platform.OS === 'android' ? this.getRecordingUiElapsed() : duration;
+    const barCount = this.recordingPeakBarCount(barDuration);
     let peaks = this.lastEmittedRecordingPeaks;
     if (barCount !== this.lastEmittedRecordingPeakCount) {
       const next = appendAbsoluteRecordingPeaks(

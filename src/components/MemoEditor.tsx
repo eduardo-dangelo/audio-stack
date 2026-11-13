@@ -301,19 +301,18 @@ function previewLivePeaksForLatency(
     Math.round((Math.max(0, leadSec) * WAVEFORM_PIXELS_PER_SECOND) / LIVE_PEAK_BAR_STEP)
   );
   if (leadBars > 0 && peaks.length <= leadBars) {
-    // iOS: blank until lead clears. Android: show provisional peaks so the lane
-    // isn't empty while the metronome already runs; trim once past lead.
-    if (!options?.showDuringLead) {
-      return null;
-    }
-    return {
-      peaks,
-      duration: Math.max(
-        0.01,
-        (peaks.length * LIVE_PEAK_BAR_STEP) / WAVEFORM_PIXELS_PER_SECOND
-      ),
-    };
+  // iOS: blank until lead clears. (Android live preview uses leadSec 0.)
+  if (!options?.showDuringLead) {
+    return null;
   }
+  return {
+    peaks,
+    duration: Math.max(
+      0.01,
+      (peaks.length * LIVE_PEAK_BAR_STEP) / WAVEFORM_PIXELS_PER_SECOND
+    ),
+  };
+}
   const previewPeaks = leadBars > 0 ? peaks.slice(leadBars) : peaks;
   return {
     peaks: previewPeaks,
@@ -329,9 +328,8 @@ function injectLiveRecordingPeaks(
   peaks: number[],
   leadSec: number
 ): TrackData[] {
-  const preview = previewLivePeaksForLatency(peaks, leadSec, {
-    showDuringLead: Platform.OS === 'android',
-  });
+  // iOS blanks until lead clears. Android passes leadSec 0 (no live trim).
+  const preview = previewLivePeaksForLatency(peaks, leadSec);
   if (!preview) {
     // Still in latency lead — clear duration so WaveformView cannot synthesize
     // fake bars from the shell's 0.01s placeholder + undefined peaks.
@@ -444,7 +442,10 @@ function LiveRecordingWaveform({
     if (!isRecording) {
       return tracks;
     }
-    return injectLiveRecordingPeaks(tracks, peaksForInject, latencyLeadSec);
+    // Android: no live latency trim — bars follow the playhead clock; post-save
+    // still applies applyRecordingIoLatencyTrim. iOS keeps blank-until-lead.
+    const leadSec = Platform.OS === 'android' ? 0 : latencyLeadSec;
+    return injectLiveRecordingPeaks(tracks, peaksForInject, leadSec);
   }, [isRecording, latencyLeadSec, peaksForInject, tracks]);
 
   return <WaveformView {...waveformProps} isRecording={isRecording} tracks={tracksWithPeaks} />;
