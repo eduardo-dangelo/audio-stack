@@ -5563,6 +5563,14 @@ function MemoEditorInner({
     }
   }, [isRecording]);
 
+  // Android: prewarm named reverb IRs when opening the reverb tool (cathedral first pick).
+  useEffect(() => {
+    if (Platform.OS !== 'android' || activeEditor !== 'reverb') {
+      return;
+    }
+    engine.prewarmReverbImpulseResponses();
+  }, [activeEditor, engine]);
+
   useEffect(
     () =>
       subscribeEditorAudioRoutes(

@@ -5,6 +5,7 @@ import type {
   DelayNode,
   GainNode,
 } from 'react-native-audio-api';
+import { Platform } from 'react-native';
 
 import {
   applyPathInputEffects,
@@ -14,7 +15,9 @@ import {
   getDelayTimeSec,
   getEffectiveReverbMix,
   isDelayPathActive,
+  isDelayPathPresent,
   isReverbPathActive,
+  isReverbPathPresent,
   reverbBusKey,
   requiredDelayMaxSec,
   setAudioParamValue,
@@ -23,6 +26,9 @@ import {
   type LayerReverbNodes,
 } from '@/src/audio/layerEffectChain';
 import type { LayerEffects } from '@/src/audio/layerEffects';
+
+/** Android: soft-ramp wet send so mid-play reverb/delay doesn't step in. */
+const ANDROID_WET_SEND_RAMP_SEC = 0.025;
 
 type DelayBus = {
   key: string;
@@ -530,20 +536,28 @@ export class MemoMixGraph {
   ): void {
     const channel = this.ensureChannel(context, layerId);
     const now = context.currentTime;
-    const delayActive = isDelayPathActive(effects);
-    const reverbActive = isReverbPathActive(effects);
-    const delayMix = delayActive ? effects.delay.mix / 100 : 0;
-    const reverbMix = reverbActive ? getEffectiveReverbMix(effects) : 0;
+    // Android: bus stays while preset is on; mix is send-gain only.
+    const delayPresent = isDelayPathPresent(effects);
+    const reverbPresent = isReverbPathPresent(effects);
+    const delayMix = isDelayPathActive(effects) ? effects.delay.mix / 100 : 0;
+    const reverbMix = isReverbPathActive(effects)
+      ? getEffectiveReverbMix(effects)
+      : 0;
 
     applyPathInputEffects(channel.dry, effects, context, anySoloActive);
     // Send-style: dry stays full; wet is additive.
     setAudioParamValue(channel.dry.dryGain.gain, 1, now);
 
-    if (delayActive) {
+    const sendRampSec =
+      Platform.OS === 'android' ? ANDROID_WET_SEND_RAMP_SEC : 0;
+
+    if (delayPresent) {
       channel.delay = this.ensureWetPath(context, channel.delay);
       applyPathInputEffects(channel.delay, effects, context, anySoloActive);
       this.syncDelayBus(context, channel, effects);
-      setAudioParamValue(channel.delay.send.gain, delayMix, now);
+      setAudioParamValue(channel.delay.send.gain, delayMix, now, {
+        rampSec: sendRampSec,
+      });
     } else {
       this.releaseChannelDelay(channel);
       if (channel.delay) {
@@ -552,11 +566,13 @@ export class MemoMixGraph {
       }
     }
 
-    if (reverbActive) {
+    if (reverbPresent) {
       channel.reverb = this.ensureWetPath(context, channel.reverb);
       applyPathInputEffects(channel.reverb, effects, context, anySoloActive);
       this.syncReverbBus(context, channel, effects);
-      setAudioParamValue(channel.reverb.send.gain, reverbMix, now);
+      setAudioParamValue(channel.reverb.send.gain, reverbMix, now, {
+        rampSec: sendRampSec,
+      });
     } else {
       this.releaseChannelReverb(channel);
       if (channel.reverb) {

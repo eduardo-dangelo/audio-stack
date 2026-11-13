@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Android mid-play wet effects
+- Status: evolving
+- What: Android mid-play reverb/delay toggles arm wet sources without full playback resync; IR length capped to cut cathedral crackle.
+- Paths: `src/audio/MemoAudioEngine.ts`, `src/audio/layerEffectChain.ts`, `src/audio/memoMixGraph.ts`, `src/components/MemoEditor.tsx`
+- Invariants: Android wet on/off uses additive arm/disarm (no `resyncPlaybackAtCurrentTime`); Android keeps wet bus while preset is on (mix 0↔>0 is send-gain); Android IR duration capped at 2.5s; Android decay IR key quantized to 0.1 with ~300ms idle assign; Android wet send gain ramps ~25ms; reverb tool open prewarms named IRs; iOS keeps uncapped IR + full wet-path resync.
+- Updated: 2026-11-13
+
 ### Precount metronome sync
 - Status: evolving
 - What: Android precount clicks and recording start arm on the AudioContext grid from `contextStart`; iOS keeps Modal dismiss wait + Phase B re-clamp.

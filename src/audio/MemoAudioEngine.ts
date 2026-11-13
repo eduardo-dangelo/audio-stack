@@ -35,6 +35,7 @@ import {
 } from '@/src/audio/layerPcmPageCache';
 import {
   clearReverbIrCache,
+  getOrCreateImpulseResponse,
   isDelayPathActive,
   isReverbPathActive,
   type LayerEffectPathNodes,
@@ -44,8 +45,10 @@ import {
   hasAnySoloActive,
   isLayerAudible,
   mergeLayerEffects,
+  REVERB_PRESET_DEFAULTS,
   type LayerEffects,
   type LayerEffectsChange,
+  type ReverbPreset,
 } from '@/src/audio/layerEffects';
 import {
   applyPitchDetuneToSource,
@@ -2294,6 +2297,15 @@ export class MemoAudioEngine {
     }
   }
 
+  /** Stop a live source and drop it from the session source list. */
+  private stopAndForgetSource(source: AudioBufferSourceNode): void {
+    this.stopSource(source);
+    const index = this.sources.indexOf(source);
+    if (index >= 0) {
+      this.sources.splice(index, 1);
+    }
+  }
+
   private stopActiveSources(): void {
     this.stoppingSources = true;
     try {
@@ -3278,6 +3290,211 @@ export class MemoAudioEngine {
   }
 
   /**
+   * Android: toggle delay/reverb mid-play without stopping dry sources.
+   * Stop wet sources before tearing down the bus; arm after applyLayerEffects.
+   */
+  private syncAndroidWetPathsMidPlay(
+    layerId: string,
+    effects: LayerEffects
+  ): void {
+    const context = this.context;
+    if (!context || !this.state.isPlaying || this.playbackContextStartWhen <= 0) {
+      return;
+    }
+    this.disarmInactiveWetSources(layerId, effects);
+    this.mixGraph.applyLayerEffects(
+      context,
+      layerId,
+      effects,
+      this.getAnySoloActive()
+    );
+    this.armMissingWetSources(layerId, effects);
+    for (const active of this.getActiveSegmentsForLayer(layerId)) {
+      active.playbackEffects = effects;
+    }
+  }
+
+  private disarmInactiveWetSources(
+    layerId: string,
+    effects: LayerEffects
+  ): void {
+    const wantDelay =
+      !this.layerPlaybackDryOnly && isDelayPathActive(effects);
+    const wantReverb =
+      !this.layerPlaybackDryOnly && isReverbPathActive(effects);
+    for (const active of this.getActiveSegmentsForLayer(layerId)) {
+      if (active.hasDelay && !wantDelay) {
+        for (const source of active.delaySources) {
+          this.stopAndForgetSource(source);
+        }
+        active.delaySources = [];
+        active.hasDelay = false;
+      }
+      if (active.hasReverb && !wantReverb) {
+        for (const source of active.reverbSources) {
+          this.stopAndForgetSource(source);
+        }
+        active.reverbSources = [];
+        active.hasReverb = false;
+      }
+    }
+  }
+
+  private armMissingWetSources(layerId: string, effects: LayerEffects): void {
+    const context = this.context;
+    if (!context || !this.state.isPlaying || this.playbackContextStartWhen <= 0) {
+      return;
+    }
+    const wantDelay =
+      !this.layerPlaybackDryOnly && isDelayPathActive(effects);
+    const wantReverb =
+      !this.layerPlaybackDryOnly && isReverbPathActive(effects);
+    if (!wantDelay && !wantReverb) {
+      return;
+    }
+    const channel = this.mixGraph.getChannel(layerId);
+    if (!channel) {
+      return;
+    }
+    const elapsed = this.getElapsedPlaybackTime(context);
+    const lead = playbackScheduleLeadSec(1);
+    const minStartWhen = context.currentTime + Math.max(0.01, lead);
+
+    for (const active of this.getActiveSegmentsForLayer(layerId)) {
+      const needDelay = wantDelay && !active.hasDelay && channel.delay != null;
+      const needReverb =
+        wantReverb && !active.hasReverb && channel.reverb != null;
+      if (!needDelay && !needReverb) {
+        if (wantDelay) {
+          active.hasDelay = true;
+        }
+        if (wantReverb) {
+          active.hasReverb = true;
+        }
+        continue;
+      }
+
+      const segmentStart = this.playbackStartAt + active.scheduleDelay;
+      const intoScheduled = Math.max(0, elapsed - segmentStart);
+      const remain = active.scheduledLength - intoScheduled;
+      if (remain <= PLAYBACK_END_TOLERANCE) {
+        // Past current chunk — flags so extendLayerPlaybackSchedule feeds wet.
+        if (wantDelay) {
+          active.hasDelay = true;
+        }
+        if (wantReverb) {
+          active.hasReverb = true;
+        }
+        continue;
+      }
+
+      const nominalStartWhen =
+        this.playbackContextStartWhen + active.scheduleDelay + intoScheduled;
+      const startWhen = Math.max(nominalStartWhen, minStartWhen);
+      const stopWhen =
+        this.playbackContextStartWhen +
+        active.scheduleDelay +
+        active.scheduledLength;
+      if (stopWhen <= startWhen + PLAYBACK_END_TOLERANCE) {
+        if (wantDelay) {
+          active.hasDelay = true;
+        }
+        if (wantReverb) {
+          active.hasReverb = true;
+        }
+        continue;
+      }
+
+      let buffer = active.buffer;
+      let bufferOffset = active.bufferOffset + intoScheduled;
+      if (active.usesPaging) {
+        const fileOffset = active.fileBufferOffset + intoScheduled;
+        const layer: LoadedLayer = {
+          id: active.layerId,
+          path: active.layerPath,
+          duration: active.layerDuration,
+          startTime: 0,
+          effects: active.playbackEffects,
+        };
+        const scheduled = this.resolveScheduleBuffer(
+          layer,
+          fileOffset,
+          remain,
+          Boolean(active.loopPlayback)
+        );
+        if (!scheduled) {
+          continue;
+        }
+        buffer = scheduled.buffer;
+        bufferOffset = scheduled.bufferOffset;
+        active.buffer = buffer;
+      }
+
+      if (needDelay && channel.delay) {
+        const delaySource = this.schedulePathSource(
+          context,
+          channel.delay,
+          buffer,
+          startWhen,
+          stopWhen,
+          bufferOffset,
+          null,
+          null,
+          effects
+        );
+        if (delaySource) {
+          active.delaySources.push(delaySource);
+        }
+        active.hasDelay = true;
+      }
+      if (needReverb && channel.reverb) {
+        const reverbSource = this.schedulePathSource(
+          context,
+          channel.reverb,
+          buffer,
+          startWhen,
+          stopWhen,
+          bufferOffset,
+          null,
+          null,
+          effects
+        );
+        if (reverbSource) {
+          active.reverbSources.push(reverbSource);
+        }
+        active.hasReverb = true;
+      }
+    }
+  }
+
+  /**
+   * Android: build named-preset IRs on the live context so the first cathedral
+   * pick mid-play does not stall the JS thread.
+   */
+  prewarmReverbImpulseResponses(): void {
+    if (Platform.OS !== 'android' || !this.context) {
+      return;
+    }
+    const context = this.context;
+    const presets = Object.keys(REVERB_PRESET_DEFAULTS) as Exclude<
+      ReverbPreset,
+      'off' | 'custom'
+    >[];
+    for (const preset of presets) {
+      const defaults = REVERB_PRESET_DEFAULTS[preset];
+      getOrCreateImpulseResponse(context, preset, defaults.decay);
+    }
+    // Also warm current layer selections (non-default decay).
+    for (const layer of this.loadedLayers) {
+      const reverb = this.getLoadedLayerEffects(layer).reverb;
+      if (reverb.preset === 'off' || reverb.preset === 'custom') {
+        continue;
+      }
+      getOrCreateImpulseResponse(context, reverb.preset, reverb.decay);
+    }
+  }
+
+  /**
    * Decode any newly audible layers that were skipped at play start (mute/solo),
    * then arm them into the live session (or fall back to a full resync).
    * Coalesces concurrent unmute/solo flips onto one in-flight run.
@@ -3773,6 +3990,17 @@ export class MemoAudioEngine {
       );
 
     if ((needsWetPathResync || needsPitchCreateResync) && this.context) {
+      // Android: arm/disarm wet paths in place — full resync crackles (esp. cathedral).
+      if (
+        Platform.OS === 'android' &&
+        needsWetPathResync &&
+        !needsPitchCreateResync &&
+        this.state.isPlaying &&
+        segments.length > 0
+      ) {
+        this.syncAndroidWetPathsMidPlay(layerId, nextEffects);
+        return;
+      }
       this.mixGraph.applyLayerEffects(
         this.context,
         layerId,

@@ -6,6 +6,7 @@ import type {
   GainNode,
   StereoPannerNode,
 } from 'react-native-audio-api';
+import { Platform } from 'react-native';
 
 import {
   clampPan,
@@ -44,7 +45,10 @@ const REVERB_DURATION: Record<Exclude<ReverbPreset, 'off' | 'custom'>, number> =
   spring: 1.2,
 };
 
-const REVERB_IR_THROTTLE_MS = 80;
+/** iOS keeps 80ms; Android commits decay IR after ~300ms idle to cut FFT/thread churn. */
+const REVERB_IR_THROTTLE_MS = Platform.OS === 'android' ? 300 : 80;
+/** Android: hard cap IR length (cathedral default was 2.5×2.5=6.25s). */
+const ANDROID_REVERB_IR_MAX_SEC = 2.5;
 /** Cap IR buffers so scrubbing decay cannot grow RAM unboundedly. */
 const REVERB_IR_CACHE_MAX = 16;
 
@@ -62,13 +66,39 @@ export function isReverbPathActive(effects: LayerEffects): boolean {
   return effects.reverb.preset !== 'off' && effects.reverb.mix > 0;
 }
 
+/**
+ * Whether the wet bus should exist. Android keeps the bus while the preset is
+ * on so mix 0↔>0 is send-gain-only (no IR rebuild / path teardown).
+ */
+export function isDelayPathPresent(effects: LayerEffects): boolean {
+  if (Platform.OS === 'android') {
+    return effects.delay.preset !== 'off';
+  }
+  return isDelayPathActive(effects);
+}
+
+export function isReverbPathPresent(effects: LayerEffects): boolean {
+  if (Platform.OS === 'android') {
+    return effects.reverb.preset !== 'off';
+  }
+  return isReverbPathActive(effects);
+}
+
 export function delayBusKey(effects: LayerEffects): string {
   const { preset, sync, timeMs, feedback } = effects.delay;
   return `${preset}:${sync}:${timeMs}:${feedback}`;
 }
 
+/** Android quantizes decay to 0.1 so slider drags regenerate fewer IRs. */
+function quantizeReverbDecay(decay: number): number {
+  if (Platform.OS !== 'android') {
+    return decay;
+  }
+  return Math.round(Math.max(0, decay) * 10) / 10;
+}
+
 export function reverbBusKey(effects: LayerEffects): string {
-  return `${effects.reverb.preset}:${effects.reverb.decay.toFixed(2)}`;
+  return `${effects.reverb.preset}:${quantizeReverbDecay(effects.reverb.decay).toFixed(2)}`;
 }
 
 export function getEffectiveReverbMix(effects: LayerEffects): number {
@@ -111,14 +141,19 @@ function createImpulseResponse(
 }
 
 export function reverbIrKey(preset: ReverbPreset, decay: number): string {
-  return `${preset}:${decay.toFixed(2)}`;
+  return `${preset}:${quantizeReverbDecay(decay).toFixed(2)}`;
 }
 
 function getReverbDurationSec(preset: ReverbPreset, decay: number): number {
-  if (preset === 'custom' || preset === 'off') {
-    return Math.max(0.3, decay);
+  const qDecay = Math.max(0.3, quantizeReverbDecay(decay));
+  let durationSec =
+    preset === 'custom' || preset === 'off'
+      ? qDecay
+      : REVERB_DURATION[preset] * qDecay;
+  if (Platform.OS === 'android') {
+    durationSec = Math.min(ANDROID_REVERB_IR_MAX_SEC, durationSec);
   }
-  return REVERB_DURATION[preset] * Math.max(0.3, decay);
+  return durationSec;
 }
 
 export function getOrCreateImpulseResponse(
@@ -243,11 +278,24 @@ export function setAudioParamValue(
   param: {
     cancelScheduledValues: (time: number) => void;
     setValueAtTime: (value: number, time: number) => void;
+    linearRampToValueAtTime?: (value: number, endTime: number) => void;
+    value?: number;
   },
   value: number,
-  time: number
+  time: number,
+  options?: { rampSec?: number }
 ): void {
+  const rampSec = options?.rampSec ?? 0;
   param.cancelScheduledValues(time);
+  if (
+    rampSec > 0 &&
+    typeof param.linearRampToValueAtTime === 'function' &&
+    typeof param.value === 'number'
+  ) {
+    param.setValueAtTime(param.value, time);
+    param.linearRampToValueAtTime(value, time + rampSec);
+    return;
+  }
   param.setValueAtTime(value, time);
 }
 
