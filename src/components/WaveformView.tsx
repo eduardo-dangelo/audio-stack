@@ -2463,6 +2463,8 @@ function WaveformViewComponent({
   const recordingClockWallSV = useSharedValue(0);
   const recordingClockSeqSV = useSharedValue(0);
   const recordingClockAppliedSeqSV = useSharedValue(-1);
+  /** Cap UI-thread extrapolate (playback A–B end); Infinity = free run. */
+  const recordingClockCeilSV = useSharedValue(Number.POSITIVE_INFINITY);
   const recordingPpsSV = useSharedValue(1);
   const recordingFrameCallback = useFrameCallback((frame) => {
     'worklet';
@@ -2481,7 +2483,10 @@ function WaveformViewComponent({
       1,
       Math.max(0, (frame.timestamp - recordingClockWallSV.value) / 1000)
     );
-    const time = recordingClockTimeSV.value + elapsedSec;
+    const time = Math.min(
+      recordingClockTimeSV.value + elapsedSec,
+      recordingClockCeilSV.value
+    );
     recordingFollowTranslateXSV.value = -(time * pps);
   }, false);
   const recordingFollowTranslateStyle = useAnimatedStyle(() => ({
@@ -3952,6 +3957,7 @@ function WaveformViewComponent({
     const pps = layoutPixelsPerSecondRef.current;
     const x = timeToScrollX(time, contentWidthRef.current, pps);
     scrollRef.current?.scrollTo({ x: 0, animated: false });
+    recordingClockCeilSV.value = Number.POSITIVE_INFINITY;
     recordingClockTimeSV.value = time;
     recordingPpsSV.value = pps;
     recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
@@ -3967,6 +3973,7 @@ function WaveformViewComponent({
         contentWidthRef.current,
         layoutPixelsPerSecondRef.current
       );
+      recordingClockCeilSV.value = Number.POSITIVE_INFINITY;
       recordingClockActiveSV.value = false;
       recordingFrameCallback.setActive(false);
       cancelAnimation(recordingFollowTranslateXSV);
@@ -4002,6 +4009,8 @@ function WaveformViewComponent({
     let lastAudioSampleMs = 0;
     let labelAnchorTime = 0;
     let labelAnchorWallMs = 0;
+    /** JS mirror of recordingClockCeilSV for label clamp. */
+    let playbackClockCeil = Number.POSITIVE_INFINITY;
     let appState: string = AppState.currentState;
 
     const emitLiveTime = (time: number) => {
@@ -4017,10 +4026,16 @@ function WaveformViewComponent({
       labelAnchorTime +
       Math.min(1, Math.max(0, (frameMs - labelAnchorWallMs) / 1000));
 
+    const setPlaybackClockCeil = (ceil: number) => {
+      playbackClockCeil = ceil;
+      recordingClockCeilSV.value = ceil;
+    };
+
     const enablePlaybackClock = (time: number, pps: number, frameMs: number) => {
       labelAnchorTime = time;
       labelAnchorWallMs = frameMs;
       lastAudioSampleMs = frameMs;
+      setPlaybackClockCeil(Number.POSITIVE_INFINITY);
       recordingClockTimeSV.value = time;
       recordingPpsSV.value = pps;
       recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
@@ -4029,6 +4044,7 @@ function WaveformViewComponent({
     };
 
     const disablePlaybackClock = () => {
+      setPlaybackClockCeil(Number.POSITIVE_INFINITY);
       recordingClockActiveSV.value = false;
       recordingFrameCallback.setActive(false);
     };
@@ -4062,17 +4078,25 @@ function WaveformViewComponent({
       const error = audioTime - displayed;
       let nextTime = audioTime;
       if (!force) {
-        if (Math.abs(error) < ANDROID_FOLLOW_IGNORE_ERROR_SEC) {
+        if (error < 0) {
+          // Display leads audio (e.g. past A–B loop end) — freeze extrapolate at clock.
+          nextTime = audioTime;
+          setPlaybackClockCeil(audioTime);
+        } else if (error < ANDROID_FOLLOW_IGNORE_ERROR_SEC) {
           // Still refresh the 1s UI extrapolate window + label anchors.
+          setPlaybackClockCeil(Number.POSITIVE_INFINITY);
           commitPlaybackAnchor(displayed, frameMs, pps);
           return;
+        } else if (error <= ANDROID_FOLLOW_HARD_SNAP_ERROR_SEC) {
+          // Soft-slew only when lagging; leading always hard-clamps above.
+          setPlaybackClockCeil(Number.POSITIVE_INFINITY);
+          nextTime =
+            displayed + Math.min(error, ANDROID_FOLLOW_MAX_CORRECTION_SEC);
+        } else {
+          setPlaybackClockCeil(Number.POSITIVE_INFINITY);
         }
-        if (Math.abs(error) <= ANDROID_FOLLOW_HARD_SNAP_ERROR_SEC) {
-          const capped =
-            Math.sign(error) *
-            Math.min(Math.abs(error), ANDROID_FOLLOW_MAX_CORRECTION_SEC);
-          nextTime = displayed + capped;
-        }
+      } else {
+        setPlaybackClockCeil(Number.POSITIVE_INFINITY);
       }
       commitPlaybackAnchor(nextTime, frameMs, pps);
     };
@@ -4104,7 +4128,7 @@ function WaveformViewComponent({
         return;
       }
       samplePlaybackAudio(frameMs, false);
-      const displayTime = displayTimeAt(frameMs);
+      const displayTime = Math.min(displayTimeAt(frameMs), playbackClockCeil);
       emitLiveTime(displayTime);
       pendingBufferScrollX = scrollOffsetRef.current;
       if (bufferSyncRaf === 0) {

@@ -10,7 +10,7 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: Selected-track header tint via child segment Views; Android follow soft-anchors; long-press menus cancel on scroll/drag.
 - Paths: `src/components/WaveformView.tsx`
-- Invariants: Header tint always from child Views with explicit `left`/`width` (Pressable bg never supplies fill — Android absolute Pressable skips paint); non-looped = one full-width `headerColor` segment; looped = cycle 0 `headerColor` + faded later cycles when cycle width ≥1px; Android playback/recording soft anchors cap slew ~3ms (hard snap if error >50ms) but sub-1ms still refreshes clock SV + recording emitLiveTime (avoids 1s extrapolate freeze); long-press epoch bumps on horizontal/vertical scroll begin and trim/move gesture start so timers no-op mid-drag; header loop long-press uses the same epoch + move-cancel path.
+- Invariants: Header tint always from child Views with explicit `left`/`width` (Pressable bg never supplies fill — Android absolute Pressable skips paint); non-looped = one full-width `headerColor` segment; looped = cycle 0 `headerColor` + faded later cycles when cycle width ≥1px; Android playback soft-slew only when lagging (display must not lead `getPlaybackTime`); recording soft anchors cap slew ~3ms (hard snap if error >50ms) but sub-1ms still refreshes clock SV + recording emitLiveTime (avoids 1s extrapolate freeze); long-press epoch bumps on horizontal/vertical scroll begin and trim/move gesture start so timers no-op mid-drag; header loop long-press uses the same epoch + move-cancel path.
 - Updated: 2026-11-14
 
 ### Android performance watchlist
@@ -59,8 +59,8 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: Editor timer/playhead follow the audio clock; Android playback slides via UI-thread translateX; store `currentTime` stays coarse (~50ms) without advance capping.
 - Paths: `src/audio/MemoAudioEngine.ts`, `src/components/MemoEditor.tsx`, `src/components/WaveformView.tsx`
-- Invariants: Engine emits raw elapsed time (no max-advance); Android playback parks ScrollView at 0 and moves translateX from a UI-thread clock anchored to `getPlaybackTime` (~50ms soft anchors, max 1s extrapolate; sub-1ms still refreshes clock SV; cap ~3ms correction); Android timer emits extrapolated follow time between those anchors (no raw catch-up jumps; no separate playback RAF); iOS playback still `scrollTo` + store-driven label; scrub handoff disables translate before pause; auto-follow does not overwrite scrollOffset from onScroll.
-- Updated: 2026-11-13
+- Invariants: Engine emits raw elapsed time (no max-advance); Android playback parks ScrollView at 0 and moves translateX from a UI-thread clock anchored to `getPlaybackTime` (~50ms anchors, max 1s extrapolate; display must not lead audio — hard-clamp when ahead and ceil UI-thread extrapolate at `getPlaybackTime` so A–B loop end does not overshoot between anchors / later wraps; soft-slew ~3ms only when lagging; sub-1ms still refreshes clock SV when not ahead); Android timer emits extrapolated follow time between those anchors (no raw catch-up jumps; no separate playback RAF); iOS playback still `scrollTo` + store-driven label; scrub handoff disables translate before pause; auto-follow does not overwrite scrollOffset from onScroll.
+- Updated: 2026-11-14
 
 ### Android UI jank
 - Status: evolving
