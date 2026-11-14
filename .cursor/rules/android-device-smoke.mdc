@@ -1,0 +1,5 @@
+# Android device smoke
+
+MUST: On a **debug / `__DEV__`** build, unlock Plus/Pro for gated FX smoke via homepage **Settings → Dev Tier** (`Store` / `Lite` / `Plus` / `Pro`) — do not stop at the Lite paywall.
+
+MUST NOT: Expect Dev Tier (or any `__DEV__` billing override) on a **production** install; for prod smoke, use a real Plus/Pro entitlement or a debug build.

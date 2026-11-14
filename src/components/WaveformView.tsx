@@ -1215,6 +1215,12 @@ function TrackMoveOverlay({
 
 const TAP_DRAG_THRESHOLD = 10;
 const LONG_PRESS_DELAY_MS = 400;
+/** Android follow: ignore sub-ms audio vs display error (no clock bump). */
+const ANDROID_FOLLOW_IGNORE_ERROR_SEC = 0.001;
+/** Android follow: max correction toward audio per ~50ms anchor. */
+const ANDROID_FOLLOW_MAX_CORRECTION_SEC = 0.003;
+/** Seek/loop-sized error → hard snap to audio instead of soft slew. */
+const ANDROID_FOLLOW_HARD_SNAP_ERROR_SEC = 0.05;
 
 function getTrackBarColor(track: TrackData, colors: VoiceMemosColorScheme): string {
   if (track.isMuted || track.isSoloedOut) {
@@ -1321,6 +1327,8 @@ type TrackWaveformRowProps = {
   visibleTimeEnd: number;
   onPress: (locationX: number) => void;
   onLongPress?: () => void;
+  /** Bumped on scroll/trim drag so armed long-press timers no-op. */
+  longPressEpochRef?: { current: number };
   trimOverlay?: TrimOverlayConfig;
   moveOverlay?: MoveOverlayConfig;
   fadeOverlay?: FadeOverlayConfig;
@@ -1444,6 +1452,7 @@ function CollapsedTrackWaveformRow({
   pixelsPerSecond,
   onPress,
   onLongPress,
+  longPressEpochRef,
   showBottomDivider = false,
 }: TrackWaveformRowProps) {
   const { styles, colors } = useWaveformTheme();
@@ -1461,6 +1470,18 @@ function CollapsedTrackWaveformRow({
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+  };
+
+  const armLongPressTimer = (fire: () => void) => {
+    clearLongPressTimer();
+    const epoch = longPressEpochRef?.current ?? 0;
+    longPressTimerRef.current = setTimeout(() => {
+      if (longPressEpochRef && longPressEpochRef.current !== epoch) {
+        return;
+      }
+      longPressTriggeredRef.current = true;
+      fire();
+    }, LONG_PRESS_DELAY_MS);
   };
 
   const barCount = getTrackBarCount(track.duration, contentWidth, pixelsPerSecond);
@@ -1484,12 +1505,10 @@ function CollapsedTrackWaveformRow({
           x: event.nativeEvent.pageX,
           y: event.nativeEvent.pageY,
         };
-        clearLongPressTimer();
         if (onLongPressRef.current) {
-          longPressTimerRef.current = setTimeout(() => {
-            longPressTriggeredRef.current = true;
-            onLongPressRef.current?.();
-          }, LONG_PRESS_DELAY_MS);
+          armLongPressTimer(() => onLongPressRef.current?.());
+        } else {
+          clearLongPressTimer();
         }
       }}
       onTouchMove={(event) => {
@@ -1592,6 +1611,7 @@ const ExpandedTrackWaveformRow = memo(function ExpandedTrackWaveformRow({
   visibleTimeEnd,
   onPress,
   onLongPress,
+  longPressEpochRef,
   trimOverlay,
   moveOverlay,
   fadeOverlay,
@@ -1614,6 +1634,18 @@ const ExpandedTrackWaveformRow = memo(function ExpandedTrackWaveformRow({
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+  };
+
+  const armLongPressTimer = (fire: () => void) => {
+    clearLongPressTimer();
+    const epoch = longPressEpochRef?.current ?? 0;
+    longPressTimerRef.current = setTimeout(() => {
+      if (longPressEpochRef && longPressEpochRef.current !== epoch) {
+        return;
+      }
+      longPressTriggeredRef.current = true;
+      fire();
+    }, LONG_PRESS_DELAY_MS);
   };
 
   const isProcessing = Boolean(track.isProcessing);
@@ -1823,7 +1855,11 @@ const ExpandedTrackWaveformRow = memo(function ExpandedTrackWaveformRow({
   const headerColor = mixHexTowardWhite(trackColor, 0.35, 0.52);
   // Faded tint for looped cycles (mirrors loopedBarColor treatment).
   const loopedHeaderColor = mixHexTowardWhite(trackColor, 0.55, 0.38);
-  const hasLoopedHeaderCycles = cycleDuration + TRACK_LOOP_EPSILON < track.duration;
+  const cycleWidthPx = cycleDuration * pixelsPerSecond;
+  const hasLoopedHeaderCycles =
+    cycleDuration + TRACK_LOOP_EPSILON < track.duration && cycleWidthPx >= 1;
+  // Always emit child Views with explicit left/width — Android absolute Pressable
+  // backgroundColor often skips paint; non-looped needs a full-width segment too.
   const headerCycleSegments = useMemo(() => {
     if (!showRegionChrome || trackWidth <= 0) {
       return [] as { left: number; width: number; isLoop: boolean }[];
@@ -1832,7 +1868,6 @@ const ExpandedTrackWaveformRow = memo(function ExpandedTrackWaveformRow({
       return [{ left: 0, width: trackWidth, isLoop: false }];
     }
     const segments: { left: number; width: number; isLoop: boolean }[] = [];
-    const cycleWidthPx = cycleDuration * pixelsPerSecond;
     let left = 0;
     let cycleIndex = 0;
     // Cap chrome Views — dense short cycles over long footprints.
@@ -1853,7 +1888,12 @@ const ExpandedTrackWaveformRow = memo(function ExpandedTrackWaveformRow({
       });
     }
     return segments;
-  }, [showRegionChrome, trackWidth, hasLoopedHeaderCycles, cycleDuration, pixelsPerSecond]);
+  }, [
+    showRegionChrome,
+    trackWidth,
+    hasLoopedHeaderCycles,
+    cycleWidthPx,
+  ]);
   // Keep selected region fill in the same ballpark as the pre-header selection tint.
   const regionBodyColor = colorWithAlpha(trackColor, 0.08);
   // Match region header label (#FFFFFF) on the tinted selected header; gray elsewhere.
@@ -1938,7 +1978,6 @@ const ExpandedTrackWaveformRow = memo(function ExpandedTrackWaveformRow({
       ) : null}
       {showRegionChrome ? (
         <Pressable
-          delayLongPress={LONG_PRESS_DELAY_MS}
           disabled={!headerLongPressEnabled}
           style={[
             styles.regionHeader,
@@ -1946,34 +1985,50 @@ const ExpandedTrackWaveformRow = memo(function ExpandedTrackWaveformRow({
               left: sidePadding + trackOffset,
               width: trackWidth,
               height: headerHeight,
-              backgroundColor: hasLoopedHeaderCycles ? 'transparent' : headerColor,
+              backgroundColor: 'transparent',
             },
           ]}
-          onLongPress={() => {
+          onPressIn={(event) => {
             if (!headerLongPressEnabled || !trackLoopOverlay) {
               return;
             }
+            // Cancel row track-menu timer; header owns this press for loop dialog.
+            touchDraggedRef.current = false;
+            longPressTriggeredRef.current = false;
+            touchStartRef.current = {
+              x: event.nativeEvent.pageX,
+              y: event.nativeEvent.pageY,
+            };
+            armLongPressTimer(() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              trackLoopOverlay.onHeaderLongPress(track.id);
+            });
+          }}
+          onTouchMove={(event) => {
+            const dx = Math.abs(event.nativeEvent.pageX - touchStartRef.current.x);
+            const dy = Math.abs(event.nativeEvent.pageY - touchStartRef.current.y);
+            if (dx > TAP_DRAG_THRESHOLD || dy > TAP_DRAG_THRESHOLD) {
+              touchDraggedRef.current = true;
+              clearLongPressTimer();
+            }
+          }}
+          onPressOut={() => {
             clearLongPressTimer();
-            longPressTriggeredRef.current = true;
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            trackLoopOverlay.onHeaderLongPress(track.id);
           }}>
-          {hasLoopedHeaderCycles
-            ? headerCycleSegments.map((segment, index) => (
-                <View
-                  key={`header-cycle-${index}`}
-                  pointerEvents="none"
-                  style={[
-                    styles.regionHeaderCycleFill,
-                    {
-                      left: segment.left,
-                      width: segment.width,
-                      backgroundColor: segment.isLoop ? loopedHeaderColor : headerColor,
-                    },
-                  ]}
-                />
-              ))
-            : null}
+          {headerCycleSegments.map((segment, index) => (
+            <View
+              key={`header-cycle-${index}`}
+              pointerEvents="none"
+              style={[
+                styles.regionHeaderCycleFill,
+                {
+                  left: segment.left,
+                  width: segment.width,
+                  backgroundColor: segment.isLoop ? loopedHeaderColor : headerColor,
+                },
+              ]}
+            />
+          ))}
           {hasLoopedHeaderCycles
             ? headerCycleSegments.map((segment, index) =>
                 segment.isLoop && segment.width >= LOOP_HEADER_ICON_MIN_WIDTH ? (
@@ -2290,12 +2345,10 @@ const ExpandedTrackWaveformRow = memo(function ExpandedTrackWaveformRow({
           x: event.nativeEvent.pageX,
           y: event.nativeEvent.pageY,
         };
-        clearLongPressTimer();
         if (onLongPressRef.current) {
-          longPressTimerRef.current = setTimeout(() => {
-            longPressTriggeredRef.current = true;
-            onLongPressRef.current?.();
-          }, LONG_PRESS_DELAY_MS);
+          armLongPressTimer(() => onLongPressRef.current?.());
+        } else {
+          clearLongPressTimer();
         }
       }}
       onTouchMove={(event) => {
@@ -2371,6 +2424,8 @@ function WaveformViewComponent({
   );
   const scrollOffsetRef = useRef(0);
   const verticalScrollOffsetRef = useRef(0);
+  /** Invalidates armed track/header long-press timers when scroll/trim drag starts. */
+  const longPressEpochRef = useRef(0);
   const trimGestureActiveRef = useRef(false);
   const zoomGestureActiveRef = useRef(false);
   const loopBarGestureRef = useRef<unknown>(undefined);
@@ -3568,6 +3623,7 @@ function WaveformViewComponent({
     if (trimGestureActiveRef.current) {
       return;
     }
+    longPressEpochRef.current += 1;
     clearUserScrollMomentumTimeout();
     isUserScrollingRef.current = true;
     setIsUserScrolling(true);
@@ -3653,6 +3709,9 @@ function WaveformViewComponent({
         scrollRef.current?.scrollTo({ x: next, animated: false });
       },
       onTrimGestureActive: (active: boolean) => {
+        if (active) {
+          longPressEpochRef.current += 1;
+        }
         trimGestureActiveRef.current = active;
         setTrimGestureActive(active);
         onEditGestureActiveRef.current?.(active);
@@ -3979,19 +4038,43 @@ function WaveformViewComponent({
       recordingFollowTranslateXSV.value = -x;
     };
 
+    const commitPlaybackAnchor = (nextTime: number, frameMs: number, pps: number) => {
+      labelAnchorTime = nextTime;
+      labelAnchorWallMs = frameMs;
+      lastAudioSampleMs = frameMs;
+      recordingClockTimeSV.value = nextTime;
+      recordingPpsSV.value = pps;
+      recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
+      scrollOffsetRef.current = timeToScrollX(nextTime, contentWidthRef.current, pps);
+    };
+
     const samplePlaybackAudio = (frameMs: number, force: boolean) => {
       if (!force && frameMs - lastAudioSampleMs < anchorIntervalMs) {
         return;
       }
-      const time = getPlaybackTimeRef.current?.() ?? currentTimeRef.current;
+      const audioTime = getPlaybackTimeRef.current?.() ?? currentTimeRef.current;
       const pps = layoutPixelsPerSecondRef.current;
-      labelAnchorTime = time;
-      labelAnchorWallMs = frameMs;
-      lastAudioSampleMs = frameMs;
-      recordingClockTimeSV.value = time;
-      recordingPpsSV.value = pps;
-      recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
-      scrollOffsetRef.current = timeToScrollX(time, contentWidthRef.current, pps);
+      const displayed =
+        labelAnchorWallMs > 0
+          ? labelAnchorTime +
+            Math.min(1, Math.max(0, (frameMs - labelAnchorWallMs) / 1000))
+          : audioTime;
+      const error = audioTime - displayed;
+      let nextTime = audioTime;
+      if (!force) {
+        if (Math.abs(error) < ANDROID_FOLLOW_IGNORE_ERROR_SEC) {
+          // Still refresh the 1s UI extrapolate window + label anchors.
+          commitPlaybackAnchor(displayed, frameMs, pps);
+          return;
+        }
+        if (Math.abs(error) <= ANDROID_FOLLOW_HARD_SNAP_ERROR_SEC) {
+          const capped =
+            Math.sign(error) *
+            Math.min(Math.abs(error), ANDROID_FOLLOW_MAX_CORRECTION_SEC);
+          nextTime = displayed + capped;
+        }
+      }
+      commitPlaybackAnchor(nextTime, frameMs, pps);
     };
 
     const syncPlaybackScroll = (enableClock: boolean) => {
@@ -4000,7 +4083,7 @@ function WaveformViewComponent({
       const x = timeToScrollX(time, contentWidthRef.current, pps);
       scrollOffsetRef.current = x;
       if (enableClock) {
-        enablePlaybackClock(time, pps, 0);
+        enablePlaybackClock(time, pps, performance.now());
         snapPlaybackTranslate(x);
         emitLiveTime(time);
       } else {
@@ -4056,7 +4139,7 @@ function WaveformViewComponent({
     if (appState === 'active') {
       const time = getPlaybackTimeRef.current?.() ?? currentTimeRef.current;
       const pps = layoutPixelsPerSecondRef.current;
-      enablePlaybackClock(time, pps, 0);
+      enablePlaybackClock(time, pps, performance.now());
       snapPlaybackTranslate(timeToScrollX(time, contentWidthRef.current, pps));
       raf = requestAnimationFrame(tick);
     } else {
@@ -4135,6 +4218,8 @@ function WaveformViewComponent({
     let pendingBufferScrollX = 0;
     let lastEmittedCenti = -1;
     let lastAudioSampleMs = 0;
+    let labelAnchorTime = 0;
+    let labelAnchorWallMs = 0;
     let appState: string = AppState.currentState;
 
     const emitLiveTime = (time: number) => {
@@ -4147,6 +4232,8 @@ function WaveformViewComponent({
     };
 
     const enableRecordingClock = (time: number, pps: number, frameMs: number) => {
+      labelAnchorTime = time;
+      labelAnchorWallMs = frameMs;
       lastAudioSampleMs = frameMs;
       recordingClockTimeSV.value = time;
       recordingPpsSV.value = pps;
@@ -4165,23 +4252,51 @@ function WaveformViewComponent({
       recordingFollowTranslateXSV.value = -x;
     };
 
+    const commitRecordingAnchor = (nextTime: number, frameMs: number, pps: number) => {
+      labelAnchorTime = nextTime;
+      labelAnchorWallMs = frameMs;
+      lastAudioSampleMs = frameMs;
+      recordingClockTimeSV.value = nextTime;
+      recordingPpsSV.value = pps;
+      recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
+      // Android: label at ~50ms anchor cadence (not every RAF/centisecond).
+      emitLiveTime(nextTime);
+    };
+
     const sampleRecordingAudio = (frameMs: number, force: boolean) => {
       // Between anchors callers should skip this entirely on Android; keep a
       // cheap early return without native clock reads if force is false.
       if (!force && frameMs - lastAudioSampleMs < anchorIntervalMs) {
         return currentTimeRef.current;
       }
-      const time = getRecordingTimeRef.current?.() ?? currentTimeRef.current;
+      const audioTime = getRecordingTimeRef.current?.() ?? currentTimeRef.current;
       const pps = layoutPixelsPerSecondRef.current;
-      lastAudioSampleMs = frameMs;
-      if (useTranslateFollow) {
-        recordingClockTimeSV.value = time;
-        recordingPpsSV.value = pps;
-        recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
-        // Android: label at ~50ms anchor cadence (not every RAF/centisecond).
-        emitLiveTime(time);
+      if (!useTranslateFollow) {
+        lastAudioSampleMs = frameMs;
+        return audioTime;
       }
-      return time;
+      const displayed =
+        labelAnchorWallMs > 0
+          ? labelAnchorTime +
+            Math.min(1, Math.max(0, (frameMs - labelAnchorWallMs) / 1000))
+          : audioTime;
+      const error = audioTime - displayed;
+      let nextTime = audioTime;
+      if (!force) {
+        if (Math.abs(error) < ANDROID_FOLLOW_IGNORE_ERROR_SEC) {
+          // Refresh 1s UI extrapolate window + timer even when error is tiny.
+          commitRecordingAnchor(displayed, frameMs, pps);
+          return displayed;
+        }
+        if (Math.abs(error) <= ANDROID_FOLLOW_HARD_SNAP_ERROR_SEC) {
+          const capped =
+            Math.sign(error) *
+            Math.min(Math.abs(error), ANDROID_FOLLOW_MAX_CORRECTION_SEC);
+          nextTime = displayed + capped;
+        }
+      }
+      commitRecordingAnchor(nextTime, frameMs, pps);
+      return nextTime;
     };
 
     const applyRecordingFollowX = (
@@ -4216,7 +4331,7 @@ function WaveformViewComponent({
         emitLiveTime(time);
         scrollRef.current?.scrollTo({ x, animated: false });
       } else if (enableClock) {
-        applyRecordingFollowX(time, x, 0, true);
+        applyRecordingFollowX(time, x, performance.now(), true);
       } else {
         scrollOffsetRef.current = x;
         emitLiveTime(time);
@@ -4300,7 +4415,11 @@ function WaveformViewComponent({
     if (appState === 'active') {
       if (useTranslateFollow) {
         const time = getRecordingTimeRef.current?.() ?? currentTimeRef.current;
-        enableRecordingClock(time, layoutPixelsPerSecondRef.current, 0);
+        enableRecordingClock(
+          time,
+          layoutPixelsPerSecondRef.current,
+          performance.now()
+        );
       }
       raf = requestAnimationFrame(tick);
     } else {
@@ -4456,6 +4575,9 @@ function WaveformViewComponent({
               scrollEventThrottle={16}
               showsVerticalScrollIndicator={false}
               style={{ flex: 1 }}
+              onScrollBeginDrag={() => {
+                longPressEpochRef.current += 1;
+              }}
               onScroll={handleVerticalScroll}>
               <View style={{ height: tracksContentHeight, position: 'relative' }}>
                 {tracks.map((track, index) => {
@@ -4497,6 +4619,7 @@ function WaveformViewComponent({
                         trackLoopOverlay={trackLoopOverlay}
                         trimOverlay={trimOverlay}
                         trimScrollHelpers={trimScrollHelpers}
+                        longPressEpochRef={longPressEpochRef}
                         onLongPress={
                           onTrackLongPressRef.current &&
                           track.id !== '__recording__' &&

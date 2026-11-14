@@ -6,6 +6,20 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Editor track header / follow / long-press
+- Status: evolving
+- What: Selected-track header tint via child segment Views; Android follow soft-anchors; long-press menus cancel on scroll/drag.
+- Paths: `src/components/WaveformView.tsx`
+- Invariants: Header tint always from child Views with explicit `left`/`width` (Pressable bg never supplies fill — Android absolute Pressable skips paint); non-looped = one full-width `headerColor` segment; looped = cycle 0 `headerColor` + faded later cycles when cycle width ≥1px; Android playback/recording soft anchors cap slew ~3ms (hard snap if error >50ms) but sub-1ms still refreshes clock SV + recording emitLiveTime (avoids 1s extrapolate freeze); long-press epoch bumps on horizontal/vertical scroll begin and trim/move gesture start so timers no-op mid-drag; header loop long-press uses the same epoch + move-cancel path.
+- Updated: 2026-11-14
+
+### Android performance watchlist
+- Status: evolving
+- What: Pre-release Android perf review + SM-G955F (Android 8) smoke; remaining hotspots queued post-release, not blocking if smoke stays clean.
+- Paths: `src/audio/MemoAudioEngine.ts`, `src/audio/memoMixGraph.ts`, `src/audio/layerEffectChain.ts`, `src/audio/layerPitch.ts`, `src/components/WaveformView.tsx`
+- Invariants: S1 follow-ups queued — pitch 0-crossing debounce + slider dedupe; seek/loop resync coalesce; long-term shared wet sends; S2 — fixed delay max, param diff/ramps, mute/solo/fade coalesce; smoke (2026-11-13): 3-layer play + mid-play named reverb (chamber/cathedral visible) no ANR/fatal; record live bars + stop OK; pitch hitch untested — device had **prod** install (no Settings → Dev Tier; Lite paywall); retest pitch on debug build or entitled Plus/Pro; session PSS ~0.9–1.1GB and ~35% janky frames on S8+ — monitor, not auto-block.
+- Updated: 2026-11-13
+
 ### Android mid-play wet effects
 - Status: evolving
 - What: Android mid-play reverb/delay toggles arm wet sources without full playback resync; IR length capped to cut cathedral crackle.
@@ -38,15 +52,15 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: Android recording follow slides timeline via translateX from `getRecordingTime`; timer uses the same follow clock; live bars use peak duration only (no clock stretch).
 - Paths: `src/components/WaveformView.tsx`, `src/components/MemoEditor.tsx`, `src/components/metronomeGridViewport.ts`, `src/audio/MemoAudioEngine.ts`
-- Invariants: Android capture parks ScrollView at 0 and moves translateX from a UI-thread clock anchored to `getRecordingTime` (max 1s extrapolation, anchor ~50ms); enter/exit/background snap translateX and disable the frame callback; follow RAF does not restart on contentWidth; between anchors Android follow RAF reschedules without native clock/layout/buffer work; iOS recording still `scrollTo`; Android recording label from `onLiveTimelineTime` at ~50ms anchors; Android MemoEditor skips `recordingDuration` shell re-renders during capture (peaks via LiveRecordingWaveform, applied ~120ms); Android recording paint overscan ~0.5vp/side (iOS keeps wide buffers); Android live Svg sized to paint buffer and path-throttled ~300ms; Android early peak emits ~50ms for 1.5s + onAudioReady (steady ~100ms, timer skips if emit within ~40ms); Android skips recordingDuration RAF loop after initial emit; Android live preview is untrimmed and bar count follows UI elapsed (post-save latency trim unchanged); Android follow elapsed is max(fileDuration, cue-context); iOS live preview still blanks until lead clears.
+- Invariants: Android capture parks ScrollView at 0 and moves translateX from a UI-thread clock anchored to `getRecordingTime` (max 1s extrapolation, ~50ms soft anchors: sub-1ms still refreshes clock SV + emitLiveTime so the 1s cap cannot freeze; cap ~3ms slew); enter/exit/background snap translateX and disable the frame callback; follow RAF does not restart on contentWidth; between anchors Android follow RAF reschedules without native clock/layout/buffer work; iOS recording still `scrollTo`; Android recording label from `onLiveTimelineTime` at ~50ms anchors; Android MemoEditor skips `recordingDuration` shell re-renders during capture (peaks via LiveRecordingWaveform, applied ~120ms); Android recording paint overscan ~0.5vp/side (iOS keeps wide buffers); Android live Svg sized to paint buffer and path-throttled ~300ms; Android early peak emits ~50ms for 1.5s + onAudioReady (steady ~100ms, timer skips if emit within ~40ms); Android skips recordingDuration RAF loop after initial emit; Android live preview is untrimmed and bar count follows UI elapsed (post-save latency trim unchanged); Android follow elapsed is max(fileDuration, cue-context); iOS live preview still blanks until lead clears.
 - Updated: 2026-11-13
 
 ### Playback UI audio clock
 - Status: evolving
 - What: Editor timer/playhead follow the audio clock; Android playback slides via UI-thread translateX; store `currentTime` stays coarse (~50ms) without advance capping.
 - Paths: `src/audio/MemoAudioEngine.ts`, `src/components/MemoEditor.tsx`, `src/components/WaveformView.tsx`
-- Invariants: Engine emits raw elapsed time (no max-advance); Android playback parks ScrollView at 0 and moves translateX from a UI-thread clock anchored to `getPlaybackTime` (~50ms anchors, max 1s extrapolate); Android timer emits extrapolated follow time between those anchors (no raw catch-up jumps; no separate playback RAF); iOS playback still `scrollTo` + store-driven label; scrub handoff disables translate before pause; auto-follow does not overwrite scrollOffset from onScroll.
-- Updated: 2026-11-12
+- Invariants: Engine emits raw elapsed time (no max-advance); Android playback parks ScrollView at 0 and moves translateX from a UI-thread clock anchored to `getPlaybackTime` (~50ms soft anchors, max 1s extrapolate; sub-1ms still refreshes clock SV; cap ~3ms correction); Android timer emits extrapolated follow time between those anchors (no raw catch-up jumps; no separate playback RAF); iOS playback still `scrollTo` + store-driven label; scrub handoff disables translate before pause; auto-follow does not overwrite scrollOffset from onScroll.
+- Updated: 2026-11-13
 
 ### Android UI jank
 - Status: evolving
@@ -101,7 +115,7 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: Expo Android platform config + stubs so a debug APK can launch beside the existing iOS app.
 - Paths: `app.json`, `src/utils/showActionSheet.ts`, `src/widgets/RecordingLiveActivity.android.tsx`, `src/actions/shareMemo.ts`, `assets/images/icon.png`, `assets/images/android-icon-foreground.png`, `assets/images/android-icon-background.png`, `assets/images/android-icon-monochrome.png`
-- Invariants: iOS StoreKit/Live Activities unchanged; Android uses Alert sheets; M4A/multi-share/project native modules remain iOS-only; Live Activity is a no-op on Android; Android launcher adaptive icons use the headphones + waveform mark (same as iOS/landing, not red Expo placeholders); `expo prebuild --platform android` required after icon asset changes before rebuild.
+- Invariants: iOS StoreKit/Live Activities unchanged; Android uses Alert sheets; M4A/multi-share/project native modules remain iOS-only; Live Activity is a no-op on Android; Android launcher adaptive icons use the headphones + waveform mark (same as iOS/landing, not red Expo placeholders); foreground mark stays inside ~56% safe zone on transparent FG over `#D3D3D3` BG; `expo prebuild --platform android` required after icon asset changes before rebuild.
 - Updated: 2026-11-13
 
 ### Landing brand icon
