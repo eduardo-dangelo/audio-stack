@@ -57,6 +57,7 @@ type RowPlaybackSlice = {
   isActive: boolean;
   currentTime: number;
   isPlaying: boolean;
+  isPlayStarting: boolean;
   duration: number;
 };
 
@@ -64,6 +65,7 @@ const INACTIVE_PLAYBACK: RowPlaybackSlice = {
   isActive: false,
   currentTime: 0,
   isPlaying: false,
+  isPlayStarting: false,
   duration: 0,
 };
 
@@ -72,6 +74,7 @@ function areRowPlaybackSlicesEqual(a: RowPlaybackSlice, b: RowPlaybackSlice): bo
     a.isActive === b.isActive &&
     a.currentTime === b.currentTime &&
     a.isPlaying === b.isPlaying &&
+    a.isPlayStarting === b.isPlayStarting &&
     a.duration === b.duration
   );
 }
@@ -86,6 +89,7 @@ function useRowPlayback(memoId: string): RowPlaybackSlice {
       isActive: true,
       currentTime: state.currentTime,
       isPlaying: state.isPlaying,
+      isPlayStarting: state.isPlayStarting,
       duration: state.duration,
     };
   }, areRowPlaybackSlicesEqual);
@@ -424,7 +428,13 @@ function RecordingRowComponent({
               duration={duration}
               showProgressBar={false}
               isPlaying={isActive && playback.isPlaying}
+              isPlayStarting={isActive && playback.isPlayStarting}
               onPlayPause={() => void handlePlayPause()}
+              onPlayPressIn={() => {
+                if (engine.getState().memoId === memo.id) {
+                  void engine.warmPlaybackBuffers();
+                }
+              }}
               onSkipBack={() => void handleSkip(-15)}
               onSkipForward={() => void handleSkip(15)}
             />

@@ -6345,6 +6345,7 @@ function MemoEditorInner({
                 currentTime={currentTime}
                 duration={duration}
                 isPlaying={engineState.isPlaying}
+                isPlayStarting={engineState.isPlayStarting}
                 isRecording={isRecording}
                 isStoppingRecording={isStoppingRecording}
                 recordDisabled={

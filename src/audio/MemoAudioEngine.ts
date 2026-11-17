@@ -302,6 +302,8 @@ export type EngineState = {
   memoTitle: string | null;
   isRecording: boolean;
   isPlaying: boolean;
+  /** True from optimistic play until sources are scheduled (UI spinner). */
+  isPlayStarting: boolean;
   monitorMixActive: boolean;
   monitorMixReady: boolean;
   currentTime: number;
@@ -329,6 +331,7 @@ const initialState: EngineState = {
   memoTitle: null,
   isRecording: false,
   isPlaying: false,
+  isPlayStarting: false,
   monitorMixActive: false,
   monitorMixReady: false,
   currentTime: 0,
@@ -963,7 +966,9 @@ export class MemoAudioEngine {
   }
 
   private emit(partial: Partial<EngineState>): void {
-    this.state = { ...this.state, ...partial };
+    const next =
+      partial.isPlaying === false ? { ...partial, isPlayStarting: false } : partial;
+    this.state = { ...this.state, ...next };
     for (const listener of this.listeners) {
       listener(this.state);
     }
@@ -5354,7 +5359,11 @@ export class MemoAudioEngine {
     this.playbackIncludeMetronome = options?.includeMetronome ?? true;
 
     // Flip the transport icon immediately; audio arms after decode below.
-    this.emit({ isPlaying: true });
+    // Skip starting chrome on A–B loop wraps (buffers usually warm).
+    this.emit({
+      isPlaying: true,
+      isPlayStarting: !options?.loopRestart,
+    });
     if (this.state.memoId && this.state.memoTitle) {
       ensurePlaybackLiveActivity({
         memoId: this.state.memoId,
@@ -5522,6 +5531,7 @@ export class MemoAudioEngine {
       this.scheduleMetronome(context, startAt, endAt, when);
       this.startPlaybackTimer(sessionId, context);
       this.playbackInterrupted = false;
+      this.emit({ isPlayStarting: false });
 
       if (!this.state.isRecording) {
         // JS must observe so we sync pause UI; native then skips onInterruptionEnd.

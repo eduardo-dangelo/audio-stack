@@ -1,13 +1,18 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppSymbol } from '@/src/components/AppSymbol';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 import { formatDuration } from '@/src/utils/format';
 
+/** Avoid spinner flash when warm play arms in under this delay. */
+const PLAY_STARTING_SPINNER_DELAY_MS = 150;
+
 type Props = {
   isPlaying: boolean;
+  /** Engine arming after optimistic play (heavy decode); spinner after short delay. */
+  isPlayStarting?: boolean;
   currentTime: number;
   duration: number;
   onPlayPause: () => void;
@@ -29,6 +34,7 @@ type Props = {
 
 export function PlaybackControls({
   isPlaying,
+  isPlayStarting = false,
   currentTime,
   duration,
   onPlayPause,
@@ -52,6 +58,7 @@ export function PlaybackControls({
   const isAndroid = Platform.OS === 'android';
   // Android: local pending chrome so Stop feedback does not wait on MemoEditor re-render.
   const [stopPending, setStopPending] = useState(false);
+  const [showPlayStartingSpinner, setShowPlayStartingSpinner] = useState(false);
   const stopFiredRef = useRef(false);
   // iOS still disables on shell isStoppingRecording; Android keeps Pressable enabled for ripple.
   const stopDisabled = isAndroid
@@ -65,6 +72,17 @@ export function PlaybackControls({
       setStopPending(false);
     }
   }, [isRecording]);
+
+  useEffect(() => {
+    if (!isPlayStarting) {
+      setShowPlayStartingSpinner(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setShowPlayStartingSpinner(true);
+    }, PLAY_STARTING_SPINNER_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [isPlayStarting]);
 
   const fireStop = () => {
     if (stopFiredRef.current || stopRecordingDisabled || !onStopRecording) {
@@ -123,7 +141,13 @@ export function PlaybackControls({
               <AppSymbol name="gobackward.15" size={compact ? 24 : 28} tintColor={colors.text} />
             </Pressable>
             <Pressable
-              accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
+              accessibilityLabel={
+                showPlayStartingSpinner
+                  ? 'Starting playback'
+                  : isPlaying
+                    ? 'Pause'
+                    : 'Play'
+              }
               disabled={playDisabled}
               onPressIn={playDisabled ? undefined : onPlayPressIn}
               onPress={() => {
@@ -138,11 +162,18 @@ export function PlaybackControls({
                 playDisabled && styles.playDisabled,
                 pressed && !playDisabled && styles.controlPressed,
               ]}>
-              <AppSymbol
-                name={isPlaying ? 'pause.fill' : 'play.fill'}
-                size={compact ? 28 : 34}
-                tintColor={colors.text}
-              />
+              {showPlayStartingSpinner ? (
+                <ActivityIndicator
+                  color={colors.text}
+                  size={compact ? 'small' : 'small'}
+                />
+              ) : (
+                <AppSymbol
+                  name={isPlaying ? 'pause.fill' : 'play.fill'}
+                  size={compact ? 28 : 34}
+                  tintColor={colors.text}
+                />
+              )}
             </Pressable>
             {onRecordPress ? (
               <Pressable
