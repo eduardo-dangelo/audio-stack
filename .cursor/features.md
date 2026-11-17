@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Empty library start → All Recordings
+- Status: evolving
+- What: Cold start with zero active memos opens All Recordings instead of folders home.
+- Paths: `app/index.tsx`, `app/recordings/index.tsx`
+- Invariants: Once per JS process after library counts load; `allCount === 0` → `router.push('/recordings')` (Back still reaches home/Settings); trash-only does not count; non-empty library keeps home start; blank grouped canvas until the first decision to avoid a folders flash.
+- Updated: 2026-11-17
+
 ### Editor track header / follow / long-press
 - Status: evolving
 - What: Selected-track header tint via child segment Views; Android follow soft-anchors; long-press menus cancel on scroll/drag.

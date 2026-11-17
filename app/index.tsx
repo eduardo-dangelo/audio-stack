@@ -72,6 +72,9 @@ import { endIdlePlaybackLiveActivities } from '@/src/widgets/recordingLiveActivi
 const PRO_STAR_PATH =
   'M7.50 0.30L9.29 5.03L14.35 5.28L10.40 8.44L11.73 13.32L7.50 10.55L3.27 13.32L4.60 8.44L0.65 5.28L5.71 5.03Z';
 
+/** Once per JS process: empty library cold-starts on All Recordings. */
+let didApplyEmptyLibraryStartRoute = false;
+
 /** Home-title Pro mark: a diagonal sheen of blue tones. */
 function ProTierMark() {
   const width = 52;
@@ -161,7 +164,8 @@ export default function FoldersHomeScreen() {
   const styles = useStyles(colors, colorScheme);
   const headerStyles = useHeaderStyles(colors, colorScheme);
   const { folders, refresh: refreshFolders } = useFolders();
-  const { counts, refresh: refreshCounts } = useLibraryCounts();
+  const { counts, loading: countsLoading, refresh: refreshCounts } = useLibraryCounts();
+  const [emptyStartReady, setEmptyStartReady] = useState(didApplyEmptyLibraryStartRoute);
   const [editMode, setEditMode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [themeModalVisible, setThemeModalVisible] = useState(false);
@@ -211,6 +215,21 @@ export default function FoldersHomeScreen() {
       publishThemePreference(settings.themePreference);
     });
   }, []);
+
+  useEffect(() => {
+    if (didApplyEmptyLibraryStartRoute) {
+      setEmptyStartReady(true);
+      return;
+    }
+    if (countsLoading) {
+      return;
+    }
+    didApplyEmptyLibraryStartRoute = true;
+    if (counts.allCount === 0) {
+      router.push('/recordings');
+    }
+    setEmptyStartReady(true);
+  }, [counts.allCount, countsLoading]);
 
   useFocusEffect(
     useCallback(() => {
@@ -464,6 +483,23 @@ export default function FoldersHomeScreen() {
       toggleSettings,
     ]
   );
+
+  if (!emptyStartReady) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            title: '',
+            headerLargeTitle: false,
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: headerStyles.canvasColor },
+            contentStyle: { backgroundColor: headerStyles.canvasColor },
+          }}
+        />
+        <View style={{ flex: 1, backgroundColor: headerStyles.canvasColor }} />
+      </>
+    );
+  }
 
   return (
     <>
