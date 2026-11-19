@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Android .aud import + open-with
+- Status: evolving
+- What: Android imports `.aud`/`.vmp` via stream extract (no full-archive `File.bytes`) and registers open-with / share for project files.
+- Paths: `src/storage/projectArchiveExtract.ts`, `src/storage/memoPackage.ts`, `modules/project-document-picker/src/index.ts`, `src/audio/importAudioFile.ts`, `app.json`
+- Invariants: Import stream-unzips to a cache dir then `File.copy`s media (never loads whole `.aud` into JS); `copyIncomingProjectAsync` pass-through when native missing; Android picker includes octet-stream/zip + project MIMEs; `content://` opens rewrite to `/import-project`; stamp/UTI iOS-only; intentFilters need native rebuild.
+- Updated: 2026-11-19
+
 ### Play-starting spinner
 - Status: evolving
 - What: Play button shows a delayed spinner while heavy playback is still arming (decode/context).
@@ -129,8 +136,8 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: Expo Android platform config + stubs so a debug APK can launch beside the existing iOS app.
 - Paths: `app.json`, `src/utils/showActionSheet.ts`, `src/widgets/RecordingLiveActivity.android.tsx`, `src/actions/shareMemo.ts`, `assets/images/icon.png`, `assets/images/android-icon-foreground.png`, `assets/images/android-icon-background.png`, `assets/images/android-icon-monochrome.png`
-- Invariants: iOS StoreKit/Live Activities unchanged; Android uses Alert sheets; M4A/multi-share/project native modules remain iOS-only; Live Activity is a no-op on Android; Android launcher adaptive icons use the headphones + waveform mark (same as iOS/landing, not red Expo placeholders); foreground mark stays inside ~56% safe zone on transparent FG over `#D3D3D3` BG; `expo prebuild --platform android` required after icon asset changes before rebuild.
-- Updated: 2026-11-13
+- Invariants: iOS StoreKit/Live Activities unchanged; Android uses Alert sheets; M4A/multi-share/stamp remain iOS-only (`.aud`/`.vmp` import uses JS path + open-with intentFilters — see Android .aud import + open-with); Live Activity is a no-op on Android; Android launcher adaptive icons use the headphones + waveform mark (same as iOS/landing, not red Expo placeholders); foreground mark stays inside ~56% safe zone on transparent FG over `#D3D3D3` BG; `expo prebuild --platform android` required after icon asset changes before rebuild.
+- Updated: 2026-11-19
 
 ### Landing brand icon
 - Status: evolving

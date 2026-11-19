@@ -16,6 +16,12 @@ export function projectFileUrlFromOpenPath(path: string): string | null {
     return null;
   }
 
+  // Android open-with / share usually delivers content:// (filename often absent).
+  // Intent filters already scoped the open; import validates the archive bytes.
+  if (/^content:/i.test(trimmed)) {
+    return trimmed;
+  }
+
   try {
     if (/^file:/i.test(trimmed)) {
       const url = new URL(trimmed);

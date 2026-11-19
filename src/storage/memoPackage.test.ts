@@ -211,7 +211,8 @@ describe('validateProjectArchive', () => {
     assert.equal(validated.meta.schemaVersion, PROJECT_SCHEMA_VERSION);
     assert.equal(validated.manifest.layers.length, 2);
     assert.equal(validated.media.size, 2);
-    assert.deepEqual(Array.from(validated.media.get('layer-0.wav') ?? []), [1, 2, 3, 4]);
+    assert.equal(validated.media.get('layer-0.wav'), 'memory:layer-0.wav');
+    assert.equal(validated.media.get('layer-1.m4a'), 'memory:layer-1.m4a');
   });
 
   it('rejects a missing format marker', () => {

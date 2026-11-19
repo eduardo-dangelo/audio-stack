@@ -68,8 +68,10 @@ export type MemoProjectPackageMeta = {
 export type ValidatedProjectArchive = {
   meta: MemoProjectPackageMeta;
   manifest: Memo;
-  /** basename → bytes for each media file referenced by layers with duration > 0 */
-  media: Map<string, Uint8Array>;
+  /** basename → local file URI for each media file referenced by layers with duration > 0 */
+  media: Map<string, string>;
+  /** Temp extract directory URI; caller deletes after media is installed into the memo. */
+  extractDirUri?: string;
 };
 
 function textEncoderBytes(value: string): Uint8Array {
@@ -281,9 +283,61 @@ export function remapImportedMemo(
   return memo;
 }
 
+function parseManifestFromJsonBytes(bytes: Uint8Array): Memo {
+  let manifestRaw: unknown;
+  try {
+    manifestRaw = JSON.parse(textDecoderString(bytes));
+  } catch {
+    throw new Error('Project manifest is not valid JSON.');
+  }
+  if (!manifestRaw || typeof manifestRaw !== 'object') {
+    throw new Error('Project manifest is invalid.');
+  }
+
+  const manifest = normalizeLayers(manifestRaw as Memo);
+  if (!Array.isArray(manifest.layers) || manifest.layers.length === 0) {
+    throw new Error('Project manifest has no layers.');
+  }
+  return manifest;
+}
+
 /**
- * Validate an unzipped project archive.
+ * Resolve layer media paths against archive entries and rewrite layer.fileName to media/basename.
+ * `resolveMediaUri` returns a readable file URI (or null when missing/empty).
+ */
+export function bindArchiveMedia(
+  manifest: Memo,
+  resolveMediaUri: (expectedPath: string, basename: string) => string | null
+): Map<string, string> {
+  const media = new Map<string, string>();
+  for (const layer of manifest.layers) {
+    if (layer.duration <= 0) {
+      continue;
+    }
+    const path = normalizeArchivePath(layer.fileName);
+    const expectedPath = path.startsWith(PROJECT_MEDIA_PREFIX)
+      ? path
+      : packagedMediaPath(path);
+    const basename = mediaBasename(expectedPath);
+    const uri = resolveMediaUri(expectedPath, basename);
+    if (!uri) {
+      throw new Error(`Project package is missing media for “${basename}”.`);
+    }
+    media.set(basename, uri);
+    layer.fileName = `${PROJECT_MEDIA_PREFIX}${basename}`;
+  }
+
+  if (!hasRecording(manifest)) {
+    throw new Error('Project package has no recorded audio.');
+  }
+
+  return media;
+}
+
+/**
+ * Validate an unzipped project archive held in memory.
  * `files` keys are archive-relative paths.
+ * Media map values are synthetic `memory:` URIs for structure checks (not readable files).
  */
 export function validateProjectArchive(
   files: Record<string, Uint8Array>
@@ -316,44 +370,36 @@ export function validateProjectArchive(
   if (!manifestBytes) {
     throw new Error('Project package is missing manifest.json.');
   }
-  let manifestRaw: unknown;
-  try {
-    manifestRaw = JSON.parse(textDecoderString(manifestBytes));
-  } catch {
-    throw new Error('Project manifest is not valid JSON.');
-  }
-  if (!manifestRaw || typeof manifestRaw !== 'object') {
-    throw new Error('Project manifest is invalid.');
-  }
+  const manifest = parseManifestFromJsonBytes(manifestBytes);
 
-  const manifest = normalizeLayers(manifestRaw as Memo);
-  if (!Array.isArray(manifest.layers) || manifest.layers.length === 0) {
-    throw new Error('Project manifest has no layers.');
-  }
-
-  const media = new Map<string, Uint8Array>();
-  for (const layer of manifest.layers) {
-    if (layer.duration <= 0) {
-      continue;
-    }
-    const path = normalizeArchivePath(layer.fileName);
-    const expectedPath = path.startsWith(PROJECT_MEDIA_PREFIX)
-      ? path
-      : packagedMediaPath(path);
-    const bytes = normalized[expectedPath] ?? normalized[path];
+  const media = bindArchiveMedia(manifest, (expectedPath, basename) => {
+    const bytes = normalized[expectedPath] ?? normalized[basename];
     if (!bytes || bytes.byteLength === 0) {
-      throw new Error(`Project package is missing media for “${mediaBasename(path)}”.`);
+      return null;
     }
-    const basename = mediaBasename(expectedPath);
-    media.set(basename, bytes);
-    layer.fileName = `${PROJECT_MEDIA_PREFIX}${basename}`;
-  }
-
-  if (!hasRecording(manifest)) {
-    throw new Error('Project package has no recorded audio.');
-  }
+    return `memory:${basename}`;
+  });
 
   return { meta, manifest, media };
+}
+
+/** Validate a project archive that was stream-extracted to disk. */
+export function validateProjectArchiveFromPaths(
+  metaJson: string,
+  manifestJson: string,
+  resolveMediaUri: (expectedPath: string, basename: string) => string | null,
+  extractDirUri?: string
+): ValidatedProjectArchive {
+  let metaRaw: unknown;
+  try {
+    metaRaw = JSON.parse(metaJson);
+  } catch {
+    throw new Error('Project package metadata is not valid JSON.');
+  }
+  const meta = parsePackageMeta(metaRaw);
+  const manifest = parseManifestFromJsonBytes(textEncoderBytes(manifestJson));
+  const media = bindArchiveMedia(manifest, resolveMediaUri);
+  return { meta, manifest, media, extractDirUri };
 }
 
 /** Zip project entries. JSON is compressed; audio is stored. */

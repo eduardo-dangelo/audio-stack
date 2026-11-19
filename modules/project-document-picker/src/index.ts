@@ -56,7 +56,12 @@ export async function pickProjectAsync(): Promise<PickProjectResult> {
 
 /** Copy a Files / Mail / AirDrop `.aud` / `.vmp` URL into caches, including security-scoped URLs. */
 export async function copyIncomingProjectAsync(uri: string): Promise<string> {
-  return requireAvailableModule().copyIncomingProjectAsync(uri);
+  const module = getModule();
+  if (!module?.isAvailable()) {
+    // Android / no native: picker already copyToCacheDirectory; open-with URIs are readable.
+    return uri;
+  }
+  return module.copyIncomingProjectAsync(uri);
 }
 
 /** Stamp a local `.aud` / `.vmp` file with the project UTI so Files / AirDrop keep the type. */

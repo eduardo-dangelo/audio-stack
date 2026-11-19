@@ -10,6 +10,7 @@ import {
 } from '@/src/billing';
 import { showImportSuccess } from '@/src/components/ImportSuccessDialog';
 import {
+  cleanupProjectExtractDir,
   isProjectFileName,
   readProjectArchiveFromUri,
   remapImportedMemo,
@@ -41,39 +42,43 @@ async function importFromUri(
 ): Promise<Memo> {
   assertImportAllowed();
   const validated = await readProjectArchiveFromUri(uri);
-  const shell = await createMemo({
-    title: validated.manifest.title?.trim() || 'Imported Recording',
-    folderId: options?.folderId,
-    titleSource: validated.manifest.titleSource ?? 'user',
-    precount: validated.manifest.precount,
-    metronome: validated.manifest.metronome,
-  });
-
   try {
-    const remapped = remapImportedMemo(validated.manifest, {
-      newMemoId: shell.id,
+    const shell = await createMemo({
+      title: validated.manifest.title?.trim() || 'Imported Recording',
       folderId: options?.folderId,
+      titleSource: validated.manifest.titleSource ?? 'user',
+      precount: validated.manifest.precount,
+      metronome: validated.manifest.metronome,
     });
-    writeImportedMemoFiles(remapped, validated.media);
 
-    const needsPeaks = remapped.layers.some(
-      (layer) =>
-        layer.duration > 0 && (!layer.waveformPeaks || layer.waveformPeaks.length === 0)
-    );
-    if (needsPeaks) {
-      return ensureWaveformPeaks(remapped);
-    }
-    return remapped;
-  } catch (error) {
     try {
-      const dir = getMemoDir(shell.id);
-      if (dir.exists) {
-        dir.delete();
+      const remapped = remapImportedMemo(validated.manifest, {
+        newMemoId: shell.id,
+        folderId: options?.folderId,
+      });
+      await writeImportedMemoFiles(remapped, validated.media);
+
+      const needsPeaks = remapped.layers.some(
+        (layer) =>
+          layer.duration > 0 && (!layer.waveformPeaks || layer.waveformPeaks.length === 0)
+      );
+      if (needsPeaks) {
+        return ensureWaveformPeaks(remapped);
       }
-    } catch {
-      // Best-effort cleanup of the shell memo.
+      return remapped;
+    } catch (error) {
+      try {
+        const dir = getMemoDir(shell.id);
+        if (dir.exists) {
+          dir.delete();
+        }
+      } catch {
+        // Best-effort cleanup of the shell memo.
+      }
+      throw error;
     }
-    throw error;
+  } finally {
+    cleanupProjectExtractDir(validated.extractDirUri);
   }
 }
 

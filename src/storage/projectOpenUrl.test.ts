@@ -33,6 +33,11 @@ describe('projectFileUrlFromOpenPath', () => {
     assert.equal(projectFileUrlFromOpenPath('file:///tmp/Session%20A.vcr'), null);
     assert.equal(projectFileUrlFromOpenPath('/tmp/notes.txt'), null);
   });
+
+  it('accepts Android content URIs without a filename', () => {
+    const url = 'content://com.android.providers.downloads.documents/document/42';
+    assert.equal(projectFileUrlFromOpenPath(url), url);
+  });
 });
 
 describe('rewriteIncomingProjectPath', () => {
@@ -60,5 +65,13 @@ describe('rewriteIncomingProjectPath', () => {
   it('does not double-rewrite the import route', () => {
     const path = '/import-project?uri=file%3A%2F%2F%2Ftmp%2Fa.aud';
     assert.equal(rewriteIncomingProjectPath(path), path);
+  });
+
+  it('rewrites Android content URIs to the import route', () => {
+    const url = 'content://com.android.providers.downloads.documents/document/42';
+    assert.equal(
+      rewriteIncomingProjectPath(url),
+      `/import-project?uri=${encodeURIComponent(url)}`
+    );
   });
 });

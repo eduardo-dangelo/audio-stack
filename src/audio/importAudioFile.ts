@@ -1,5 +1,6 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { File, FileMode, Paths } from 'expo-file-system';
+import { Platform } from 'react-native';
 
 import {
   accumulatePeaksFromSamples,
@@ -109,6 +110,16 @@ export async function pickAudioFile(): Promise<
 export async function pickImportableFile(): Promise<
   { canceled: true } | ({ canceled: false } & PickedAudioFile)
 > {
+  if (Platform.OS === 'android') {
+    // SAF often reports custom extensions as octet-stream / zip, not the vendor MIME.
+    return pickDocument([
+      'audio/*',
+      'application/octet-stream',
+      'application/zip',
+      PROJECT_MIME_TYPE,
+      ...LEGACY_PROJECT_MIME_TYPES,
+    ]);
+  }
   return pickDocument(['audio/*', PROJECT_MIME_TYPE, ...LEGACY_PROJECT_MIME_TYPES]);
 }
 
