@@ -40,7 +40,14 @@ import {
   subscribeBilling,
 } from './effectiveTierStore';
 import { entitlementsFromPurchases } from './entitlements';
-import { PLUS_PRODUCT_ID, PRO_YEARLY_PRODUCT_ID } from './productIds';
+import {
+  PLUS_PRODUCT_ID,
+  PRO_ANDROID_PRODUCT_ID,
+  PRO_PRODUCT_IDS,
+  PRO_YEARLY_PRODUCT_ID,
+  isProProductId,
+  proProductIdForPlatform,
+} from './productIds';
 import { requestUpgradeCelebration } from './celebrationBridge';
 import {
   closePaywallPreferred,
@@ -48,6 +55,10 @@ import {
   registerPaywallOpener,
 } from './upgradeBridge';
 import type { TierId, UpgradeReason } from './types';
+
+function isStoreBillingPlatform(): boolean {
+  return Platform.OS === 'ios' || Platform.OS === 'android';
+}
 
 async function applyProWelcomeTheme(): Promise<void> {
   const next = resolveProWelcomeTheme(
@@ -70,8 +81,19 @@ function hasActiveProSubscription(
   subscriptions: readonly ActiveSubscription[]
 ): boolean {
   return subscriptions.some(
-    (sub) => sub.productId === PRO_YEARLY_PRODUCT_ID && sub.isActive
+    (sub) => isProProductId(sub.productId) && sub.isActive
   );
+}
+
+function androidProOfferToken(
+  product: ProductSubscription | null
+): string | null {
+  if (!product || product.platform !== 'android') {
+    return null;
+  }
+  const offers = product.subscriptionOffers ?? [];
+  const withToken = offers.find((offer) => offer.offerTokenAndroid);
+  return withToken?.offerTokenAndroid ?? null;
 }
 
 type BillingContextValue = {
@@ -163,7 +185,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
         if (!userInitiated) {
           return;
         }
-        if (purchase.productId === PRO_YEARLY_PRODUCT_ID) {
+        if (isProProductId(purchase.productId)) {
           await celebrateUpgrade('pro');
         } else if (purchase.productId === PLUS_PRODUCT_ID) {
           await celebrateUpgrade('plus');
@@ -186,13 +208,13 @@ export function BillingProvider({ children }: { children: ReactNode }) {
   const refreshEntitlementsRef = useRef<(() => Promise<void>) | null>(null);
 
   const refreshEntitlements = useCallback(async () => {
-    if (Platform.OS !== 'ios' || !connected) {
+    if (!isStoreBillingPlatform() || !connected) {
       applyPurchasesToStore([], false);
       return;
     }
     try {
       await getAvailablePurchases();
-      await getActiveSubscriptions([PRO_YEARLY_PRODUCT_ID]);
+      await getActiveSubscriptions([...PRO_PRODUCT_IDS]);
     } catch {
       // Keep last known entitlements on transient store errors.
     }
@@ -212,16 +234,17 @@ export function BillingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!connected || Platform.OS !== 'ios') {
+    if (!connected || !isStoreBillingPlatform()) {
       return;
     }
+    const proSku = proProductIdForPlatform(Platform.OS);
     void (async () => {
       try {
         await fetchProducts({ skus: [PLUS_PRODUCT_ID], type: 'in-app' });
-        await fetchProducts({ skus: [PRO_YEARLY_PRODUCT_ID], type: 'subs' });
+        await fetchProducts({ skus: [proSku], type: 'subs' });
         await refreshEntitlements();
       } catch {
-        // Products may be missing until ASC is configured.
+        // Products may be missing until the store console is configured.
       }
     })();
   }, [connected, fetchProducts, refreshEntitlements]);
@@ -229,8 +252,7 @@ export function BillingProvider({ children }: { children: ReactNode }) {
   const plusProduct =
     products.find((product) => product.id === PLUS_PRODUCT_ID) ?? null;
   const proProduct =
-    subscriptions.find((product) => product.id === PRO_YEARLY_PRODUCT_ID) ??
-    null;
+    subscriptions.find((product) => isProProductId(product.id)) ?? null;
 
   const effectiveTier = useMemo(() => {
     void tierTick;
@@ -260,15 +282,18 @@ export function BillingProvider({ children }: { children: ReactNode }) {
   closePaywallRef.current = closePaywall;
 
   const purchasePlus = useCallback(async () => {
-    if (Platform.OS !== 'ios') {
-      Alert.alert('Unavailable', 'Purchases are only available on iOS.');
+    if (!isStoreBillingPlatform()) {
+      Alert.alert('Unavailable', 'Purchases are not available on this device.');
       return;
     }
     expectingPurchaseRef.current = true;
     setPurchasing(true);
     try {
       await requestPurchase({
-        request: { apple: { sku: PLUS_PRODUCT_ID } },
+        request: {
+          apple: { sku: PLUS_PRODUCT_ID },
+          google: { skus: [PLUS_PRODUCT_ID] },
+        },
         type: 'in-app',
       });
     } catch (error) {
@@ -281,10 +306,42 @@ export function BillingProvider({ children }: { children: ReactNode }) {
   }, [requestPurchase]);
 
   const purchasePro = useCallback(async () => {
-    if (Platform.OS !== 'ios') {
-      Alert.alert('Unavailable', 'Purchases are only available on iOS.');
+    if (!isStoreBillingPlatform()) {
+      Alert.alert('Unavailable', 'Purchases are not available on this device.');
       return;
     }
+    const proSku = proProductIdForPlatform(Platform.OS);
+    if (Platform.OS === 'android') {
+      const offerToken = androidProOfferToken(proProduct);
+      if (!offerToken) {
+        Alert.alert(
+          'Unavailable',
+          'Pro is not available to purchase yet. Try again in a few minutes.'
+        );
+        return;
+      }
+      expectingPurchaseRef.current = true;
+      setPurchasing(true);
+      try {
+        await requestPurchase({
+          request: {
+            google: {
+              skus: [proSku],
+              subscriptionOffers: [{ sku: proSku, offerToken }],
+            },
+          },
+          type: 'subs',
+        });
+      } catch (error) {
+        expectingPurchaseRef.current = false;
+        setPurchasing(false);
+        const message =
+          error instanceof Error ? error.message : 'Could not start purchase.';
+        Alert.alert('Purchase Failed', message);
+      }
+      return;
+    }
+
     expectingPurchaseRef.current = true;
     setPurchasing(true);
     try {
@@ -299,20 +356,22 @@ export function BillingProvider({ children }: { children: ReactNode }) {
         error instanceof Error ? error.message : 'Could not start purchase.';
       Alert.alert('Purchase Failed', message);
     }
-  }, [requestPurchase]);
+  }, [proProduct, requestPurchase]);
 
   const restore = useCallback(async () => {
-    if (Platform.OS !== 'ios') {
+    if (!isStoreBillingPlatform()) {
       return;
     }
     try {
       await restorePurchases();
       await refreshEntitlements();
       const tier = getEffectiveTierSync();
+      const accountLabel =
+        Platform.OS === 'android' ? 'Google account' : 'Apple ID';
       Alert.alert(
         'Purchases Restored',
         tier === 'lite'
-          ? 'No previous purchases were found for this Apple ID.'
+          ? `No previous purchases were found for this ${accountLabel}.`
           : `Your plan is ${tierDisplayName(tier)}.`
       );
     } catch (error) {
@@ -324,11 +383,17 @@ export function BillingProvider({ children }: { children: ReactNode }) {
 
   const manageSubscriptions = useCallback(async () => {
     try {
-      await deepLinkToSubscriptions({});
+      await deepLinkToSubscriptions(
+        Platform.OS === 'android'
+          ? { skuAndroid: PRO_ANDROID_PRODUCT_ID }
+          : {}
+      );
     } catch {
       Alert.alert(
         'Subscriptions',
-        'Open Settings → Apple ID → Subscriptions to manage your plan.'
+        Platform.OS === 'android'
+          ? 'Open Google Play → Payments & subscriptions to manage your plan.'
+          : 'Open Settings → Apple ID → Subscriptions to manage your plan.'
       );
     }
   }, []);

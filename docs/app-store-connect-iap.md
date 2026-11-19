@@ -2,6 +2,8 @@
 
 Create these products before TestFlight purchase testing. Product IDs must match the app.
 
+Google Play uses the same Plus ID but a shorter Pro product ID (`…pro`, base plan `yearly`) because of Play’s 40-character limit — see [play-console-iap.md](./play-console-iap.md).
+
 ## Prerequisites
 
 1. App Store Connect → **Agreements, Tax, and Banking** → Paid Apps agreement **Active**
