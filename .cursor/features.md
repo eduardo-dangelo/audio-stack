@@ -17,8 +17,8 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: Play button shows a delayed spinner while heavy playback is still arming (decode/context).
 - Paths: `src/audio/MemoAudioEngine.ts`, `src/components/PlaybackControls.tsx`, `src/components/MemoEditor.tsx`, `src/components/RecordingRow.tsx`
-- Invariants: `isPlayStarting` from optimistic play until sources scheduled; cleared on pause/fail; A–B `loopRestart` does not set it; spinner only after ~150ms continuous starting; press still pauses/cancels; editor + list mini player both wired; list press-in warms buffers when memo already loaded.
-- Updated: 2026-11-17
+- Invariants: `isPlayStarting` from optimistic play until sources scheduled; cleared on pause/fail; A–B `loopRestart` does not set it; spinner only after ~150ms continuous starting; press still pauses/cancels; editor selects `isPlayStarting` in `MemoEditorEngineSlice` (not only the PlaybackControls prop); list mini player wired; list press-in warms buffers when memo already loaded.
+- Updated: 2026-11-19
 
 ### Empty library start → All Recordings
 - Status: evolving

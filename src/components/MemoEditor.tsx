@@ -227,6 +227,7 @@ type MemoEditorEngineSlice = {
   memoId: string | null;
   isRecording: boolean;
   isPlaying: boolean;
+  isPlayStarting: boolean;
   duration: number;
   currentTime: number;
   monitorMixActive: boolean;
@@ -239,6 +240,7 @@ function selectMemoEditorEngine(state: EngineState): MemoEditorEngineSlice {
     memoId: state.memoId,
     isRecording: state.isRecording,
     isPlaying: state.isPlaying,
+    isPlayStarting: state.isPlayStarting,
     duration: state.duration,
     currentTime: state.currentTime,
     monitorMixActive: state.monitorMixActive,
@@ -256,6 +258,7 @@ function areMemoEditorEngineSlicesEqual(
     a.memoId !== b.memoId ||
     a.isRecording !== b.isRecording ||
     a.isPlaying !== b.isPlaying ||
+    a.isPlayStarting !== b.isPlayStarting ||
     a.duration !== b.duration ||
     a.monitorMixActive !== b.monitorMixActive ||
     a.monitorMixReady !== b.monitorMixReady
