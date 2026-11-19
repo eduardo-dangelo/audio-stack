@@ -38,6 +38,7 @@ const SF_TO_ANDROID: Record<string, AndroidSymbol> = {
 
   'play.fill': 'play_arrow',
   'pause.fill': 'pause',
+  'stop.fill': 'stop',
   'gobackward.15': 'replay_10',
   'goforward.15': 'forward_10',
 

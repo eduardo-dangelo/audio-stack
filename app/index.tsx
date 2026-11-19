@@ -666,7 +666,9 @@ export default function FoldersHomeScreen() {
                       <Pressable
                         key={theme.id}
                         accessibilityRole="button"
-                        accessibilityState={{ selected, disabled: locked }}
+                        // Do not set disabled for locked rows — Android swallows presses
+                        // and Lite Solarized would never open the themes paywall.
+                        accessibilityState={{ selected }}
                         onPress={() => selectThemePreference(theme.id)}
                         style={({ pressed }) => [
                           styles.settingsRow,

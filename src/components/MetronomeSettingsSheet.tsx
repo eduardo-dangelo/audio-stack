@@ -1,10 +1,10 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
-import { SymbolView } from 'expo-symbols';
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { useAudioEngine, useAudioEngineSelector } from '@/src/audio/AudioEngineContext';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import {
   GRID_BASIS_PRESETS,
   METRONOME_GRID_SUBDIVISIONS,
@@ -214,8 +214,8 @@ export function MetronomeSettingsSheet({
               (previewDisabled || controlsDisabled) && styles.previewButtonDisabled,
             ]}
             onPress={togglePreview}>
-            <SymbolView
-              name={{ ios: previewActive ? 'stop.fill' : 'play.fill' }}
+            <AppSymbol
+              name={previewActive ? 'stop.fill' : 'play.fill'}
               size={16}
               tintColor={previewDisabled ? colors.secondaryText : colors.accent}
             />

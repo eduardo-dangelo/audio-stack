@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Alert, Appearance, Platform } from 'react-native';
 import { router } from 'expo-router';
 import {
   deepLinkToSubscriptions,
@@ -26,8 +26,8 @@ import {
   setThemePreference,
   type DevTierOverride,
 } from '@/src/settings/appSettings';
-import { publishThemePreference } from '@/src/theme/themeStore';
-import { PRO_WELCOME_THEME } from '@/src/theme/themes';
+import { getThemePreferenceLive, publishThemePreference } from '@/src/theme/themeStore';
+import { resolveProWelcomeTheme } from '@/src/theme/themes';
 
 import { tierDisplayName } from './capabilities';
 import {
@@ -50,8 +50,12 @@ import {
 import type { TierId, UpgradeReason } from './types';
 
 async function applyProWelcomeTheme(): Promise<void> {
-  publishThemePreference(PRO_WELCOME_THEME);
-  await setThemePreference(PRO_WELCOME_THEME);
+  const next = resolveProWelcomeTheme(
+    getThemePreferenceLive(),
+    Appearance.getColorScheme()
+  );
+  publishThemePreference(next);
+  await setThemePreference(next);
 }
 
 /** Jackpot first so the burst is not blocked on theme persistence. */

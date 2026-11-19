@@ -167,6 +167,30 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "ExpoWidgetsTarget",
+                  "bundleIdentifier": "com.eduardodangelo.voicememosplus.widgets",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.eduardodangelo.voicememosplus"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "6d5f5268-3b53-4bf4-942a-a162a72470a8"
+      }
+    },
+    "owner": "ed-dangelo"
   }
 }

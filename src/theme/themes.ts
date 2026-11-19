@@ -38,8 +38,19 @@ export type PlusThemeId = (typeof PLUS_THEME_IDS)[number];
 export type ProOnlyThemeId = (typeof PRO_ONLY_THEME_IDS)[number];
 export type ProThemeId = (typeof PRO_THEME_IDS)[number];
 
-/** Theme applied when entering Pro via purchase or Dev Tier. */
-export const PRO_WELCOME_THEME: ProOnlyThemeId = 'gruvbox';
+/**
+ * Pro welcome theme from current appearance: light → Quiet Light, dark → Gruvbox.
+ * `systemScheme` is used when preference is `system` (e.g. Appearance.getColorScheme()).
+ */
+export function resolveProWelcomeTheme(
+  pref: ThemePreference,
+  systemScheme: 'light' | 'dark' | null | undefined
+): ProOnlyThemeId {
+  const appearance = appearanceForTheme(pref);
+  const isDark =
+    appearance === 'system' ? systemScheme === 'dark' : appearance === 'dark';
+  return isDark ? 'gruvbox' : 'quietLight';
+}
 
 export const FREE_APPEARANCE_THEMES: readonly EditorThemeChoice[] = [
   { id: 'light', label: 'Light' },
