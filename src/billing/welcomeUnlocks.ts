@@ -13,7 +13,8 @@ export const PLUS_WELCOME_UNLOCKS: readonly WelcomeUnlock[] = [
   { label: 'Unlimited layers', symbol: 'square.stack.3d.up' },
   { label: 'Custom FX', symbol: 'slider.horizontal.3' },
   { label: 'Folders', symbol: 'folder' },
-  { label: 'M4A export', symbol: 'square.and.arrow.up' },
+  { label: 'High-quality M4A', symbol: 'square.and.arrow.up' },
+  { label: 'WAV export', symbol: 'waveform' },
   { label: 'Merge', symbol: 'square.stack.3d.down.right' },
   { label: 'Solarized themes', symbol: 'paintbrush' },
 ];
@@ -23,7 +24,7 @@ export const PRO_WELCOME_UNLOCKS: readonly WelcomeUnlock[] = [
   { label: 'Everything in Plus', symbol: 'sparkles' },
   { label: 'Duplicate', symbol: 'plus.square.on.square' },
   { label: 'Loop', symbol: 'repeat' },
-  { label: 'WAV / .aud', symbol: 'doc' },
+  { label: 'Project (.aud)', symbol: 'doc' },
   { label: 'Named IDE themes', symbol: 'paintbrush' },
   { label: 'Pitch', symbol: 'tuningfork' },
 ];

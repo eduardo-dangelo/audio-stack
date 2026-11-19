@@ -19,7 +19,8 @@ const LITE_CAPABILITIES: TierCapabilities = {
   duplicate: false,
   themes: false,
   pitch: false,
-  exportFormats: [],
+  /** Low-quality M4A only; WAV / .aud remain paid. */
+  exportFormats: ['m4a'],
 };
 
 const PLUS_CAPABILITIES: TierCapabilities = {
@@ -33,7 +34,7 @@ const PLUS_CAPABILITIES: TierCapabilities = {
   duplicate: false,
   themes: false,
   pitch: false,
-  exportFormats: ['m4a'],
+  exportFormats: ['m4a', 'wav'],
 };
 
 const PRO_CAPABILITIES: TierCapabilities = {
@@ -157,9 +158,9 @@ export function paywallSubtitle(reason: UpgradeReason): string {
     case 'import':
       return 'Importing audio and projects is included on every plan.';
     case 'export':
-      return 'M4A export is included with Plus. WAV and .aud need Pro.';
+      return 'Lite includes low-quality M4A. WAV needs Plus; project (.aud) needs Pro.';
     case 'exportFormat':
-      return 'WAV and .aud projects are included with Pro.';
+      return 'WAV export is included with Plus. Project (.aud) export needs Pro.';
     case 'folders':
       return 'Folders are included with Plus and Pro.';
     case 'merge':

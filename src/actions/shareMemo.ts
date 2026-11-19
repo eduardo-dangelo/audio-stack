@@ -25,13 +25,8 @@ export type ShareMemoOptions = {
   onExportFinished?: () => void;
 };
 
-const AUDIO_FORMATS_IOS = ['m4a', 'wav'] as const;
-const AUDIO_FORMATS_ANDROID = ['wav'] as const;
+const AUDIO_FORMATS = ['m4a', 'wav'] as const;
 const PROJECT_FORMAT_LABEL = 'Project (.aud)';
-
-function getAudioFormats(): readonly ('m4a' | 'wav')[] {
-  return Platform.OS === 'android' ? AUDIO_FORMATS_ANDROID : AUDIO_FORMATS_IOS;
-}
 
 function getShareMimeType(format: ExportFormat): string {
   if (format === 'aud') {
@@ -74,12 +69,10 @@ function showFormatPicker(
     return;
   }
 
-  // Plus and Pro both pick a format; Plus wav/aud is gated in the callback.
-  // Android: WAV only until M4A native encode exists.
-  const audioFormats = getAudioFormats();
+  // All tiers see the format list; canExportFormat gates wav/aud (and opens paywall).
   const sheetOptions = includeProject
-    ? ([...audioFormats, PROJECT_FORMAT_LABEL, 'Cancel'] as const)
-    : ([...audioFormats, 'Cancel'] as const);
+    ? ([...AUDIO_FORMATS, PROJECT_FORMAT_LABEL, 'Cancel'] as const)
+    : ([...AUDIO_FORMATS, 'Cancel'] as const);
   const cancelIndex = sheetOptions.indexOf('Cancel');
 
   showActionSheet(
@@ -98,7 +91,8 @@ function showFormatPicker(
         return;
       }
       if (!canExportFormat(tier, format)) {
-        requestUpgrade(tier === 'lite' ? 'export' : 'exportFormat');
+        // wav → Plus; aud → Pro (paywall recommends from current tier + reason).
+        requestUpgrade(format === 'aud' || format === 'wav' ? 'exportFormat' : 'export');
         return;
       }
       onFormat(format);
@@ -113,7 +107,7 @@ async function exportAndShare(
 ): Promise<void> {
   const tier = getEffectiveTierSync();
   if (!canExportFormat(tier, format)) {
-    requestUpgrade(tier === 'lite' ? 'export' : 'exportFormat');
+    requestUpgrade(format === 'aud' || format === 'wav' ? 'exportFormat' : 'export');
     return;
   }
 
@@ -152,7 +146,7 @@ async function exportAndShareMany(
 
   const tier = getEffectiveTierSync();
   if (!canExportFormat(tier, format)) {
-    requestUpgrade(tier === 'lite' ? 'export' : 'exportFormat');
+    requestUpgrade(format === 'aud' || format === 'wav' ? 'exportFormat' : 'export');
     return;
   }
 
@@ -224,11 +218,6 @@ export function shareMemo(memo: Memo, options?: ShareMemoOptions): void {
 
   if (!canExportAnything(getEffectiveTierSync())) {
     requestUpgrade('export');
-    return;
-  }
-
-  if (options?.format === 'm4a' && Platform.OS === 'android') {
-    Alert.alert('Unavailable', 'M4A export is not available on Android yet. Choose WAV.');
     return;
   }
 

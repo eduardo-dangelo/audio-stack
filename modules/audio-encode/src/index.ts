@@ -1,7 +1,13 @@
 import { requireNativeModule } from 'expo-modules-core';
 
+export type M4aEncodeQuality = 'low' | 'high';
+
 type AudioEncodeModule = {
-  encodeWavToM4a(inputUri: string, outputUri: string): Promise<void>;
+  encodeWavToM4a(
+    inputUri: string,
+    outputUri: string,
+    quality: M4aEncodeQuality
+  ): Promise<void>;
   isAvailable(): boolean;
 };
 
@@ -20,13 +26,17 @@ function getModule(): AudioEncodeModule | null {
   }
 }
 
-export async function encodeWavToM4a(inputUri: string, outputUri: string): Promise<void> {
+export async function encodeWavToM4a(
+  inputUri: string,
+  outputUri: string,
+  quality: M4aEncodeQuality = 'high'
+): Promise<void> {
   const module = getModule();
   if (!module?.isAvailable()) {
     throw new Error(
-      'M4A encoding is not available on this platform yet. On iOS, rebuild with npx expo run:ios. On Android, export WAV for now.'
+      'M4A encoding is not available. Rebuild the app with a native build that includes audio-encode.'
     );
   }
 
-  await module.encodeWavToM4a(inputUri, outputUri);
+  await module.encodeWavToM4a(inputUri, outputUri, quality);
 }

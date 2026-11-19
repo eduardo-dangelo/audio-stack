@@ -24,7 +24,7 @@ Play product IDs are limited to **40 characters**. The App Store Pro SKU (`…pr
 
 Description example:
 
-- Audio Stack Plus unlocks unlimited recordings and layers, custom effects, folders, merge, and M4A export. One-time purchase.
+- Audio Stack Plus unlocks unlimited recordings and layers, custom effects, folders, merge, high-quality M4A, and WAV export. One-time purchase.
 
 ### Pro (yearly)
 
@@ -40,12 +40,12 @@ Benefits (≤40 chars each), example:
 
 1. Loop and duplicate tracks  
 2. Pitch control  
-3. WAV and .aud project export  
+3. Project (.aud) export  
 4. Everything included in Plus  
 
 Description (≤200 chars), example:
 
-- Audio Stack Pro (yearly): loop, duplicate, pitch, WAV/.aud export, themes, and everything in Plus. Cancel anytime in Google Play.
+- Audio Stack Pro (yearly): loop, duplicate, pitch, project (.aud) export, themes, and everything in Plus. Cancel anytime in Google Play.
 
 Recommended subscription settings:
 

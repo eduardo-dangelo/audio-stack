@@ -24,7 +24,7 @@ Google Play uses the same Plus ID but a shorter Pro product ID (`…pro`, base p
 Localization example:
 
 - Display name: **Plus**
-- Description: Unlimited recordings and layers, custom effects, import, and M4A export.
+- Description: Unlimited recordings and layers, custom effects, folders, merge, high-quality M4A, and WAV export.
 
 ### Pro (yearly)
 
@@ -39,7 +39,7 @@ Localization example:
 Localization example:
 
 - Display name: **Pro**
-- Description: Everything in Plus, plus loop, duplicate, pitch, WAV, and project (.aud) export.
+- Description: Everything in Plus, plus loop, duplicate, pitch, and project (.aud) export.
 
 If an older monthly product (`…pro.monthly`) was never released, take it off sale. If anyone already subscribed, leave it in the same subscription group so renewals continue until they lapse. Apple does not allow changing a subscription’s duration; yearly Pro is a separate product.
 

@@ -87,10 +87,18 @@ const FEATURES: FeatureRow[] = [
   {
     label: 'M4A export',
     symbol: 'square.and.arrow.up',
+    lite: 'Low',
+    plus: 'High',
+    pro: 'High',
+    highlightReasons: ['export'],
+  },
+  {
+    label: 'WAV export',
+    symbol: 'waveform',
     lite: false,
     plus: true,
     pro: true,
-    highlightReasons: ['export'],
+    highlightReasons: ['exportFormat'],
   },
   {
     label: 'Merge',
@@ -117,7 +125,7 @@ const FEATURES: FeatureRow[] = [
     highlightReasons: ['loop'],
   },
   {
-    label: 'WAV / .aud',
+    label: 'Project (.aud)',
     symbol: 'doc',
     lite: false,
     plus: false,
@@ -225,8 +233,8 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
       recommended:
         effectiveTier === 'lite' &&
         (reason == null ||
-          (reason !== 'exportFormat' &&
-            reason !== 'themes' &&
+          reason === 'exportFormat' ||
+          (reason !== 'themes' &&
             reason !== 'pitch' &&
             reason !== 'duplicate' &&
             reason !== 'loop')),
@@ -236,7 +244,7 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
       price: proPriceLabel,
       symbol: 'star.fill',
       recommended:
-        reason === 'exportFormat' ||
+        (reason === 'exportFormat' && effectiveTier === 'plus') ||
         reason === 'themes' ||
         reason === 'pitch' ||
         reason === 'duplicate' ||

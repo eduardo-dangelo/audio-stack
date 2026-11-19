@@ -1506,13 +1506,25 @@ export async function exportMemoToFile(
   }
 
   writeAudioBufferToWavFile(rendered, wavTemp.uri);
-  await encodeWavToM4a(wavTemp.uri, output.uri);
-  if (wavTemp.exists) {
-    wavTemp.delete();
+  const m4aQuality =
+    getEffectiveTierSync() === 'lite' ? 'low' : 'high';
+  try {
+    await encodeWavToM4a(wavTemp.uri, output.uri, m4aQuality);
+  } finally {
+    if (wavTemp.exists) {
+      wavTemp.delete();
+    }
   }
 
+  // Native may write via a decoded path; re-resolve in case the first handle is stale.
   if (!output.exists) {
-    throw new Error('Failed to create M4A export file.');
+    const refreshed = new File(output.uri);
+    if (refreshed.exists) {
+      return refreshed;
+    }
+    throw new Error(
+      `Failed to create M4A export file at ${output.uri}. Rebuild the app if Android audio-encode was just added.`
+    );
   }
 
   return output;
