@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Android timeline edit vs playhead follow
+- Status: evolving
+- What: Freeze Android translateX playhead-follow during fade/trim/move/loop gestures; coalesce setMemo and defer mid-play fade/trim AudioParam reschedule until release.
+- Paths: `src/components/WaveformView.tsx`, `src/components/MemoEditor.tsx`, `src/audio/MemoAudioEngine.ts`
+- Invariants: Shared `onTrimGestureActive` gates follow for fade/trim/move/loop; while active on Android playback, translate clock is handed off to native scroll and `autoScrollForContentX` never `scrollTo`s against an active translate clock; `setFadeAutomationLive(false)` during gesture defers `rescheduleActiveLayerFades` (flush once on end); timeline `setMemo` during gesture is rAF-coalesced and flushed on end.
+- Updated: 2026-11-20
+
 ### Cumulative export + Android M4A
 - Status: evolving
 - What: Lite exports low-quality M4A; Plus adds high M4A + WAV; Pro adds project (.aud); Android encodes M4A via MediaCodec.
@@ -45,8 +52,8 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: Selected-track header tint via child segment Views; Android follow soft-anchors; long-press menus cancel on scroll/drag.
 - Paths: `src/components/WaveformView.tsx`
-- Invariants: Header tint always from child Views with explicit `left`/`width` (Pressable bg never supplies fill — Android absolute Pressable skips paint); non-looped = one full-width `headerColor` segment; looped = cycle 0 `headerColor` + faded later cycles when cycle width ≥1px; Android playback soft-slew only when lagging (display must not lead `getPlaybackTime`); recording soft anchors cap slew ~3ms (hard snap if error >50ms) but sub-1ms still refreshes clock SV + recording emitLiveTime (avoids 1s extrapolate freeze); long-press epoch bumps on horizontal/vertical scroll begin and trim/move gesture start so timers no-op mid-drag; header loop long-press uses the same epoch + move-cancel path.
-- Updated: 2026-11-14
+- Invariants: Header tint always from child Views with explicit `left`/`width` (Pressable bg never supplies fill — Android absolute Pressable skips paint); non-looped = one full-width `headerColor` segment; looped = cycle 0 `headerColor` + faded later cycles when cycle width ≥1px; Android playback soft-slew only when lagging (display must not lead `getPlaybackTime`); recording soft anchors cap slew ~3ms (hard snap if error >50ms) but sub-1ms still refreshes clock SV + recording emitLiveTime (avoids 1s extrapolate freeze); long-press epoch bumps on horizontal/vertical scroll begin and trim/move/fade/loop gesture start so timers no-op mid-drag; header loop long-press uses the same epoch + move-cancel path; Android playback follow tick also yields while `trimGestureActive` (see Android timeline edit vs playhead follow).
+- Updated: 2026-11-20
 
 ### Android performance watchlist
 - Status: evolving

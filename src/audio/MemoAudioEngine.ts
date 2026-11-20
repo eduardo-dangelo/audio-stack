@@ -404,6 +404,12 @@ export class MemoAudioEngine {
   private playbackStartAt = 0;
   private playbackEndAt = 0;
   private playbackContextStartWhen = 0;
+  /**
+   * While true, mid-play fade/trim AudioParam reschedules are deferred (timeline
+   * edit gestures). Latest effects stay on the layer; flush on gesture end.
+   */
+  private fadeRescheduleSuppressed = false;
+  private pendingFadeRescheduleLayerIds = new Set<string>();
   /** Current playback rate applied to live sources (1 = normal). */
   private playbackRate = 1;
   /** AudioContext time of the last rate-clock anchor. */
@@ -4057,9 +4063,46 @@ export class MemoAudioEngine {
           partial.trimIn !== undefined ||
           partial.trimOut !== undefined;
         if (fadesChanged && this.state.isPlaying) {
-          this.rescheduleActiveLayerFades(this.context, layerId, nextEffects);
+          if (this.fadeRescheduleSuppressed) {
+            this.pendingFadeRescheduleLayerIds.add(layerId);
+          } else {
+            this.rescheduleActiveLayerFades(this.context, layerId, nextEffects);
+          }
         }
       }
+    }
+  }
+
+  /**
+   * Timeline edit gestures (fade/trim/move/loop): suppress live AudioParam fade
+   * storms while dragging; flush once when `live` becomes true again.
+   */
+  setFadeAutomationLive(live: boolean): void {
+    this.fadeRescheduleSuppressed = !live;
+    if (live) {
+      this.flushPendingFadeReschedules();
+    } else {
+      this.pendingFadeRescheduleLayerIds.clear();
+    }
+  }
+
+  private flushPendingFadeReschedules(): void {
+    if (!this.context || !this.state.isPlaying || this.pendingFadeRescheduleLayerIds.size === 0) {
+      this.pendingFadeRescheduleLayerIds.clear();
+      return;
+    }
+    const layerIds = [...this.pendingFadeRescheduleLayerIds];
+    this.pendingFadeRescheduleLayerIds.clear();
+    for (const layerId of layerIds) {
+      const layer = this.loadedLayers.find((entry) => entry.id === layerId);
+      if (!layer) {
+        continue;
+      }
+      this.rescheduleActiveLayerFades(
+        this.context,
+        layerId,
+        this.getLoadedLayerEffects(layer)
+      );
     }
   }
 

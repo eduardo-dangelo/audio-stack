@@ -3688,6 +3688,16 @@ function WaveformViewComponent({
       viewportWidth,
       getScrollX: () => scrollOffsetRef.current,
       autoScrollForContentX: (contentX: number) => {
+        // Android playback slides via translateX with ScrollView parked at 0 —
+        // never scrollTo against that clock (fade/loop edge follow would fight it).
+        if (
+          Platform.OS === 'android' &&
+          isPlayingRef.current &&
+          !followRecordingScrollRef.current &&
+          recordingClockActiveSV.value
+        ) {
+          return;
+        }
         const scrollX = scrollOffsetRef.current;
         const viewportX = contentX - scrollX;
         let delta = 0;
@@ -3714,10 +3724,46 @@ function WaveformViewComponent({
         scrollRef.current?.scrollTo({ x: next, animated: false });
       },
       onTrimGestureActive: (active: boolean) => {
+        // Set the gate before freeze/resume so the follow tick cannot race.
+        trimGestureActiveRef.current = active;
         if (active) {
           longPressEpochRef.current += 1;
+          // Freeze Android playhead-follow for the whole edit gesture so
+          // fade/trim/move/loop drags do not race translateX + scroll delta.
+          if (
+            Platform.OS === 'android' &&
+            isPlayingRef.current &&
+            !followRecordingScrollRef.current &&
+            recordingClockActiveSV.value
+          ) {
+            const x = scrollOffsetRef.current;
+            recordingClockActiveSV.value = false;
+            recordingFrameCallback.setActive(false);
+            cancelAnimation(recordingFollowTranslateXSV);
+            recordingFollowTranslateXSV.value = 0;
+            scrollRef.current?.scrollTo({ x, animated: false });
+          }
+        } else if (
+          Platform.OS === 'android' &&
+          isPlayingRef.current &&
+          !followRecordingScrollRef.current
+        ) {
+          // Resume translate follow from live audio after the gesture.
+          const time = getPlaybackTimeRef.current?.() ?? currentTimeRef.current;
+          const pps = layoutPixelsPerSecondRef.current;
+          const x = timeToScrollX(time, contentWidthRef.current, pps);
+          scrollRef.current?.scrollTo({ x: 0, animated: false });
+          recordingClockCeilSV.value = Number.POSITIVE_INFINITY;
+          recordingClockTimeSV.value = time;
+          recordingPpsSV.value = pps;
+          recordingClockSeqSV.value = recordingClockSeqSV.value + 1;
+          recordingClockActiveSV.value = true;
+          recordingFrameCallback.setActive(true);
+          cancelAnimation(recordingFollowTranslateXSV);
+          recordingFollowTranslateXSV.value = -x;
+          scrollOffsetRef.current = x;
+          syncMetronomeGridRef.current(x);
         }
-        trimGestureActiveRef.current = active;
         setTrimGestureActive(active);
         onEditGestureActiveRef.current?.(active);
       },
@@ -3886,8 +3932,8 @@ function WaveformViewComponent({
         raf = 0;
         return;
       }
-      // User scrub can start before isPlaying flips false; don't fight the drag.
-      if (isUserScrollingRef.current) {
+      // User scrub / timeline edit gesture: don't fight the drag.
+      if (isUserScrollingRef.current || trimGestureActiveRef.current) {
         raf = requestAnimationFrame(tick);
         return;
       }
@@ -4123,7 +4169,7 @@ function WaveformViewComponent({
         raf = 0;
         return;
       }
-      if (isUserScrollingRef.current) {
+      if (isUserScrollingRef.current || trimGestureActiveRef.current) {
         raf = requestAnimationFrame(tick);
         return;
       }

@@ -951,6 +951,8 @@ function MemoEditorInner({
   const draftGenerationRef = useRef(0);
   const editGestureActiveRef = useRef(false);
   const [editGestureActive, setEditGestureActive] = useState(false);
+  /** Coalesce setMemo to one frame while a timeline edit gesture is active. */
+  const pendingMemoSetRafRef = useRef<number | null>(null);
   const confirmEditDraftRef = useRef<(keepTool?: boolean) => Promise<void>>(
     async () => {}
   );
@@ -1045,6 +1047,51 @@ function MemoEditorInner({
     };
   }, [cancelProcessingClearTimer]);
 
+  const flushCoalescedMemoSet = useCallback(() => {
+    if (pendingMemoSetRafRef.current != null) {
+      cancelAnimationFrame(pendingMemoSetRafRef.current);
+      pendingMemoSetRafRef.current = null;
+    }
+    const current = memoRef.current;
+    if (current) {
+      setMemo(current);
+    }
+  }, []);
+
+  const scheduleMemoSet = useCallback(
+    (nextMemo: NonNullable<typeof memoRef.current>) => {
+      memoRef.current = nextMemo;
+      if (!editGestureActiveRef.current) {
+        if (pendingMemoSetRafRef.current != null) {
+          cancelAnimationFrame(pendingMemoSetRafRef.current);
+          pendingMemoSetRafRef.current = null;
+        }
+        setMemo(nextMemo);
+        return;
+      }
+      if (pendingMemoSetRafRef.current != null) {
+        return;
+      }
+      pendingMemoSetRafRef.current = requestAnimationFrame(() => {
+        pendingMemoSetRafRef.current = null;
+        const current = memoRef.current;
+        if (current) {
+          setMemo(current);
+        }
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      if (pendingMemoSetRafRef.current != null) {
+        cancelAnimationFrame(pendingMemoSetRafRef.current);
+        pendingMemoSetRafRef.current = null;
+      }
+    };
+  }, []);
+
   const applyLayerEffectsChange = useCallback(
     (layerId: string, partial: LayerEffectsChange) => {
       const draftGeneration = editDraftRef.current?.generation;
@@ -1103,8 +1150,7 @@ function MemoEditorInner({
         trimEnd,
       };
 
-      memoRef.current = nextMemo;
-      setMemo(nextMemo);
+      scheduleMemoSet(nextMemo);
 
       if (partial.muted === true && activeLayerIdRef.current === layerId) {
         setActiveLayerId(null);
@@ -1140,7 +1186,7 @@ function MemoEditorInner({
         void updateLayerEffects(memoId, layerId, layerEffectsPersistPayload(nextEffects));
       }, 300);
     },
-    [engine, isDraftGenerationCurrent]
+    [engine, isDraftGenerationCurrent, scheduleMemoSet]
   );
 
   const handleEffectsChange = useCallback(
@@ -1406,14 +1452,18 @@ function MemoEditorInner({
       editGestureActiveRef.current = active;
       setEditGestureActive(active);
       if (active) {
+        // Defer mid-play fade/trim AudioParam storms until the finger lifts.
+        engine.setFadeAutomationLive(false);
         // Disable stack pop immediately so the first horizontal move cannot race
         // the interactive back gesture (iPad split view / card pop).
         navigation.setOptions({ gestureEnabled: false });
         return;
       }
+      flushCoalescedMemoSet();
+      engine.setFadeAutomationLive(true);
       void confirmEditDraftRef.current(true);
     },
-    [navigation]
+    [engine, flushCoalescedMemoSet, navigation]
   );
 
   const handleEditorToolChange = useCallback(
@@ -1512,9 +1562,7 @@ function MemoEditorInner({
         return;
       }
 
-      const nextMemo = { ...prev, layers: nextLayers };
-      memoRef.current = nextMemo;
-      setMemo(nextMemo);
+      scheduleMemoSet({ ...prev, layers: nextLayers });
 
       const memoId = prev.id;
       pendingEffectsPersist.current = null;
@@ -1540,7 +1588,7 @@ function MemoEditorInner({
         }
       }, 300);
     },
-    [engine]
+    [engine, scheduleMemoSet]
   );
 
   const handleFadeChange = useCallback(
@@ -1621,14 +1669,12 @@ function MemoEditorInner({
         }
       }
 
-      const nextMemo = {
+      scheduleMemoSet({
         ...prev,
         layers: nextLayers,
         duration: nextTimeline,
         trimEnd,
-      };
-      memoRef.current = nextMemo;
-      setMemo(nextMemo);
+      });
 
       engine.updateLayerStartTimes(nextStartTimes);
       engine.updateTimelineDuration(nextTimeline, trimEnd);
@@ -1654,7 +1700,7 @@ function MemoEditorInner({
         void updateLayerStartTimes(pending.memoId, pending.startTimes);
       }, 300);
     },
-    [engine, isDraftGenerationCurrent]
+    [engine, isDraftGenerationCurrent, scheduleMemoSet]
   );
 
   const handleLoopChange = useCallback(
