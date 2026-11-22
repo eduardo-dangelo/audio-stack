@@ -87,8 +87,8 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: Android precount clicks and recording start arm on the AudioContext grid from `contextStart`; iOS keeps Modal dismiss wait + Phase B re-clamp.
 - Paths: `src/components/MemoEditor.tsx`, `src/audio/MemoAudioEngine.ts`, `src/audio/metronome.ts`, `src/audio/postPrecountTiming.ts`, `src/components/PrecountOverlay.tsx`
-- Invariants: Android sound precount schedules clicks at `contextStart + n*interval`; Android leaves ~100ms before wall downbeat then dismisses in ~16ms and arms `contextStart+4*interval`; iOS still waits Modal onDismiss (~250ms) then `computePostPrecountContextWhen`; Android precount numerals have no enter/exit fade; live bars sync via early peak emits + UI-clock bar count (see Recording UI audio clock).
-- Updated: 2026-11-13
+- Invariants: Android sound precount schedules clicks at `contextStart + n*interval`; Android leaves ~100ms before wall downbeat then dismisses in ~16ms and arms `contextStart+4*interval`; iOS still waits Modal onDismiss (~250ms) then `computePostPrecountContextWhen`; Android precount numerals use ZoomIn(120)+FadeOut(80) without spring (iOS keeps spring ZoomIn); live bars sync via early peak emits + UI-clock bar count (see Recording UI audio clock).
+- Updated: 2026-11-22
 
 ### Android splash wordmark
 - Status: evolving

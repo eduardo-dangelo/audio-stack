@@ -13,8 +13,11 @@ import Animated, { FadeOut, ZoomIn } from 'react-native-reanimated';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
 const numeralEntering =
-  Platform.OS === 'ios' ? ZoomIn.duration(180).springify().damping(18) : undefined;
-const numeralExiting = Platform.OS === 'ios' ? FadeOut.duration(90) : undefined;
+  Platform.OS === 'ios'
+    ? ZoomIn.duration(180).springify().damping(18)
+    : ZoomIn.duration(120);
+const numeralExiting =
+  Platform.OS === 'ios' ? FadeOut.duration(90) : FadeOut.duration(80);
 
 type Props = {
   visible: boolean;
