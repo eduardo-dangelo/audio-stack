@@ -54,7 +54,14 @@ import {
   subscribeHeadphoneDisconnect,
 } from '@/src/audio/headphoneDetection';
 import type { LayerEffects, LayerEffectsChange } from '@/src/audio/layerEffects';
-import { hasAnySoloActive, isLayerLocked, isLayerSelectable, isLockedLayerEffectsChangeAllowed, mergeLayerEffects } from '@/src/audio/layerEffects';
+import {
+  hasAnySoloActive,
+  hasBakeableLayerEffects,
+  isLayerLocked,
+  isLayerSelectable,
+  isLockedLayerEffectsChangeAllowed,
+  mergeLayerEffects,
+} from '@/src/audio/layerEffects';
 import {
   awaitEngineLoadIdle,
   engineLayersMatchMemo,
@@ -180,6 +187,7 @@ import {
   getMemo,
   mergeLayers,
   permanentlyDeleteMemo,
+  rasterizeLayer,
   scheduleWaveformPeaksRegen,
   setMemoHideCollapseTracksPerformanceTip,
   setMemoHideMergeLayersPerformanceTip,
@@ -2675,6 +2683,89 @@ function MemoEditorInner({
     [performMergeLayers]
   );
 
+  const performRasterizeLayer = useCallback(
+    async (layerId: string) => {
+      const current = memoRef.current;
+      if (!current || engineState.isRecording || isExporting) {
+        return;
+      }
+
+      const layer = current.layers.find((entry) => entry.id === layerId);
+      if (!layer || layer.duration <= 0) {
+        return;
+      }
+      if (isLayerLocked(getLayerEffects(layer))) {
+        return;
+      }
+
+      try {
+        await confirmEditDraft(false);
+        flushEffectsPersist();
+        flushStartTimePersist();
+        const latest = memoRef.current;
+        if (!latest) {
+          return;
+        }
+
+        setBusyOverlayMessage('Rasterizing…');
+        setIsExporting(true);
+        if (engineState.isPlaying) {
+          engine.pause();
+        }
+
+        const seekTime = Math.min(engine.getPlaybackTime(), latest.duration);
+        const updated = await rasterizeLayer(latest.id, layerId);
+        memoRef.current = updated;
+        setMemo(updated);
+        setActiveEditor(null);
+        const rasterized = updated.layers.find((entry) => entry.id === layerId);
+        if (rasterized) {
+          const file = getLayerFile(updated.id, rasterized.fileName);
+          if (file) {
+            engine.invalidateLayerBuffer(file.uri);
+          }
+        }
+        await loadMemoIntoEngine(engine, updated, seekTime);
+      } catch (error) {
+        Alert.alert(
+          'Rasterize failed',
+          error instanceof Error ? error.message : 'Unknown error'
+        );
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [
+      confirmEditDraft,
+      engine,
+      engineState.isPlaying,
+      engineState.isRecording,
+      flushEffectsPersist,
+      flushStartTimePersist,
+      isExporting,
+    ]
+  );
+
+  const confirmRasterizeLayer = useCallback(
+    (layerId: string) => {
+      Alert.alert(
+        'Rasterize',
+        'Bake effects into this track’s audio. Effects will reset. This cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Rasterize',
+            style: 'destructive',
+            onPress: () => {
+              void performRasterizeLayer(layerId);
+            },
+          },
+        ]
+      );
+    },
+    [performRasterizeLayer]
+  );
+
   const handleMergeAllLayers = useCallback(() => {
     if (!memo || !canMergeLayers(memo.layers) || engineState.isRecording) {
       return;
@@ -2860,6 +2951,13 @@ function MemoEditorInner({
           systemImage: 'lock',
         },
       ];
+      if (hasBakeableLayerEffects(effects, layer.duration)) {
+        actions.push({
+          id: 'rasterize',
+          title: 'Rasterize',
+          systemImage: 'arrow.down.to.line',
+        });
+      }
       if (unlockedPartners.length > 0) {
         actions.push({
           id: 'merge',
@@ -3078,6 +3176,23 @@ function MemoEditorInner({
             setTrackMenuMergePicker(true);
           }
           break;
+        case 'rasterize':
+          if (isLayerLocked(effects)) {
+            break;
+          }
+          if (!canUseMerge(getEffectiveTierSync())) {
+            setTrackMenuLayerId(null);
+            requestUpgrade('merge');
+            break;
+          }
+          if (!hasBakeableLayerEffects(effects, layer.duration)) {
+            break;
+          }
+          setTrackMenuLayerId(null);
+          setTrackMenuFormatPicker(false);
+          setTrackMenuMergePicker(false);
+          confirmRasterizeLayer(layerId);
+          break;
         case 'delete':
           if (isLayerLocked(effects)) {
             break;
@@ -3104,6 +3219,7 @@ function MemoEditorInner({
       activeEditor,
       activeLayerId,
       applyLayerEffectsChange,
+      confirmRasterizeLayer,
       engineState.isPlaying,
       engineState.isRecording,
       expandManualCollapsedLayer,

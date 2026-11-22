@@ -56,6 +56,7 @@ const SF_TO_ANDROID: Record<string, AndroidSymbol> = {
   folder: 'folder',
   'square.stack.3d.down.right': 'layers',
   'square.stack.3d.up': 'layers',
+  'arrow.down.to.line': 'vertical_align_bottom',
   'speaker.wave.2': 'volume_up',
   headphones: 'headphones',
   lock: 'lock',

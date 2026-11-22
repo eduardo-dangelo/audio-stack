@@ -13,7 +13,11 @@ import {
   mergeLayerEffects,
   type LayerEffectsChange,
 } from '@/src/audio/layerEffects';
-import { renderLayersMix, renderMemoForShare } from '@/src/audio/memoExport';
+import {
+  renderLayerForRasterize,
+  renderLayersMix,
+  renderMemoForShare,
+} from '@/src/audio/memoExport';
 import {
   buildMergedLayerLabel,
   resolveMergeSurvivor,
@@ -1404,6 +1408,89 @@ export async function mergeLayers(
       }
     }
     memo.layers = memo.layers.filter((entry) => !removeIds.has(entry.id));
+
+    updateMemoTimeline(memo);
+    normalizeLoopRegion(memo, memo.duration);
+    memo.updatedAt = new Date().toISOString();
+    writeManifest(memo);
+    return memo;
+  } finally {
+    if (temp.exists) {
+      temp.delete();
+    }
+  }
+}
+
+/**
+ * Bakes a layer’s audible FX into its media file, then resets bakeable effects
+ * while preserving mute/solo/lock and timeline placement.
+ */
+export async function rasterizeLayer(
+  memoId: string,
+  layerId: string
+): Promise<Memo> {
+  const memo = await getMemo(memoId);
+  if (!memo) {
+    throw new Error('Memo not found');
+  }
+
+  const layer = memo.layers.find((entry) => entry.id === layerId);
+  if (!layer || layer.duration <= 0) {
+    throw new Error('Track not found.');
+  }
+
+  const priorEffects = getLayerEffects(layer);
+  const previousMuted = Boolean(priorEffects.muted);
+  const previousSolo = Boolean(priorEffects.solo);
+  const previousLocked = Boolean(priorEffects.locked);
+  const previousStartTime = layer.startTime;
+
+  const rendered = await renderLayerForRasterize(memo, layerId);
+  const temp = new File(Paths.cache, `rasterize-${memo.id}-${Date.now()}.wav`);
+  if (temp.exists) {
+    temp.delete();
+  }
+  writeAudioBufferToWavFile(rendered, temp.uri);
+
+  try {
+    const liveLayer = memo.layers.find((entry) => entry.id === layerId);
+    if (!liveLayer) {
+      throw new Error('Track not found.');
+    }
+
+    const previousFileName = liveLayer.fileName;
+    alignLayerFileNameWithSource(liveLayer, temp.uri);
+
+    if (previousFileName !== liveLayer.fileName) {
+      const oldFile = requireLayerFile(memoId, previousFileName);
+      if (oldFile.exists) {
+        oldFile.delete();
+      }
+    }
+
+    const dest = requireLayerFile(memoId, liveLayer.fileName);
+    if (dest.exists) {
+      dest.delete();
+    }
+    await temp.copy(dest);
+
+    const peakCount = peakCountForDuration(rendered.duration);
+    const waveformPeaks = computeWaveformPeaksFromChannelData(
+      rendered.getChannelData(0),
+      peakCount
+    );
+    await refreshLayerFromFile(memo, liveLayer, undefined, {
+      duration: rendered.duration,
+      waveformPeaks,
+    });
+    liveLayer.startTime = previousStartTime;
+    liveLayer.effects = {
+      ...createDefaultLayerEffects(liveLayer.duration),
+      muted: previousMuted,
+      solo: previousSolo,
+      locked: previousLocked,
+    };
+    normalizeLayerLoopUntil(liveLayer);
 
     updateMemoTimeline(memo);
     normalizeLoopRegion(memo, memo.duration);

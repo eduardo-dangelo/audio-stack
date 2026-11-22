@@ -9,6 +9,7 @@ import {
 import { schedulePathFades } from '@/src/audio/fadeCurve';
 import {
   clearReverbIrCache,
+  getDelayTimeSec,
   isDelayPathActive,
   isReverbPathActive,
   type LayerEffectPathNodes,
@@ -20,6 +21,7 @@ import { MemoMixGraph } from '@/src/audio/memoMixGraph';
 import { prepareLayersForMix } from '@/src/audio/mergeLayersLogic';
 import {
   buildLayerPlaybackPlans,
+  type BuildLayerPlaybackPlansOptions,
   getLayerEffectsForPlayback,
   getMemoExportBounds,
   PLAYBACK_END_TOLERANCE,
@@ -92,9 +94,45 @@ function schedulePathSource(
   return source;
 }
 
+/** Extra render time so delay/reverb tails are not truncated when baking FX. */
+function rasterizeWetTailSec(effects: LayerEffects): number {
+  let tail = 0;
+
+  if (isDelayPathActive(effects)) {
+    const delayTime = getDelayTimeSec(effects);
+    const feedback = Math.min(0.95, Math.max(0, effects.delay.feedback / 100));
+    const repeats =
+      feedback > 0.05
+        ? Math.min(12, Math.ceil(Math.log(0.001) / Math.log(feedback)))
+        : 1;
+    tail = Math.max(tail, delayTime * Math.max(1, repeats));
+  }
+
+  if (isReverbPathActive(effects)) {
+    const decay = Math.max(0.3, effects.reverb.decay);
+    const preset = effects.reverb.preset;
+    const presetBase =
+      preset === 'room'
+        ? 0.6
+        : preset === 'hall'
+          ? 1.8
+          : preset === 'plate' || preset === 'spring'
+            ? 1.2
+            : preset === 'chamber'
+              ? 0.9
+              : preset === 'cathedral'
+                ? 2.5
+                : 1.5;
+    tail = Math.max(tail, Math.min(3, presetBase * decay));
+  }
+
+  return Math.min(3, Math.max(0, tail));
+}
+
 async function renderLayersOffline(
   layers: LoadedLayer[],
-  bounds: { start: number; end: number }
+  bounds: { start: number; end: number },
+  planOptions?: BuildLayerPlaybackPlansOptions
 ): Promise<AudioBuffer> {
   const exportDuration = bounds.end - bounds.start;
 
@@ -121,7 +159,13 @@ async function renderLayersOffline(
       }))
     );
 
-    const planSpecs = buildLayerPlaybackPlans(layers, bounds.start, bounds.end);
+    const planSpecs = buildLayerPlaybackPlans(
+      layers,
+      bounds.start,
+      bounds.end,
+      undefined,
+      planOptions
+    );
     const resolvedPlans: ResolvedPlaybackPlan[] = [];
 
     for (const plan of planSpecs) {
@@ -236,6 +280,50 @@ export async function renderLayersMix(
       : { start: 0, end: duration };
 
   return renderLayersOffline(layers, bounds);
+}
+
+/**
+ * Offline-renders one layer’s audible FX into a stereo buffer covering the keep
+ * region plus a short wet tail when reverb/delay is active.
+ */
+export async function renderLayerForRasterize(
+  memo: Memo,
+  layerId: string
+): Promise<AudioBuffer> {
+  if (!hasRecording(memo)) {
+    throw new Error('This memo has no recorded audio.');
+  }
+
+  const timeline = getMemoPlaybackTimeline(memo);
+  // One keep-region pass only — drop loopUntil so wet-tail bounds do not expand cycles.
+  const layers = prepareLayersForMix(timeline.layers, {
+    layerIds: [layerId],
+    forceAudible: true,
+  }).map(({ loopUntil: _loopUntil, ...layer }) => layer);
+
+  const layer = layers[0];
+  if (!layer || layer.duration <= 0) {
+    throw new Error('Track not found.');
+  }
+
+  const effects = getLayerEffectsForPlayback(layer);
+  const trimOut = Math.min(effects.trimOut, layer.duration);
+  const trimIn = Math.min(
+    effects.trimIn,
+    Math.max(0, trimOut - PLAYBACK_END_TOLERANCE)
+  );
+  if (trimOut - trimIn <= PLAYBACK_END_TOLERANCE) {
+    throw new Error('Nothing to rasterize in the selected range.');
+  }
+
+  const keepStart = layer.startTime + trimIn;
+  const keepEnd = layer.startTime + trimOut;
+  const bounds = {
+    start: keepStart,
+    end: keepEnd + rasterizeWetTailSec(effects),
+  };
+
+  return renderLayersOffline(layers, bounds, { expandLoopCycles: false });
 }
 
 export async function renderMemoForShare(

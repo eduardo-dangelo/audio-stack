@@ -431,6 +431,41 @@ export function hasActivePitch(
   return Math.abs(effects.pitchSemitones) >= PITCH_ACTIVE_EPSILON;
 }
 
+const BAKEABLE_TRIM_EPSILON = 0.05;
+
+/** True when Rasterize would bake non-default volume/pan/pitch/eq/reverb/delay/fades/trim. */
+export function hasBakeableLayerEffects(
+  effects: LayerEffects,
+  layerDuration: number
+): boolean {
+  if (effects.volumeDb !== 0) {
+    return true;
+  }
+  if (hasActivePan(effects)) {
+    return true;
+  }
+  if (hasActivePitch(effects)) {
+    return true;
+  }
+  if (hasActiveEq(effects)) {
+    return true;
+  }
+  if (hasActiveReverb(effects)) {
+    return true;
+  }
+  if (hasActiveDelay(effects)) {
+    return true;
+  }
+  if (hasActiveFade(effects)) {
+    return true;
+  }
+  if (effects.trimIn > BAKEABLE_TRIM_EPSILON) {
+    return true;
+  }
+  const trimOut = Math.min(effects.trimOut, Math.max(0, layerDuration));
+  return trimOut < layerDuration - BAKEABLE_TRIM_EPSILON;
+}
+
 /** Cents for react-native-audio-api `detune` when pitchCorrection is on. */
 export function pitchSemitonesToDetuneCents(semitones: number): number {
   return clampPitchSemitones(semitones) * 100;

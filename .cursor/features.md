@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Rasterize layer
+- Status: evolving
+- What: Per-track Rasterize bakes volume/pan/pitch/EQ/reverb/delay/fades/trim into the layer WAV, then resets those FX while keeping mute/solo/lock and startTime.
+- Paths: `src/audio/memoExport.ts`, `src/storage/memoStore.ts`, `src/components/MemoEditor.tsx`, `src/audio/layerEffects.ts`
+- Invariants: Offline bounce uses keep-region bounds plus wet tail; FX reset via `createDefaultLayerEffects` with mute/solo/lock restored; locked or no-bakeable layers hide the menu item; Plus+ gated like merge (`canUseMerge` / `requestUpgrade('merge')`); iOS + Android.
+- Updated: 2026-11-22
+
 ### Android status notifications
 - Status: evolving
 - What: Android maps the shared Live Activity controller to ongoing FGS shade notifications (recording + MediaStyle playback) via react-native-audio-api.
