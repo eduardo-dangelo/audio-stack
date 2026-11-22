@@ -6,6 +6,7 @@ import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useR
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Modal,
   Platform,
   Pressable,
@@ -4327,6 +4328,20 @@ function MemoEditorInner({
     const unsubscribe = navigation.addListener('blur', resetLayoutReady);
     return unsubscribe;
   }, [navigation, resetLayoutReady]);
+
+  // Keep decoded PCM warm while the editor is open and the app is foregrounded
+  // so pause → play does not wait on a cold 45s idle eviction.
+  useEffect(() => {
+    const syncKeepWarm = (appState = AppState.currentState) => {
+      engine.setEditorPlaybackKeepWarm(appState === 'active');
+    };
+    syncKeepWarm();
+    const subscription = AppState.addEventListener('change', syncKeepWarm);
+    return () => {
+      subscription.remove();
+      engine.setEditorPlaybackKeepWarm(false);
+    };
+  }, [engine]);
 
   useEffect(() => {
     const generation = ++loadGenerationRef.current;

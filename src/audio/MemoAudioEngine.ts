@@ -164,6 +164,11 @@ const CANCEL_PREPARE_JOIN_TIMEOUT_MS = 2000;
  */
 const LAYER_PCM_IDLE_EVICT_MS = 45_000;
 /**
+ * Cap parallel full-stem decode for warm/play so 6× long WAVs do not spike
+ * CPU/RAM unboundedly (Jetsam risk on low-end Android).
+ */
+const LAYER_BUFFER_DECODE_CONCURRENCY = 3;
+/**
  * Monitor-mix only: page long WAV stems instead of full-decoding into
  * recordingPlaybackBuffers. Listen-play stays on full buffers.
  */
@@ -198,6 +203,32 @@ function recorderOutputPath(result: unknown): string | null {
     return record.paths[0].length > 0 ? record.paths[0] : null;
   }
   return null;
+}
+
+/** Run async work over items with a fixed worker pool (order-preserving results). */
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) {
+    return [];
+  }
+  const limit = Math.max(1, Math.min(concurrency, items.length));
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const runWorker = async () => {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= items.length) {
+        return;
+      }
+      results[index] = await worker(items[index]!, index);
+    }
+  };
+  await Promise.all(Array.from({ length: limit }, () => runWorker()));
+  return results;
 }
 
 function assertRecordingFilePresent(path: string): void {
@@ -376,6 +407,11 @@ export class MemoAudioEngine {
   private pcmPageCache = new LayerPcmPageCache();
   /** Clears decoded PCM after a long pause (see LAYER_PCM_IDLE_EVICT_MS). */
   private pcmIdleEvictTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * When true (MemoEditor focused + app active), skip idle PCM eviction so
+   * pause → play stays warm. Cleared on editor unmount / background.
+   */
+  private editorPlaybackKeepWarm = false;
   private playInFlight: Promise<void> | null = null;
   /** Request id that owns `playInFlight`; used so pause-cancelled plays are not coalesced. */
   private playInFlightRequestId = 0;
@@ -2705,6 +2741,7 @@ export class MemoAudioEngine {
   /**
    * Best-effort background decode of audible layers so Play is near-instant.
    * Cancelled on unload / new load / record arm. Does not run after idle eviction.
+   * Decodes with limited concurrency (shared inflight dedupe with play).
    */
   async warmPlaybackBuffers(): Promise<void> {
     if (
@@ -2726,25 +2763,44 @@ export class MemoAudioEngine {
         return;
       }
       const anySoloActive = this.getAnySoloActive();
-      for (const layer of this.loadedLayers) {
-        if (gen !== this.warmGeneration || this.state.isRecording) {
-          return;
-        }
+      const layersToWarm = this.loadedLayers.filter((layer) => {
         if (layer.duration <= 0) {
-          continue;
+          return false;
         }
         if (!isLayerAudible(this.getLoadedLayerEffects(layer), anySoloActive)) {
-          continue;
+          return false;
         }
-        if (this.getCachedPlaybackBuffer(layer)) {
-          continue;
+        return !this.getCachedPlaybackBuffer(layer);
+      });
+      await mapWithConcurrency(
+        layersToWarm,
+        LAYER_BUFFER_DECODE_CONCURRENCY,
+        async (layer) => {
+          if (gen !== this.warmGeneration || this.state.isRecording) {
+            return;
+          }
+          await this.getLayerBuffer(context, layer);
         }
-        await this.getLayerBuffer(context, layer);
-      }
+      );
     } catch (error) {
       if (__DEV__) {
         console.warn('[audio] warmPlaybackBuffers failed', error);
       }
+    }
+  }
+
+  /**
+   * MemoEditor focus keep-warm: while true, pause does not schedule the 45s PCM
+   * idle eviction. Cleared on editor unmount or when the app leaves foreground.
+   */
+  setEditorPlaybackKeepWarm(enabled: boolean): void {
+    this.editorPlaybackKeepWarm = enabled;
+    if (enabled) {
+      this.cancelPcmIdleEvict();
+      return;
+    }
+    if (!this.state.isPlaying && !this.state.isRecording) {
+      this.schedulePcmIdleEvict();
     }
   }
 
@@ -2762,6 +2818,7 @@ export class MemoAudioEngine {
   private schedulePcmIdleEvict(): void {
     this.cancelPcmIdleEvict();
     if (
+      this.editorPlaybackKeepWarm ||
       this.state.isPlaying ||
       this.state.isRecording ||
       this.recordingPrepared ||
@@ -2779,6 +2836,7 @@ export class MemoAudioEngine {
 
   private evictIdleDecodedPcm(): void {
     if (
+      this.editorPlaybackKeepWarm ||
       this.state.isPlaying ||
       this.state.isRecording ||
       this.recordingPrepared ||
@@ -4214,6 +4272,7 @@ export class MemoAudioEngine {
 
   unload(): void {
     this.cancelPlaybackWarm();
+    this.editorPlaybackKeepWarm = false;
     this.cancelPcmIdleEvict();
     this.stopPlayback();
     this.loadedLayers = [];
@@ -5493,23 +5552,45 @@ export class MemoAudioEngine {
       // Full-decode audible layers only for listen-play. Inaudible (muted /
       // soloed-out) stay cold until unmute → requestEnsureAudibleLayerBuffers.
       // Monitor-mix may page long WAVs separately during record warmup.
+      // Limited parallel decode (shared inflight with warmPlaybackBuffers).
       const preloadedBuffers = new Map<string, AudioBuffer>();
-      for (const layer of layersToDecode) {
-        if (this.playRequestAbandoned(requestId, sessionId)) {
-          return;
-        }
-        const buffer = await this.getLayerBuffer(context, layer);
-        if (!this.bufferMatchesContextRate(buffer, context)) {
-          if (__DEV__) {
-            console.warn(
-              `[MemoAudioEngine] decoded buffer rate ${Math.round(buffer.sampleRate)} Hz ` +
-                `!= context ${Math.round(context.sampleRate)} Hz for ${layer.id}`
-            );
+      let preloadFailed = false;
+      let decodedCount = 0;
+      await mapWithConcurrency(
+        layersToDecode,
+        LAYER_BUFFER_DECODE_CONCURRENCY,
+        async (layer) => {
+          if (preloadFailed || this.playRequestAbandoned(requestId, sessionId)) {
+            return;
           }
-          this.abortFailedPlaybackStart(requestId, startAt);
-          return;
+          const buffer = await this.getLayerBuffer(context, layer);
+          if (preloadFailed || this.playRequestAbandoned(requestId, sessionId)) {
+            return;
+          }
+          if (!this.bufferMatchesContextRate(buffer, context)) {
+            if (__DEV__) {
+              console.warn(
+                `[MemoAudioEngine] decoded buffer rate ${Math.round(buffer.sampleRate)} Hz ` +
+                  `!= context ${Math.round(context.sampleRate)} Hz for ${layer.id}`
+              );
+            }
+            preloadFailed = true;
+            return;
+          }
+          preloadedBuffers.set(layer.path, buffer);
+          decodedCount += 1;
         }
-        preloadedBuffers.set(layer.path, buffer);
+      );
+      if (preloadFailed) {
+        this.abortFailedPlaybackStart(requestId, startAt);
+        return;
+      }
+      if (this.playRequestAbandoned(requestId, sessionId)) {
+        return;
+      }
+      if (decodedCount < layersToDecode.length) {
+        this.abortFailedPlaybackStart(requestId, startAt);
+        return;
       }
 
       if (__DEV__) {

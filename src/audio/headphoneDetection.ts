@@ -141,6 +141,12 @@ export async function isSealedHeadphonesConnected(): Promise<boolean> {
 // Unlock / Live Activity allow prompts fire ConfigurationChange without a real unplug.
 const DISCONNECT_ROUTE_REASONS = new Set(['OldDeviceUnavailable']);
 
+/**
+ * Cancel live monitor-mix takes when headphones are truly gone.
+ * iOS: OldDeviceUnavailable (+ AppState re-check).
+ * Android: no AppState cancel — availableOutputs often looks headphone-less after
+ * lock/unlock and would discard the take; engine already continues on route churn.
+ */
 export function subscribeHeadphoneDisconnect(onDisconnect: () => void): () => void {
   const checkDisconnected = () => {
     void isHeadphonesConnected().then((connected) => {
@@ -157,16 +163,19 @@ export function subscribeHeadphoneDisconnect(onDisconnect: () => void): () => vo
     checkDisconnected();
   });
 
-  // Android may not emit routeChange on unplug — re-check when returning to foreground.
-  const appSub = AppState.addEventListener('change', (state) => {
-    if (state === 'active') {
-      checkDisconnected();
-    }
-  });
+  // iOS only — Android AppState resume false-positives destroy stack takes.
+  let appSub: { remove: () => void } | undefined;
+  if (Platform.OS !== 'android') {
+    appSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        checkDisconnected();
+      }
+    });
+  }
 
   return () => {
     subscription?.remove();
-    appSub.remove();
+    appSub?.remove();
   };
 }
 

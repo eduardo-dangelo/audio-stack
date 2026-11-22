@@ -6,6 +6,20 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Android status notifications
+- Status: evolving
+- What: Android maps the shared Live Activity controller to ongoing FGS shade notifications (recording + MediaStyle playback) via react-native-audio-api.
+- Paths: `src/widgets/RecordingLiveActivity.android.tsx`, `src/widgets/androidStatusNotifications.ts`, `src/widgets/recordingLiveActivityController.ts`, `src/recording/resumeActiveRecording.ts`
+- Invariants: Recording and playback both use MediaStyle PlaybackNotificationManager (RecordingNotificationManager custom RemoteViews is unreliable; hide still best-effort); recording chrome is status-only (all transport controls disabled); end/start is generation-guarded and recording start awaits prior end; playback notification actions drive MemoAudioEngine only in playback mode; POST_NOTIFICATIONS before first show on API 33+; tap → launcher + AppState resume to active recording/playing memo; iOS ActivityKit unchanged; home-screen widgets out of scope on SDK 56.
+- Updated: 2026-11-22
+
+### Faster large-memo play (Phase 1 keep-warm)
+- Status: evolving
+- What: Parallel limited-concurrency stem decode for warm/play; keep decoded PCM warm while MemoEditor is focused and the app is foregrounded.
+- Paths: `src/audio/MemoAudioEngine.ts`, `src/components/MemoEditor.tsx`
+- Invariants: Warm/play decode concurrency capped at 3 with shared inflight dedupe; `setEditorPlaybackKeepWarm(true)` skips 45s idle PCM eviction (cleared on editor unmount, AppState background, unload); listen-play still full-decodes (paging deferred); spinner UX unchanged.
+- Updated: 2026-11-20
+
 ### Android timeline edit vs playhead follow
 - Status: evolving
 - What: Freeze Android translateX playhead-follow during fade/trim/move/loop gestures; coalesce setMemo and defer mid-play fade/trim AudioParam reschedule until release.
@@ -135,9 +149,9 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 ### Android headphone detection
 - Status: evolving
 - What: Normalize Android `availableOutputs` type strings (and iOS categories) so wired/BT unlock metronome clicks and skip the stack headphones warning.
-- Paths: `src/audio/headphoneDetection.ts`, `src/audio/audioInputRouting.ts`
-- Invariants: Android uses `availableOutputs` + type→category map (`currentOutputs` empty); `some(headphone)` not speaker-only; AppState + 2s Android poll; route snapshot prefers BuiltInMic when `currentInputs` empty and HFP only from primary categories; `ALLOW_METRONOME_WITHOUT_HEADPHONES` stays false.
-- Updated: 2026-11-11
+- Paths: `src/audio/headphoneDetection.ts`, `src/audio/audioInputRouting.ts`, `src/components/MemoEditor.tsx`
+- Invariants: Android uses `availableOutputs` + type→category map (`currentOutputs` empty); `some(headphone)` not speaker-only; AppState + 2s Android poll for UI route state; `subscribeHeadphoneDisconnect` does **not** cancel on Android AppState resume (false unplug after lock/unlock); iOS cancel remains `OldDeviceUnavailable` (+ AppState); route snapshot prefers BuiltInMic when `currentInputs` empty and HFP only from primary categories; `ALLOW_METRONOME_WITHOUT_HEADPHONES` stays false.
+- Updated: 2026-11-22
 
 ### Android Material buttons
 - Status: evolving
@@ -157,8 +171,8 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: Expo Android platform config + stubs so a debug APK can launch beside the existing iOS app.
 - Paths: `app.json`, `src/utils/showActionSheet.ts`, `src/widgets/RecordingLiveActivity.android.tsx`, `src/actions/shareMemo.ts`, `assets/images/icon.png`, `assets/images/android-icon-foreground.png`, `assets/images/android-icon-background.png`, `assets/images/android-icon-monochrome.png`
-- Invariants: iOS StoreKit/Live Activities unchanged; Android uses Alert sheets; multi-share/stamp remain iOS-only (M4A encode + `.aud`/`.vmp` import are available on Android — see Cumulative export + Android M4A / Android .aud import); Live Activity is a no-op on Android; Android launcher adaptive icons use the headphones + waveform mark (same as iOS/landing, not red Expo placeholders); foreground mark stays inside ~56% safe zone on transparent FG over `#D3D3D3` BG; `expo prebuild --platform android` required after icon asset changes before rebuild.
-- Updated: 2026-11-19
+- Invariants: iOS StoreKit/Live Activities unchanged; Android uses Alert sheets; multi-share/stamp remain iOS-only (M4A encode + `.aud`/`.vmp` import are available on Android — see Cumulative export + Android M4A / Android .aud import); Android Live Activity stub maps to FGS status notifications (see Android status notifications); Android launcher adaptive icons use the headphones + waveform mark (same as iOS/landing, not red Expo placeholders); foreground mark stays inside ~56% safe zone on transparent FG over `#D3D3D3` BG; `expo prebuild --platform android` required after icon asset changes before rebuild.
+- Updated: 2026-11-22
 
 ### Landing brand icon
 - Status: evolving

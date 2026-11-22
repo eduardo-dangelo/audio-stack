@@ -94,12 +94,22 @@ export async function endMemoLiveActivity(): Promise<void> {
 }
 
 export function startRecordingLiveActivity(session: ActiveRecordingSession): void {
+  void startRecordingLiveActivityAsync(session);
+}
+
+async function startRecordingLiveActivityAsync(
+  session: ActiveRecordingSession
+): Promise<void> {
   try {
-    void endMemoLiveActivity();
+    // Await end so a late hide cannot wipe the new recording notification (Android).
+    await endMemoLiveActivity();
 
     const sessionWithStart = ensureSessionRecordingStartedAt(session);
     const props = buildRecordingProps(sessionWithStart);
-    instance = RecordingActivity.start(props, memoDeepLink(sessionWithStart.memoId));
+    instance = RecordingActivity.start(
+      props,
+      memoDeepLink(sessionWithStart.memoId)
+    );
   } catch (error) {
     instance = null;
     if (__DEV__) {

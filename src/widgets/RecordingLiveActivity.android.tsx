@@ -1,3 +1,9 @@
+import {
+  beginAndroidStatusNotificationGeneration,
+  hideAndroidStatusNotification,
+  showAndroidStatusNotification,
+} from './androidStatusNotifications';
+
 export type RecordingActivityProps = {
   memoId: string;
   memoTitle: string;
@@ -11,25 +17,43 @@ export type RecordingActivityProps = {
   trackColor: string | null;
 };
 
-type StubLiveActivity = {
+type AndroidLiveActivity = {
   end: (_dismissal: 'immediate' | string) => Promise<void>;
-  update: (_props: RecordingActivityProps) => Promise<void>;
+  update: (props: RecordingActivityProps) => Promise<void>;
 };
 
-function createStubActivity(): StubLiveActivity {
-  return {
-    end: async () => {},
-    update: async () => {},
-  };
-}
+let active: AndroidLiveActivity | null = null;
 
-/** Android has no ActivityKit; keep the Live Activity API surface as no-ops. */
+/**
+ * Android has no ActivityKit. Map the Live Activity API surface to ongoing
+ * foreground-service notifications via Recording/PlaybackNotificationManager.
+ */
 const RecordingActivity = {
-  start(_props: RecordingActivityProps, _url?: string): StubLiveActivity {
-    return createStubActivity();
+  start(props: RecordingActivityProps, _url?: string): AndroidLiveActivity {
+    const generation = beginAndroidStatusNotificationGeneration();
+    void showAndroidStatusNotification(props, generation);
+
+    const handle: AndroidLiveActivity = {
+      update: async (next) => {
+        if (active !== handle) {
+          return;
+        }
+        await showAndroidStatusNotification(next, generation);
+      },
+      end: async () => {
+        if (active === handle) {
+          active = null;
+        }
+        // Only hide if this generation is still current — avoids wiping a newer show.
+        await hideAndroidStatusNotification(generation);
+      },
+    };
+
+    active = handle;
+    return handle;
   },
-  getInstances(): StubLiveActivity[] {
-    return [];
+  getInstances(): AndroidLiveActivity[] {
+    return active ? [active] : [];
   },
 };
 
