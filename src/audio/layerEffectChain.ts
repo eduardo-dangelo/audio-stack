@@ -32,9 +32,11 @@ export type LayerReverbNodes = {
   reverbWet: GainNode;
 };
 
-const DELAY_MAX_CAP_SEC = 2;
-const DELAY_HEADROOM_SEC = 0.05;
-const DELAY_MIN_MAX_SEC = 0.05;
+/** Fixed DelayNode max on construction — avoids mid-play recreate when time grows. */
+export const DELAY_MAX_CAP_SEC = 2;
+export const DELAY_PARAM_EPSILON = 1e-4;
+const PATH_GAIN_EPSILON = 1e-4;
+const PATH_PAN_EPSILON = 1e-4;
 
 const REVERB_DURATION: Record<Exclude<ReverbPreset, 'off' | 'custom'>, number> = {
   room: 0.6,
@@ -47,8 +49,8 @@ const REVERB_DURATION: Record<Exclude<ReverbPreset, 'off' | 'custom'>, number> =
 
 /** iOS keeps 80ms; Android commits decay IR after ~300ms idle to cut FFT/thread churn. */
 const REVERB_IR_THROTTLE_MS = Platform.OS === 'android' ? 300 : 80;
-/** Android: hard cap IR length (cathedral default was 2.5×2.5=6.25s). */
-const ANDROID_REVERB_IR_MAX_SEC = 2.5;
+/** Android: hard cap IR length (cathedral default was 2.5×2.5=6.25s; 2.5s still crackled). */
+const ANDROID_REVERB_IR_MAX_SEC = 1.2;
 /** Cap IR buffers so scrubbing decay cannot grow RAM unboundedly. */
 const REVERB_IR_CACHE_MAX = 16;
 
@@ -85,8 +87,9 @@ export function isReverbPathPresent(effects: LayerEffects): boolean {
 }
 
 export function delayBusKey(effects: LayerEffects): string {
-  const { preset, sync, timeMs, feedback } = effects.delay;
-  return `${preset}:${sync}:${timeMs}:${feedback}`;
+  // Feedback is applied in place — omit from key to avoid scrub rekeys.
+  const { preset, sync, timeMs } = effects.delay;
+  return `${preset}:${sync}:${timeMs}`;
 }
 
 /** Android quantizes decay to 0.1 so slider drags regenerate fewer IRs. */
@@ -114,12 +117,9 @@ export function getDelayTimeSec(effects: LayerEffects): number {
     : syncDelayTimeMs(effects.delay.sync) / 1000;
 }
 
-/** Max delay buffer size for createDelay (fixed at construction). */
-export function requiredDelayMaxSec(effects: LayerEffects): number {
-  return Math.min(
-    DELAY_MAX_CAP_SEC,
-    Math.max(DELAY_MIN_MAX_SEC, getDelayTimeSec(effects) + DELAY_HEADROOM_SEC)
-  );
+/** DelayNode construction size — always the cap so mid-play time changes never recreate. */
+export function requiredDelayMaxSec(_effects?: LayerEffects): number {
+  return DELAY_MAX_CAP_SEC;
 }
 
 function createImpulseResponse(
@@ -223,10 +223,37 @@ function assignReverbImpulse(
   lastReverbIrSyncAt.set(convolver, Date.now());
 }
 
+export type SyncReverbConvolverOptions = {
+  /**
+   * Android: when swapping IR while wet is already audible, mute this send
+   * before assign. Caller (or pending timeout) restores mix afterward.
+   */
+  duckSend?: GainNode;
+  /** Mix to restore after a throttled/pending ducked assign. */
+  restoreMix?: number;
+  restoreRampSec?: number;
+};
+
+function duckSendIfAudible(
+  duckSend: GainNode | undefined,
+  context: AudioContext
+): boolean {
+  if (!duckSend || Platform.OS !== 'android') {
+    return false;
+  }
+  const current = typeof duckSend.gain.value === 'number' ? duckSend.gain.value : 0;
+  if (current <= 0.001) {
+    return false;
+  }
+  setAudioParamValue(duckSend.gain, 0, context.currentTime);
+  return true;
+}
+
 export function syncReverbConvolver(
   nodes: LayerReverbNodes,
   effects: LayerEffects,
-  context: AudioContext
+  context: AudioContext,
+  options?: SyncReverbConvolverOptions
 ): void {
   const { preset, decay } = effects.reverb;
   if (preset === 'off') {
@@ -238,6 +265,9 @@ export function syncReverbConvolver(
   const previousKey = lastReverbIrKey.get(convolver);
   const previousPreset = lastReverbPreset.get(convolver);
   const presetChanged = previousPreset !== preset;
+  const duckSend = options?.duckSend;
+  const restoreMix = options?.restoreMix;
+  const restoreRampSec = options?.restoreRampSec ?? 0.008;
 
   if (previousKey === key) {
     const pending = pendingReverbIrSync.get(convolver);
@@ -259,7 +289,18 @@ export function syncReverbConvolver(
       convolver,
       setTimeout(() => {
         pendingReverbIrSync.delete(convolver);
+        const ducked = duckSendIfAudible(duckSend, context);
         assignReverbImpulse(convolver, preset, decay, context);
+        if (
+          ducked &&
+          duckSend &&
+          typeof restoreMix === 'number' &&
+          restoreMix > 0
+        ) {
+          setAudioParamValue(duckSend.gain, restoreMix, context.currentTime, {
+            rampSec: restoreRampSec,
+          });
+        }
       }, REVERB_IR_THROTTLE_MS - (nowMs - lastSyncAt))
     );
     return;
@@ -270,6 +311,7 @@ export function syncReverbConvolver(
     clearTimeout(pending);
     pendingReverbIrSync.delete(convolver);
   }
+  duckSendIfAudible(duckSend, context);
   assignReverbImpulse(convolver, preset, decay, context);
 }
 
@@ -315,21 +357,47 @@ export function applyPathInputEffects(
   anySoloActive: boolean
 ): void {
   const now = context.currentTime;
-  setAudioParamValue(
-    path.gain.gain,
-    isLayerAudible(effects, anySoloActive) ? dbToLinear(effects.volumeDb) : 0,
-    now
-  );
-  setAudioParamValue(path.panner.pan, clampPan(effects.pan), now);
+  const nextGain = isLayerAudible(effects, anySoloActive)
+    ? dbToLinear(effects.volumeDb)
+    : 0;
+  const currentGain =
+    typeof path.gain.gain.value === 'number' ? path.gain.gain.value : nextGain;
+  if (Math.abs(currentGain - nextGain) > PATH_GAIN_EPSILON) {
+    setAudioParamValue(path.gain.gain, nextGain, now);
+  }
+
+  const nextPan = clampPan(effects.pan);
+  const currentPan =
+    typeof path.panner.pan.value === 'number' ? path.panner.pan.value : nextPan;
+  if (Math.abs(currentPan - nextPan) > PATH_PAN_EPSILON) {
+    setAudioParamValue(path.panner.pan, nextPan, now);
+  }
+
   effects.eq.bands.forEach((bandDb, index) => {
     const filter = path.eqFilters[index];
     const type = effects.eq.types[index] ?? 'peaking';
     if (filter.type !== type) {
       filter.type = type;
     }
-    setAudioParamValue(filter.gain, bandDb, now);
-    setAudioParamValue(filter.frequency, effects.eq.frequencies[index], now);
-    setAudioParamValue(filter.Q, effects.eq.qFactors[index], now);
+    const currentBand =
+      typeof filter.gain.value === 'number' ? filter.gain.value : bandDb;
+    if (Math.abs(currentBand - bandDb) > PATH_GAIN_EPSILON) {
+      setAudioParamValue(filter.gain, bandDb, now);
+    }
+    const nextFreq = effects.eq.frequencies[index];
+    const currentFreq =
+      typeof filter.frequency.value === 'number'
+        ? filter.frequency.value
+        : nextFreq;
+    if (Math.abs(currentFreq - nextFreq) > 0.5) {
+      setAudioParamValue(filter.frequency, nextFreq, now);
+    }
+    const nextQ = effects.eq.qFactors[index];
+    const currentQ =
+      typeof filter.Q.value === 'number' ? filter.Q.value : nextQ;
+    if (Math.abs(currentQ - nextQ) > PATH_GAIN_EPSILON) {
+      setAudioParamValue(filter.Q, nextQ, now);
+    }
   });
 }
 

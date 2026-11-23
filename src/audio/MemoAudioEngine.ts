@@ -35,6 +35,7 @@ import {
 } from '@/src/audio/layerPcmPageCache';
 import {
   clearReverbIrCache,
+  getEffectiveReverbMix,
   getOrCreateImpulseResponse,
   isDelayPathActive,
   isReverbPathActive,
@@ -58,7 +59,10 @@ import { loadedLayerTimelineChanged } from '@/src/audio/engineLayerTimeline';
 import { runSerializedEngineLoad } from '@/src/audio/engineMemoLoadQueue';
 import { getMemoPlaybackTimeline } from '@/src/storage/paths';
 import { getMemoMetronomeSettings } from '@/src/storage/types';
-import { MemoMixGraph } from '@/src/audio/memoMixGraph';
+import {
+  ANDROID_WET_SEND_RAMP_SEC,
+  MemoMixGraph,
+} from '@/src/audio/memoMixGraph';
 import {
   playSilentMetronomePrime,
   PRECOUNT_CLICK_LEAD_SEC,
@@ -3361,6 +3365,7 @@ export class MemoAudioEngine {
   /**
    * Android: toggle delay/reverb mid-play without stopping dry sources.
    * Stop wet sources before tearing down the bus; arm after applyLayerEffects.
+   * Defers wet send until wet BufferSources start (short ramp at startWhen).
    */
   private syncAndroidWetPathsMidPlay(
     layerId: string,
@@ -3370,14 +3375,55 @@ export class MemoAudioEngine {
     if (!context || !this.state.isPlaying || this.playbackContextStartWhen <= 0) {
       return;
     }
+    const segments = this.getActiveSegmentsForLayer(layerId);
+    const wantDelay =
+      !this.layerPlaybackDryOnly && isDelayPathActive(effects);
+    const wantReverb =
+      !this.layerPlaybackDryOnly && isReverbPathActive(effects);
+    const needsArm =
+      segments.some(
+        (active) =>
+          (wantDelay && !active.hasDelay) || (wantReverb && !active.hasReverb)
+      );
+
     this.disarmInactiveWetSources(layerId, effects);
     this.mixGraph.applyLayerEffects(
       context,
       layerId,
       effects,
-      this.getAnySoloActive()
+      this.getAnySoloActive(),
+      {
+        deferWetSend: needsArm,
+        skipDryPathInputs: true,
+      }
     );
-    this.armMissingWetSources(layerId, effects);
+    const armedAt = this.armMissingWetSources(layerId, effects);
+    if (needsArm) {
+      const delayMix = wantDelay ? effects.delay.mix / 100 : 0;
+      const reverbMix = wantReverb ? getEffectiveReverbMix(effects) : 0;
+      // If arm scheduled sources, ramp from startWhen; otherwise apply mix now
+      // so send is never stuck at 0 after an early-return arm.
+      const rampAt =
+        armedAt != null ? armedAt : context.currentTime;
+      if (wantDelay) {
+        this.mixGraph.setWetSendGain(
+          layerId,
+          'delay',
+          delayMix,
+          rampAt,
+          ANDROID_WET_SEND_RAMP_SEC
+        );
+      }
+      if (wantReverb) {
+        this.mixGraph.setWetSendGain(
+          layerId,
+          'reverb',
+          reverbMix,
+          rampAt,
+          ANDROID_WET_SEND_RAMP_SEC
+        );
+      }
+    }
     for (const active of this.getActiveSegmentsForLayer(layerId)) {
       active.playbackEffects = effects;
     }
@@ -3409,25 +3455,33 @@ export class MemoAudioEngine {
     }
   }
 
-  private armMissingWetSources(layerId: string, effects: LayerEffects): void {
+  /**
+   * Arm missing wet BufferSources. Returns the earliest source startWhen when
+   * any source was scheduled, otherwise null (caller should apply send now).
+   */
+  private armMissingWetSources(
+    layerId: string,
+    effects: LayerEffects
+  ): number | null {
     const context = this.context;
     if (!context || !this.state.isPlaying || this.playbackContextStartWhen <= 0) {
-      return;
+      return null;
     }
     const wantDelay =
       !this.layerPlaybackDryOnly && isDelayPathActive(effects);
     const wantReverb =
       !this.layerPlaybackDryOnly && isReverbPathActive(effects);
     if (!wantDelay && !wantReverb) {
-      return;
+      return null;
     }
     const channel = this.mixGraph.getChannel(layerId);
     if (!channel) {
-      return;
+      return null;
     }
     const elapsed = this.getElapsedPlaybackTime(context);
-    const lead = playbackScheduleLeadSec(1);
-    const minStartWhen = context.currentTime + Math.max(0.01, lead);
+    // Single wet voice: keep lead short for snappy mid-play enable.
+    const minStartWhen = context.currentTime + 0.005;
+    let earliestStartWhen: number | null = null;
 
     for (const active of this.getActiveSegmentsForLayer(layerId)) {
       const needDelay = wantDelay && !active.hasDelay && channel.delay != null;
@@ -3499,6 +3553,7 @@ export class MemoAudioEngine {
         active.buffer = buffer;
       }
 
+      let scheduledAny = false;
       if (needDelay && channel.delay) {
         const delaySource = this.schedulePathSource(
           context,
@@ -3513,6 +3568,7 @@ export class MemoAudioEngine {
         );
         if (delaySource) {
           active.delaySources.push(delaySource);
+          scheduledAny = true;
         }
         active.hasDelay = true;
       }
@@ -3530,10 +3586,18 @@ export class MemoAudioEngine {
         );
         if (reverbSource) {
           active.reverbSources.push(reverbSource);
+          scheduledAny = true;
         }
         active.hasReverb = true;
       }
+      if (scheduledAny) {
+        earliestStartWhen =
+          earliestStartWhen == null
+            ? startWhen
+            : Math.min(earliestStartWhen, startWhen);
+      }
     }
+    return earliestStartWhen;
   }
 
   /**
@@ -3560,6 +3624,28 @@ export class MemoAudioEngine {
         continue;
       }
       getOrCreateImpulseResponse(context, reverb.preset, reverb.decay);
+    }
+  }
+
+  /**
+   * Android: prewarm IRs and ensure wet EQ paths / standby delay bus with
+   * send=0 so mid-play enable is send+arm (not build+generate).
+   */
+  prebuildAndroidWetPaths(layerId?: string): void {
+    if (Platform.OS !== 'android' || !this.context) {
+      return;
+    }
+    this.prewarmReverbImpulseResponses();
+    const context = this.context;
+    const layers = layerId
+      ? this.loadedLayers.filter((layer) => layer.id === layerId)
+      : this.loadedLayers;
+    for (const layer of layers) {
+      this.mixGraph.prebuildAndroidWetInfrastructure(
+        context,
+        layer.id,
+        this.getLoadedLayerEffects(layer)
+      );
     }
   }
 

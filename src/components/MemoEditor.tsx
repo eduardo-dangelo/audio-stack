@@ -5743,13 +5743,16 @@ function MemoEditorInner({
     }
   }, [isRecording]);
 
-  // Android: prewarm named reverb IRs when opening the reverb tool (cathedral first pick).
+  // Android: prewarm IRs + prebuild wet paths/buses when opening reverb/delay tools.
   useEffect(() => {
-    if (Platform.OS !== 'android' || activeEditor !== 'reverb') {
+    if (Platform.OS !== 'android') {
       return;
     }
-    engine.prewarmReverbImpulseResponses();
-  }, [activeEditor, engine]);
+    if (activeEditor !== 'reverb' && activeEditor !== 'delay') {
+      return;
+    }
+    engine.prebuildAndroidWetPaths(activeLayerId ?? undefined);
+  }, [activeEditor, activeLayerId, engine]);
 
   useEffect(
     () =>

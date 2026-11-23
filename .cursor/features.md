@@ -80,15 +80,15 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 - Status: evolving
 - What: Pre-release Android perf review + SM-G955F (Android 8) smoke; remaining hotspots queued post-release, not blocking if smoke stays clean.
 - Paths: `src/audio/MemoAudioEngine.ts`, `src/audio/memoMixGraph.ts`, `src/audio/layerEffectChain.ts`, `src/audio/layerPitch.ts`, `src/components/WaveformView.tsx`
-- Invariants: S1 follow-ups queued — pitch 0-crossing debounce + slider dedupe; seek/loop resync coalesce; long-term shared wet sends; S2 — fixed delay max, param diff/ramps, mute/solo/fade coalesce; smoke (2026-11-13): 3-layer play + mid-play named reverb (chamber/cathedral visible) no ANR/fatal; record live bars + stop OK; pitch hitch untested — device had **prod** install (no Settings → Dev Tier; Lite paywall); retest pitch on debug build or entitled Plus/Pro; session PSS ~0.9–1.1GB and ~35% janky frames on S8+ — monitor, not auto-block.
-- Updated: 2026-11-13
+- Invariants: S1 follow-ups queued — pitch 0-crossing debounce + slider dedupe; seek/loop resync coalesce; long-term shared wet sends; S2 shipped for wet — fixed delay max, delay/EQ param skip + short ramps; mute/solo/fade coalesce still queued; smoke (2026-11-13): 3-layer play + mid-play named reverb (chamber/cathedral visible) no ANR/fatal; record live bars + stop OK; pitch hitch untested — device had **prod** install (no Settings → Dev Tier; Lite paywall); retest pitch on debug build or entitled Plus/Pro; session PSS ~0.9–1.1GB and ~35% janky frames on S8+ — monitor, not auto-block.
+- Updated: 2026-11-23
 
 ### Android mid-play wet effects
 - Status: evolving
-- What: Android mid-play reverb/delay toggles arm wet sources without full playback resync; IR length capped to cut cathedral crackle.
+- What: Android mid-play reverb/delay arms wet sources without full resync; prebuild + fixed delay max + short arm-aligned send ramp cut crackle and slow onset.
 - Paths: `src/audio/MemoAudioEngine.ts`, `src/audio/layerEffectChain.ts`, `src/audio/memoMixGraph.ts`, `src/components/MemoEditor.tsx`
-- Invariants: Android wet on/off uses additive arm/disarm (no `resyncPlaybackAtCurrentTime`); Android keeps wet bus while preset is on (mix 0↔>0 is send-gain); Android IR duration capped at 2.5s; Android decay IR key quantized to 0.1 with ~300ms idle assign; Android wet send gain ramps ~25ms; reverb tool open prewarms named IRs; iOS keeps uncapped IR + full wet-path resync.
-- Updated: 2026-11-13
+- Invariants: Android wet on/off uses additive arm/disarm (no `resyncPlaybackAtCurrentTime`); wet EQ paths retained while preset off; DelayNode always `createDelay(2s)` (no mid-play recreate); IR duck only when send already audible (preset A→B); first enable defers send until wet `startWhen` then ~8ms ramp; reverb/delay tool open prewarms IRs + prebuilds wet infra (silent cathedral standby bus); IR capped 1.2s + decay throttle; iOS keeps uncapped IR + full wet-path resync.
+- Updated: 2026-11-23
 
 ### Precount metronome sync
 - Status: evolving

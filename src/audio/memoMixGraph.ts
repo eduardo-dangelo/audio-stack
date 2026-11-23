@@ -11,6 +11,8 @@ import {
   applyPathInputEffects,
   buildInputEqPath,
   clearPendingReverbIrSync,
+  DELAY_MAX_CAP_SEC,
+  DELAY_PARAM_EPSILON,
   delayBusKey,
   getDelayTimeSec,
   getEffectiveReverbMix,
@@ -19,16 +21,18 @@ import {
   isReverbPathActive,
   isReverbPathPresent,
   reverbBusKey,
-  requiredDelayMaxSec,
   setAudioParamValue,
   syncReverbConvolver,
   type LayerEffectPathNodes,
   type LayerReverbNodes,
 } from '@/src/audio/layerEffectChain';
-import type { LayerEffects } from '@/src/audio/layerEffects';
+import {
+  REVERB_PRESET_DEFAULTS,
+  type LayerEffects,
+} from '@/src/audio/layerEffects';
 
-/** Android: soft-ramp wet send so mid-play reverb/delay doesn't step in. */
-const ANDROID_WET_SEND_RAMP_SEC = 0.025;
+/** Android: short wet-send ramp once the wet BufferSource exists. */
+export const ANDROID_WET_SEND_RAMP_SEC = 0.008;
 
 type DelayBus = {
   key: string;
@@ -61,6 +65,16 @@ export type LayerChannel = {
   reverbBusKey: string | null;
 };
 
+export type ApplyLayerEffectsOptions = {
+  /** Keep wet sends at 0; caller ramps after arming wet sources. */
+  deferWetSend?: boolean;
+  /** Skip dry-path EQ/gain/pan rewrite (wet-presence-only updates). */
+  skipDryPathInputs?: boolean;
+  /** Context time for wet send automation (default: now). */
+  wetSendAtTime?: number;
+  wetSendRampSec?: number;
+};
+
 function disconnectNode(node: AudioNode): void {
   try {
     node.disconnect();
@@ -69,17 +83,43 @@ function disconnectNode(node: AudioNode): void {
   }
 }
 
-function applyDelayBusParams(bus: DelayBus, effects: LayerEffects, context: AudioContext): void {
+function applyDelayBusParams(
+  bus: DelayBus,
+  effects: LayerEffects,
+  context: AudioContext
+): void {
   const now = context.currentTime;
-  const delayTimeSec = Math.min(bus.maxDelayTime, Math.max(0, getDelayTimeSec(effects)));
-
-  setAudioParamValue(bus.delayNode.delayTime, delayTimeSec, now);
-  setAudioParamValue(
-    bus.delayFeedback.gain,
-    Math.min(0.85, Math.max(0, effects.delay.feedback / 100)),
-    now
+  const delayTimeSec = Math.min(
+    bus.maxDelayTime,
+    Math.max(0, getDelayTimeSec(effects))
   );
-  setAudioParamValue(bus.wet.gain, 1, now);
+  const nextFeedback = Math.min(
+    0.85,
+    Math.max(0, effects.delay.feedback / 100)
+  );
+  const rampSec = Platform.OS === 'android' ? ANDROID_WET_SEND_RAMP_SEC : 0;
+
+  const currentDelay =
+    typeof bus.delayNode.delayTime.value === 'number'
+      ? bus.delayNode.delayTime.value
+      : delayTimeSec;
+  if (Math.abs(currentDelay - delayTimeSec) > DELAY_PARAM_EPSILON) {
+    setAudioParamValue(bus.delayNode.delayTime, delayTimeSec, now, { rampSec });
+  }
+
+  const currentFeedback =
+    typeof bus.delayFeedback.gain.value === 'number'
+      ? bus.delayFeedback.gain.value
+      : nextFeedback;
+  if (Math.abs(currentFeedback - nextFeedback) > DELAY_PARAM_EPSILON) {
+    setAudioParamValue(bus.delayFeedback.gain, nextFeedback, now, { rampSec });
+  }
+
+  const currentWet =
+    typeof bus.wet.gain.value === 'number' ? bus.wet.gain.value : 1;
+  if (Math.abs(currentWet - 1) > DELAY_PARAM_EPSILON) {
+    setAudioParamValue(bus.wet.gain, 1, now);
+  }
 }
 
 export class MemoMixGraph {
@@ -152,6 +192,93 @@ export class MemoMixGraph {
       this.ensureChannel(context, layer.id);
       this.applyLayerEffects(context, layer.id, layer.effects, anySoloActive);
     }
+  }
+
+  /**
+   * Android: create wet EQ paths (+ delay/reverb buses when preset is on) with
+   * send=0 so mid-play enable is mostly send+arm.
+   */
+  prebuildAndroidWetInfrastructure(
+    context: AudioContext,
+    layerId: string,
+    effects: LayerEffects
+  ): void {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+    this.bindContext(context);
+    const channel = this.ensureChannel(context, layerId);
+    const now = context.currentTime;
+
+    channel.delay = this.ensureWetPath(context, channel.delay);
+    channel.reverb = this.ensureWetPath(context, channel.reverb);
+    setAudioParamValue(channel.delay.send.gain, 0, now);
+    setAudioParamValue(channel.reverb.send.gain, 0, now);
+
+    // Standby delay bus at fixed max so first delay preset never recreates.
+    if (!channel.delayBusKey) {
+      const standbyEffects: LayerEffects = {
+        ...effects,
+        delay: {
+          ...effects.delay,
+          preset: effects.delay.preset === 'off' ? 'echo' : effects.delay.preset,
+          mix: 0,
+        },
+      };
+      const bus = this.acquireDelayBus(
+        context,
+        delayBusKey(standbyEffects),
+        standbyEffects
+      );
+      this.connectDelaySend(channel, bus);
+      channel.delayBusKey = bus.key;
+    }
+
+    if (isReverbPathPresent(effects)) {
+      this.syncReverbBus(context, channel, effects);
+      setAudioParamValue(channel.reverb.send.gain, 0, now);
+    } else {
+      this.ensureCathedralStandbyBus(context, channel, effects);
+    }
+  }
+
+  /** Silent cathedral bus so mid-play cathedral pick skips convolver.buffer assign. */
+  private ensureCathedralStandbyBus(
+    context: AudioContext,
+    channel: LayerChannel,
+    effects: LayerEffects
+  ): void {
+    if (channel.reverbBusKey || !channel.reverb) {
+      return;
+    }
+    const decay = REVERB_PRESET_DEFAULTS.cathedral.decay;
+    const standbyEffects: LayerEffects = {
+      ...effects,
+      reverb: { preset: 'cathedral', mix: 0, decay },
+    };
+    const bus = this.acquireReverbBus(
+      context,
+      this.cathedralStandbyBusKey(effects),
+      standbyEffects
+    );
+    this.connectReverbSend(channel, bus);
+    channel.reverbBusKey = bus.key;
+    setAudioParamValue(channel.reverb.send.gain, 0, context.currentTime);
+  }
+
+  setWetSendGain(
+    layerId: string,
+    kind: 'delay' | 'reverb',
+    value: number,
+    atTime: number,
+    rampSec = 0
+  ): void {
+    const channel = this.layerChannels.get(layerId);
+    const path = kind === 'delay' ? channel?.delay : channel?.reverb;
+    if (!path) {
+      return;
+    }
+    setAudioParamValue(path.send.gain, value, atTime, { rampSec });
   }
 
   private ensureChannel(context: AudioContext, layerId: string): LayerChannel {
@@ -242,7 +369,7 @@ export class MemoMixGraph {
     }
 
     const master = this.getMasterGain(context);
-    const maxDelayTime = requiredDelayMaxSec(effects);
+    const maxDelayTime = DELAY_MAX_CAP_SEC;
     const input = context.createGain();
     const delayNode = context.createDelay(maxDelayTime);
     const delayFeedback = context.createGain();
@@ -301,51 +428,6 @@ export class MemoMixGraph {
     this.delayBuses.set(nextKey, bus);
   }
 
-  private recreateDelayBus(
-    context: AudioContext,
-    previous: DelayBus,
-    key: string,
-    effects: LayerEffects
-  ): DelayBus {
-    const subscribers = previous.refCount;
-    this.delayBuses.delete(previous.key);
-    try {
-      previous.input.disconnect();
-      previous.delayNode.disconnect();
-      previous.delayFeedback.disconnect();
-      previous.wet.disconnect();
-    } catch {
-      // Already torn down.
-    }
-
-    const master = this.getMasterGain(context);
-    const maxDelayTime = requiredDelayMaxSec(effects);
-    const input = context.createGain();
-    const delayNode = context.createDelay(maxDelayTime);
-    const delayFeedback = context.createGain();
-    const wet = context.createGain();
-
-    input.connect(delayNode);
-    delayNode.connect(wet);
-    delayNode.connect(delayFeedback);
-    delayFeedback.connect(delayNode);
-    wet.connect(master);
-
-    const bus: DelayBus = {
-      key,
-      input,
-      delayNode,
-      delayFeedback,
-      wet,
-      maxDelayTime,
-      refCount: subscribers,
-    };
-
-    this.delayBuses.set(key, bus);
-    applyDelayBusParams(bus, effects, context);
-    return bus;
-  }
-
   private createReverbBusNodes(
     context: AudioContext,
     key: string,
@@ -356,6 +438,7 @@ export class MemoMixGraph {
     const wet = context.createGain();
 
     const reverbNodes: LayerReverbNodes = { reverbConvolver: convolver, reverbWet: wet };
+    // First create: send not connected yet — no duck needed.
     syncReverbConvolver(reverbNodes, effects, context);
 
     const master = this.getMasterGain(context);
@@ -435,7 +518,7 @@ export class MemoMixGraph {
   /**
    * Attach or update delay bus for a channel.
    * Updates in place when this layer is the sole subscriber (avoids scrub thrash).
-   * Moves to a new bus when diverging from a shared bus or when max delay must grow.
+   * Moves to a new bus when diverging from a shared bus.
    */
   private syncDelayBus(
     context: AudioContext,
@@ -443,7 +526,6 @@ export class MemoMixGraph {
     effects: LayerEffects
   ): void {
     const nextKey = delayBusKey(effects);
-    const neededMax = requiredDelayMaxSec(effects);
 
     if (!channel.delayBusKey) {
       const bus = this.acquireDelayBus(context, nextKey, effects);
@@ -466,14 +548,8 @@ export class MemoMixGraph {
       return;
     }
 
-    // Sole subscriber: update in place (and grow buffer if needed).
+    // Sole subscriber: update params in place (fixed max — never recreate).
     if (current.refCount === 1) {
-      if (neededMax > current.maxDelayTime) {
-        const bus = this.recreateDelayBus(context, current, nextKey, effects);
-        this.connectDelaySend(channel, bus);
-        channel.delayBusKey = nextKey;
-        return;
-      }
       applyDelayBusParams(current, effects, context);
       this.rekeyDelayBus(current, nextKey);
       channel.delayBusKey = nextKey;
@@ -509,12 +585,19 @@ export class MemoMixGraph {
 
     const current = this.reverbBuses.get(channel.reverbBusKey);
     if (current && current.refCount === 1) {
-      // Sole subscriber: update IR in place (avoids scrub thrash / node churn).
+      // Sole subscriber: update IR in place. Duck only if wet send already audible.
       const reverbNodes: LayerReverbNodes = {
         reverbConvolver: current.convolver,
         reverbWet: current.wet,
       };
-      syncReverbConvolver(reverbNodes, effects, context);
+      const restoreMix = isReverbPathActive(effects)
+        ? getEffectiveReverbMix(effects)
+        : 0;
+      syncReverbConvolver(reverbNodes, effects, context, {
+        duckSend: channel.reverb?.send,
+        restoreMix,
+        restoreRampSec: ANDROID_WET_SEND_RAMP_SEC,
+      });
       this.rekeyReverbBus(current, nextKey);
       channel.reverbBusKey = nextKey;
       return;
@@ -532,7 +615,8 @@ export class MemoMixGraph {
     context: AudioContext,
     layerId: string,
     effects: LayerEffects,
-    anySoloActive: boolean
+    anySoloActive: boolean,
+    options?: ApplyLayerEffectsOptions
   ): void {
     const channel = this.ensureChannel(context, layerId);
     const now = context.currentTime;
@@ -544,25 +628,37 @@ export class MemoMixGraph {
       ? getEffectiveReverbMix(effects)
       : 0;
 
-    applyPathInputEffects(channel.dry, effects, context, anySoloActive);
+    if (!options?.skipDryPathInputs) {
+      applyPathInputEffects(channel.dry, effects, context, anySoloActive);
+    }
     // Send-style: dry stays full; wet is additive.
     setAudioParamValue(channel.dry.dryGain.gain, 1, now);
 
+    const deferWetSend = Boolean(options?.deferWetSend);
+    const sendAt = options?.wetSendAtTime ?? now;
     const sendRampSec =
-      Platform.OS === 'android' ? ANDROID_WET_SEND_RAMP_SEC : 0;
+      options?.wetSendRampSec ??
+      (Platform.OS === 'android' ? ANDROID_WET_SEND_RAMP_SEC : 0);
 
     if (delayPresent) {
       channel.delay = this.ensureWetPath(context, channel.delay);
       applyPathInputEffects(channel.delay, effects, context, anySoloActive);
       this.syncDelayBus(context, channel, effects);
-      setAudioParamValue(channel.delay.send.gain, delayMix, now, {
-        rampSec: sendRampSec,
-      });
+      setAudioParamValue(
+        channel.delay.send.gain,
+        deferWetSend ? 0 : delayMix,
+        deferWetSend ? now : sendAt,
+        deferWetSend ? undefined : { rampSec: sendRampSec }
+      );
     } else {
       this.releaseChannelDelay(channel);
       if (channel.delay) {
-        this.teardownWetPath(channel.delay);
-        channel.delay = null;
+        setAudioParamValue(channel.delay.send.gain, 0, now);
+        // Android: keep wet EQ path for fast mid-play re-enable.
+        if (Platform.OS !== 'android') {
+          this.teardownWetPath(channel.delay);
+          channel.delay = null;
+        }
       }
     }
 
@@ -570,9 +666,22 @@ export class MemoMixGraph {
       channel.reverb = this.ensureWetPath(context, channel.reverb);
       applyPathInputEffects(channel.reverb, effects, context, anySoloActive);
       this.syncReverbBus(context, channel, effects);
-      setAudioParamValue(channel.reverb.send.gain, reverbMix, now, {
-        rampSec: sendRampSec,
-      });
+      setAudioParamValue(
+        channel.reverb.send.gain,
+        deferWetSend ? 0 : reverbMix,
+        deferWetSend ? now : sendAt,
+        deferWetSend ? undefined : { rampSec: sendRampSec }
+      );
+    } else if (Platform.OS === 'android' && channel.reverb) {
+      // Keep silent cathedral standby across preset-off applies (avoid recreate thrash).
+      const standbyKey = this.cathedralStandbyBusKey(effects);
+      setAudioParamValue(channel.reverb.send.gain, 0, now);
+      if (channel.reverbBusKey === standbyKey) {
+        // Already on standby — leave bus in place.
+      } else {
+        this.releaseChannelReverb(channel);
+        this.ensureCathedralStandbyBus(context, channel, effects);
+      }
     } else {
       this.releaseChannelReverb(channel);
       if (channel.reverb) {
@@ -580,6 +689,14 @@ export class MemoMixGraph {
         channel.reverb = null;
       }
     }
+  }
+
+  private cathedralStandbyBusKey(effects: LayerEffects): string {
+    const decay = REVERB_PRESET_DEFAULTS.cathedral.decay;
+    return reverbBusKey({
+      ...effects,
+      reverb: { preset: 'cathedral', mix: 0, decay },
+    });
   }
 
   connectSourceToPath(source: AudioNode, path: LayerEffectPathNodes): void {
