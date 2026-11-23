@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Android mic Camcorder preset
+- Status: evolving
+- What: Android Oboe capture opens with InputPreset::Camcorder instead of the default VoiceRecognition path (quieter/hissier on many devices).
+- Paths: `plugins/withAndroidBuiltinMicPin.js`
+- Invariants: `builder.setInputPreset(Camcorder)` on AudioRecorder open (marker `AUDIO_STACK_INPUT_PRESET_CAMCORDER`); keeps BuiltInMic Shared mono 44.1k pin for duplex; requires native rebuild after plugin/node_modules patch; iOS unchanged; not `Unprocessed` / `VoiceCommunication`.
+- Updated: 2026-11-23
+
 ### Rasterize layer
 - Status: evolving
 - What: Per-track Rasterize bakes volume/pan/pitch/EQ/reverb/delay/fades/trim into the layer WAV, then resets those FX while keeping mute/solo/lock and startTime.

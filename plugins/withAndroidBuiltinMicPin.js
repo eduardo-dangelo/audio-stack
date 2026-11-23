@@ -7,6 +7,9 @@
  * When a preferred device is set (duplex stack with headphones), open Shared
  * mono @ 44.1kHz so miniaudio's converter does not get Invalid argument from
  * Exclusive BuiltInMic streams.
+ *
+ * Also sets Oboe InputPreset::Camcorder so capture is not stuck on the default
+ * VoiceRecognition path (quieter / hissier on many devices).
  */
 const fs = require('fs');
 const path = require('path');
@@ -15,6 +18,10 @@ const { withDangerousMod } = require('expo/config-plugins');
 
 const MARKER = 'AUDIO_STACK_BUILTIN_MIC_PIN';
 const OPEN_STREAM_V2_MARKER = 'AUDIO_STACK_BUILTIN_MIC_PIN_V2';
+const INPUT_PRESET_MARKER = 'AUDIO_STACK_INPUT_PRESET_CAMCORDER';
+
+const INPUT_PRESET_LINE = `  // ${INPUT_PRESET_MARKER}: media capture (not default VoiceRecognition)
+  builder.setInputPreset(oboe::InputPreset::Camcorder);`;
 
 const MEDIA_SESSION_HELPERS = `
   // ${MARKER}: preferred capture device for Oboe setDeviceId
@@ -124,6 +131,7 @@ const OPEN_STREAM_V2 = `  oboe::AudioStreamBuilder builder;
       builder.setSharingMode(oboe::SharingMode::Exclusive);
     }
   }
+${INPUT_PRESET_LINE}
   builder.setDirection(oboe::Direction::Input)`;
 
 const OPEN_STREAM_ORIGINAL = `  oboe::AudioStreamBuilder builder;
@@ -192,6 +200,26 @@ function patchAudioAPIModule(projectRoot) {
   fs.writeFileSync(target, contents);
 }
 
+/** Idempotent: insert Camcorder preset on an already-V2 open-stream block. */
+function ensureCamcorderInputPreset(contents) {
+  if (contents.includes(INPUT_PRESET_MARKER)) {
+    return contents;
+  }
+  if (!contents.includes(OPEN_STREAM_V2_MARKER)) {
+    return contents;
+  }
+  const anchor = `  }\n  builder.setDirection(oboe::Direction::Input)`;
+  if (!contents.includes(anchor)) {
+    throw new Error(
+      'withAndroidBuiltinMicPin: V2 open-stream present but Camcorder insert anchor missing'
+    );
+  }
+  return contents.replace(
+    anchor,
+    `  }\n${INPUT_PRESET_LINE}\n  builder.setDirection(oboe::Direction::Input)`
+  );
+}
+
 function patchAndroidAudioRecorder(projectRoot) {
   const target = path.join(
     packageRoot(projectRoot),
@@ -203,6 +231,10 @@ function patchAndroidAudioRecorder(projectRoot) {
   let contents = fs.readFileSync(target, 'utf8');
 
   if (contents.includes(OPEN_STREAM_V2_MARKER)) {
+    const next = ensureCamcorderInputPreset(contents);
+    if (next !== contents) {
+      fs.writeFileSync(target, next);
+    }
     return;
   }
 
