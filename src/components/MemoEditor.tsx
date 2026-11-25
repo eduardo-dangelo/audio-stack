@@ -1720,14 +1720,24 @@ function MemoEditorInner({
       }
       const nextSnap =
         loopSnapToGrid !== undefined ? loopSnapToGrid : current.loopSnapToGrid;
-      setMemo({ ...current, loopStart, loopEnd, loopEnabled, loopSnapToGrid: nextSnap });
+      // Sync memoRef before setMemo so gesture-end flushCoalescedMemoSet cannot
+      // stomp a just-committed create with the pre-loop memo.
+      const next = {
+        ...current,
+        loopStart,
+        loopEnd,
+        loopEnabled,
+        loopSnapToGrid: nextSnap,
+      };
+      memoRef.current = next;
+      setMemo(next);
       engine.setLoopRegion(loopStart, loopEnd, loopEnabled);
 
       if (persistLoopTimeout.current) {
         clearTimeout(persistLoopTimeout.current);
       }
       persistLoopTimeout.current = setTimeout(() => {
-        void updateLoopRegion(current.id, loopStart, loopEnd, loopEnabled, nextSnap);
+        void updateLoopRegion(next.id, loopStart, loopEnd, loopEnabled, nextSnap);
       }, 300);
     },
     [engine]

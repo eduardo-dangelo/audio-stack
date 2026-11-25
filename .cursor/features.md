@@ -23,8 +23,8 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 ### A–B loop bar create commit
 - Status: evolving
 - What: Top A–B loop create-drag commits from the live preview on release (not Pan onFinalize translation), so Android keeps the region visible without reopen.
-- Paths: `src/components/LoopRegionBar.tsx`
-- Invariants: Create finish uses `previewRef` when span > MIN_LOOP_DURATION; never `onChange(0,0,false)` solely because finalize translation is ~0; edge resize still uses `commitEdgePreview`; tap-empty / toggle / double-tap clear unchanged.
+- Paths: `src/components/LoopRegionBar.tsx`, `src/components/MemoEditor.tsx`
+- Invariants: Create finish uses `previewRef` when span > MIN_LOOP_DURATION; never `onChange(0,0,false)` solely because finalize translation is ~0; `handleLoopChange` syncs `memoRef` before `setMemo` so gesture-end flush cannot stomp a create commit; edge resize still uses `commitEdgePreview`; tap-empty / toggle / double-tap clear unchanged.
 - Updated: 2026-11-25
 
 ### Android mic Camcorder preset
