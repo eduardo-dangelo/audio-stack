@@ -6,6 +6,20 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Paywall landscape scroll
+- Status: evolving
+- What: Paywall sheet caps to window height; only feature rows scroll so short viewports (e.g. Android tablet landscape) fit without losing CTAs.
+- Paths: `src/components/PaywallModal.tsx`
+- Invariants: Sheet title/close, tier header, and Buy/Subscribe CTA row stay fixed; feature rows scroll inside the table; manage link stays below the table; sheet `maxHeight` from window − insets − peek (Duo rail keeps clearance/height).
+- Updated: 2026-11-25
+
+### Trim/move snap caption
+- Status: evolving
+- What: Trim and move tool panels show a small `snap:` caption before the snap PresetPills.
+- Paths: `src/components/track-editor/editors/EditSnapEditor.tsx`
+- Invariants: Caption is `snap:` in secondary text before pills; shared for trim and move on iOS and Android; snap options/logic unchanged.
+- Updated: 2026-11-25
+
 ### Android AppSymbol icons
 - Status: evolving
 - What: Android renders Material Symbols in AppSymbol with font-scale lock and letter fallback; remaining SymbolView call sites use AppSymbol.

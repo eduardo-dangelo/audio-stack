@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -27,6 +28,8 @@ import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 /** Closed Duo rail: leave the status cluster on the dimmed editor, sheet full width over the rail. */
 const CLOSED_RAIL_TOP_CLEARANCE = 160;
 const CLOSED_RAIL_MIN_SHEET = 360;
+/** Bottom-sheet peek above the status bar when not in closed-rail mode. */
+const SHEET_TOP_PEEK = 24;
 
 const HEADER_HEIGHT = 52;
 const ROW_HEIGHT = 32;
@@ -198,10 +201,12 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
   const { height: windowHeight } = useWindowDimensions();
   const sideColumn = useDuoSideColumn();
   const closedRail = sideColumn.edge != null;
-  const closedRailMaxHeight = Math.max(
-    CLOSED_RAIL_MIN_SHEET,
-    windowHeight - insets.top - CLOSED_RAIL_TOP_CLEARANCE
-  );
+  const topClearance = closedRail ? CLOSED_RAIL_TOP_CLEARANCE : SHEET_TOP_PEEK;
+  const availableHeight = windowHeight - insets.top - topClearance;
+  const closedRailMaxHeight = Math.max(CLOSED_RAIL_MIN_SHEET, availableHeight);
+  // Never force a min taller than the viewport (landscape tablet).
+  const sheetMaxHeight = closedRail ? closedRailMaxHeight : availableHeight;
+  const sheetPaddingBottom = Math.max(insets.bottom, 16);
   const {
     effectiveTier,
     plusPriceLabel,
@@ -213,6 +218,18 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
     hasPlus,
     hasPro,
   } = useBilling();
+  const showManageLink = hasPro || effectiveTier === 'pro';
+  // Sheet chrome outside the feature ScrollView (title, tier header, CTAs, footer).
+  const fixedChromeReserve =
+    (reason ? 96 : 72) +
+    16 +
+    14 +
+    (HEADER_HEIGHT + 14) +
+    (CTA_HEIGHT + 20) +
+    sheetPaddingBottom +
+    (showManageLink ? 36 : 0) +
+    (purchasing ? 28 : 0);
+  const featureScrollMaxHeight = Math.max(96, sheetMaxHeight - fixedChromeReserve);
 
   const tierMeta: Record<
     TierId,
@@ -315,148 +332,122 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
     tierMeta[tier].recommended && edge === 'bottom' ? styles.tierColRecommendedBottom : null,
   ];
 
-  const comparison: ReactNode = (
-    <>
-      <View style={[styles.table, closedRail ? styles.closedRailTable : null]}>
-        {/* Header: titles + prices — padding lives on cells so column bg fills the row */}
-        <View style={[styles.row, styles.headerRow, closedRail ? styles.closedRailTightRow : null]}>
-          <View style={[styles.labelCol, styles.headerCellPad]} />
-          {TIERS.map((tier) => {
-            const titleRow = (
-              <View style={styles.tierTitleRow}>
-                {tierMeta[tier].symbol ? (
-                  <AppSymbol
-                    name={tierMeta[tier].symbol!}
-                    size={13}
-                    tintColor={tier === 'pro' ? PRO_STAR_TINT : colors.accent}
-                  />
-                ) : null}
-                <Text style={styles.tierTitle} numberOfLines={1}>
-                  {tierMeta[tier].title}
+  const tierHeader: ReactNode = (
+    <View style={[styles.row, styles.headerRow, closedRail ? styles.closedRailTightRow : null]}>
+      <View style={[styles.labelCol, styles.headerCellPad]} />
+      {TIERS.map((tier) => {
+        const titleRow = (
+          <View style={styles.tierTitleRow}>
+            {tierMeta[tier].symbol ? (
+              <AppSymbol
+                name={tierMeta[tier].symbol!}
+                size={13}
+                tintColor={tier === 'pro' ? PRO_STAR_TINT : colors.accent}
+              />
+            ) : null}
+            <Text style={styles.tierTitle} numberOfLines={1}>
+              {tierMeta[tier].title}
+            </Text>
+          </View>
+        );
+        return (
+          <View key={tier} style={[...columnTone(tier, 'top'), styles.headerCellPad]}>
+            {tier === 'pro' ? (
+              <Pressable onPress={onColumnCaptionPress} hitSlop={8}>
+                {titleRow}
+              </Pressable>
+            ) : (
+              titleRow
+            )}
+            <Text style={styles.tierPrice} numberOfLines={1}>
+              {tierMeta[tier].price}
+            </Text>
+            {tierMeta[tier].recommended ? (
+              <View style={styles.recommendedPill}>
+                <Text style={styles.recommended} numberOfLines={1}>
+                  Recommended
                 </Text>
               </View>
-            );
-            return (
-            <View key={tier} style={[...columnTone(tier, 'top'), styles.headerCellPad]}>
-              {tier === 'pro' ? (
-                <Pressable onPress={onColumnCaptionPress} hitSlop={8}>
-                  {titleRow}
-                </Pressable>
-              ) : (
-                titleRow
-              )}
-              <Text style={styles.tierPrice} numberOfLines={1}>
-                {tierMeta[tier].price}
-              </Text>
-              {tierMeta[tier].recommended ? (
-                <View style={styles.recommendedPill}>
-                  <Text style={styles.recommended} numberOfLines={1}>
-                    Recommended
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.recommendedSpacer} />
-              )}
-            </View>
-            );
-          })}
-        </View>
+            ) : (
+              <View style={styles.recommendedSpacer} />
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
 
-        {/* Feature rows */}
-        {FEATURES.map((feature, index) => {
-          const highlighted =
-            reason != null && feature.highlightReasons?.includes(reason);
-          return (
-            <View
-              key={feature.label}
-              style={[
-                styles.row,
-                closedRail ? styles.closedRailFeatureRow : styles.featureRow,
-                highlighted ? styles.featureRowActive : null,
-                index < FEATURES.length - 1 ? styles.featureRowBorder : null,
-              ]}>
-              <View style={styles.labelCol}>
-                <AppSymbol
-                  name={feature.symbol}
-                  size={12}
-                  tintColor={highlighted ? colors.accent : colors.secondaryText}
-                />
-                <Text
-                  style={[
-                    styles.featureLabel,
-                    highlighted ? styles.featureLabelHighlight : null,
-                  ]}
-                  numberOfLines={1}>
-                  {feature.label}
-                </Text>
-              </View>
-              {TIERS.map((tier) => (
-                <View key={tier} style={columnTone(tier, undefined, highlighted)}>
-                  <FeatureCell
-                    value={cellValue(tier, feature)}
-                    styles={styles}
-                    colors={colors}
-                  />
-                </View>
-              ))}
-            </View>
-          );
-        })}
-
-        {/* CTA row — padding on cells so column bg fills the row */}
-        <View style={[styles.row, styles.ctaRow, closedRail ? styles.closedRailTightRow : null]}>
-          <View style={[styles.labelCol, styles.ctaCellPad]} />
-          {TIERS.map((tier) => {
-            const cta = ctaFor(tier);
-            return (
-              <View key={tier} style={[...columnTone(tier, 'bottom'), styles.ctaCellPad]}>
-                {cta.kind === 'action' ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={purchasing}
-                    onPress={cta.onPress}
-                    style={({ pressed }) => [
-                      styles.cta,
-                      pressed ? styles.ctaPressed : null,
-                      purchasing ? styles.ctaDisabled : null,
-                    ]}>
-                    <Text style={styles.ctaLabel} numberOfLines={1}>
-                      {cta.label}
-                    </Text>
-                  </Pressable>
-                ) : cta.kind === 'current' || cta.kind === 'owned' ? (
-                  <Text style={styles.statusLabel} numberOfLines={1}>
-                    {cta.label}
-                  </Text>
-                ) : (
-                  <View style={styles.ctaPlaceholder} />
-                )}
-              </View>
-            );
-          })}
+  const featureRows: ReactNode = FEATURES.map((feature, index) => {
+    const highlighted = reason != null && feature.highlightReasons?.includes(reason);
+    return (
+      <View
+        key={feature.label}
+        style={[
+          styles.row,
+          styles.featureRow,
+          highlighted ? styles.featureRowActive : null,
+          index < FEATURES.length - 1 ? styles.featureRowBorder : null,
+        ]}>
+        <View style={styles.labelCol}>
+          <AppSymbol
+            name={feature.symbol}
+            size={12}
+            tintColor={highlighted ? colors.accent : colors.secondaryText}
+          />
+          <Text
+            style={[styles.featureLabel, highlighted ? styles.featureLabelHighlight : null]}
+            numberOfLines={1}>
+            {feature.label}
+          </Text>
         </View>
+        {TIERS.map((tier) => (
+          <View key={tier} style={columnTone(tier, undefined, highlighted)}>
+            <FeatureCell value={cellValue(tier, feature)} styles={styles} colors={colors} />
+          </View>
+        ))}
       </View>
+    );
+  });
 
-      {purchasing ? (
-        <ActivityIndicator color={colors.accent} style={styles.spinner} />
-      ) : null}
-
-      {hasPro || effectiveTier === 'pro' ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void manageSubscriptions()}
-          style={styles.manageLink}>
-          <Text style={styles.manageLinkText}>Manage Subscription</Text>
-        </Pressable>
-      ) : null}
-    </>
+  const ctaRow: ReactNode = (
+    <View style={[styles.row, styles.ctaRow, closedRail ? styles.closedRailTightRow : null]}>
+      <View style={[styles.labelCol, styles.ctaCellPad]} />
+      {TIERS.map((tier) => {
+        const cta = ctaFor(tier);
+        return (
+          <View key={tier} style={[...columnTone(tier, 'bottom'), styles.ctaCellPad]}>
+            {cta.kind === 'action' ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={purchasing}
+                onPress={cta.onPress}
+                style={({ pressed }) => [
+                  styles.cta,
+                  pressed ? styles.ctaPressed : null,
+                  purchasing ? styles.ctaDisabled : null,
+                ]}>
+                <Text style={styles.ctaLabel} numberOfLines={1}>
+                  {cta.label}
+                </Text>
+              </Pressable>
+            ) : cta.kind === 'current' || cta.kind === 'owned' ? (
+              <Text style={styles.statusLabel} numberOfLines={1}>
+                {cta.label}
+              </Text>
+            ) : (
+              <View style={styles.ctaPlaceholder} />
+            )}
+          </View>
+        );
+      })}
+    </View>
   );
 
   const body: ReactNode = (
     <View
       style={[
         styles.sheet,
-        { paddingBottom: Math.max(insets.bottom, 16) },
+        { paddingBottom: sheetPaddingBottom, maxHeight: sheetMaxHeight },
         closedRail ? { height: closedRailMaxHeight } : null,
       ]}>
       <View style={styles.header}>
@@ -474,20 +465,41 @@ export function PaywallScreen({ reason = null, onClose }: PaywallScreenProps) {
         </Pressable>
       </View>
 
-      {comparison}
+      <View style={[styles.table, closedRail ? styles.closedRailTable : null]}>
+        {tierHeader}
+        <ScrollView
+          bounces={false}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+          style={[
+            styles.featureScroll,
+            closedRail ? styles.featureScrollClosedRail : { maxHeight: featureScrollMaxHeight },
+          ]}>
+          {featureRows}
+        </ScrollView>
+        {ctaRow}
+      </View>
+
+      {purchasing ? (
+        <ActivityIndicator color={colors.accent} style={styles.spinner} />
+      ) : null}
+
+      {showManageLink ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void manageSubscriptions()}
+          style={styles.manageLink}>
+          <Text style={styles.manageLinkText}>Manage Subscription</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 
   return (
     <View style={styles.screen}>
       <Pressable style={styles.dismissArea} onPress={onClose} />
-      <View
-        style={[
-          styles.sheetChrome,
-          closedRail ? { maxHeight: closedRailMaxHeight } : null,
-        ]}>
-        {body}
-      </View>
+      <View style={[styles.sheetChrome, { maxHeight: sheetMaxHeight }]}>{body}</View>
     </View>
   );
 }
@@ -533,13 +545,16 @@ function useStyles(
           paddingTop: 16,
           gap: 14,
         },
-        closedRailTable: {
-          flex: 1,
+        featureScroll: {
+          flexGrow: 0,
+          flexShrink: 1,
           minHeight: 0,
         },
-        closedRailFeatureRow: {
-          flexGrow: 1,
-          flexShrink: 1,
+        featureScrollClosedRail: {
+          flex: 1,
+        },
+        closedRailTable: {
+          flex: 1,
           minHeight: 0,
         },
         closedRailTightRow: {
