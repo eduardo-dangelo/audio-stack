@@ -5,11 +5,7 @@ import {
   type LayerEffects,
   type ReverbPreset,
 } from '@/src/audio/layerEffects';
-import {
-  canUseCustomEffects,
-  getEffectiveTierSync,
-  requestUpgrade,
-} from '@/src/billing';
+import { canUseCustomEffects, getEffectiveTierSync } from '@/src/billing';
 
 import { PresetPills } from '../primitives/PresetPills';
 
@@ -41,14 +37,12 @@ export function ReverbEditor({ effects, onChange, onRequestCustomEdit }: Props) 
       return;
     }
     if (preset === 'custom') {
-      if (!canUseCustomEffects(getEffectiveTierSync())) {
-        requestUpgrade('customEffects');
-        return;
-      }
-      if (reverb.preset === 'off') {
-        onChange({ preset: 'custom', ...CUSTOM_DEFAULTS });
-      } else {
-        onChange({ preset: 'custom', mix: reverb.mix, decay: reverb.decay });
+      if (canUseCustomEffects(getEffectiveTierSync())) {
+        if (reverb.preset === 'off') {
+          onChange({ preset: 'custom', ...CUSTOM_DEFAULTS });
+        } else {
+          onChange({ preset: 'custom', mix: reverb.mix, decay: reverb.decay });
+        }
       }
       onRequestCustomEdit?.();
       return;

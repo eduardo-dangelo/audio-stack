@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Deferred Custom FX paywall
+- Status: evolving
+- What: Lite can open EQ/Delay/Reverb Custom dialogs to browse; paywall fires only on control interaction inside the dialog.
+- Paths: `src/components/track-editor/EffectCustomDialog.tsx`, `src/components/track-editor/editors/EQEditor.tsx`, `src/components/track-editor/editors/DelayEditor.tsx`, `src/components/track-editor/editors/ReverbEditor.tsx`
+- Invariants: Custom pill always opens the dialog; Lite does not apply custom preset until entitled; dialog sliders/EQ/sync call `requestUpgrade('customEffects')` once per open and skip `onChange`; Advanced expand ungated; Plus/Pro unchanged.
+- Updated: 2026-11-25
+
 ### Paywall landscape scroll
 - Status: evolving
 - What: Paywall sheet caps to window height; only feature rows scroll so short viewports (e.g. Android tablet landscape) fit without losing CTAs.

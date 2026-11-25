@@ -1,5 +1,5 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
@@ -14,6 +14,11 @@ import {
   type LayerEffects,
   type LayerEffectsChange,
 } from '@/src/audio/layerEffects';
+import {
+  canUseCustomEffects,
+  getEffectiveTierSync,
+  requestUpgrade,
+} from '@/src/billing';
 import { useIsRegularWidth } from '@/src/hooks/useIsRegularWidth';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
@@ -54,12 +59,28 @@ export function EffectCustomDialog({ visible, effect, effects, onChange, onClose
   const isRegularWidth = useIsRegularWidth();
   const styles = useStyles(colors, colorScheme, isRegularWidth);
   const [delayAdvancedOpen, setDelayAdvancedOpen] = useState(false);
+  const upgradeRequestedRef = useRef(false);
 
   useEffect(() => {
     if (!visible) {
       setDelayAdvancedOpen(false);
+      upgradeRequestedRef.current = false;
     }
   }, [visible]);
+
+  const commitChange = useCallback(
+    (partial: LayerEffectsChange) => {
+      if (!canUseCustomEffects(getEffectiveTierSync())) {
+        if (!upgradeRequestedRef.current) {
+          upgradeRequestedRef.current = true;
+          requestUpgrade('customEffects');
+        }
+        return;
+      }
+      onChange(partial);
+    },
+    [onChange]
+  );
 
   const updateBand = (index: number, change: EqBandChange) => {
     const nextBands = [...effects.eq.bands] as EqBandGains;
@@ -82,7 +103,7 @@ export function EffectCustomDialog({ visible, effect, effects, onChange, onClose
     if (change.type != null) {
       nextTypes[index] = change.type;
     }
-    onChange({
+    commitChange({
       eq: {
         bands: nextBands,
         frequencies: nextFrequencies,
@@ -108,8 +129,8 @@ export function EffectCustomDialog({ visible, effect, effects, onChange, onClose
                 maximumValue={100}
                 minimumValue={0}
                 value={effects.reverb.mix}
-                onSlidingComplete={(mix) => onChange({ reverb: { mix } })}
-                onValueChange={(mix) => onChange({ reverb: { mix } })}
+                onSlidingComplete={(mix) => commitChange({ reverb: { mix } })}
+                onValueChange={(mix) => commitChange({ reverb: { mix } })}
               />
             </View>
             <Text style={styles.sliderValue}>{Math.round(effects.reverb.mix)}%</Text>
@@ -121,8 +142,8 @@ export function EffectCustomDialog({ visible, effect, effects, onChange, onClose
                 maximumValue={3}
                 minimumValue={0.1}
                 value={effects.reverb.decay}
-                onSlidingComplete={(decay) => onChange({ reverb: { decay } })}
-                onValueChange={(decay) => onChange({ reverb: { decay } })}
+                onSlidingComplete={(decay) => commitChange({ reverb: { decay } })}
+                onValueChange={(decay) => commitChange({ reverb: { decay } })}
               />
             </View>
             <Text style={styles.sliderValue}>{effects.reverb.decay.toFixed(1)}s</Text>
@@ -140,10 +161,10 @@ export function EffectCustomDialog({ visible, effect, effects, onChange, onClose
                 minimumValue={50}
                 value={displayTimeMs}
                 onSlidingComplete={(timeMs) =>
-                  onChange({ delay: { timeMs, sync: 'off' } })
+                  commitChange({ delay: { timeMs, sync: 'off' } })
                 }
                 onValueChange={(timeMs) =>
-                  onChange({ delay: { timeMs, sync: 'off' } })
+                  commitChange({ delay: { timeMs, sync: 'off' } })
                 }
               />
             </View>
@@ -156,8 +177,8 @@ export function EffectCustomDialog({ visible, effect, effects, onChange, onClose
                 maximumValue={100}
                 minimumValue={0}
                 value={effects.delay.mix}
-                onSlidingComplete={(mix) => onChange({ delay: { mix } })}
-                onValueChange={(mix) => onChange({ delay: { mix } })}
+                onSlidingComplete={(mix) => commitChange({ delay: { mix } })}
+                onValueChange={(mix) => commitChange({ delay: { mix } })}
               />
             </View>
             <Text style={styles.sliderValue}>{Math.round(effects.delay.mix)}%</Text>
@@ -169,8 +190,8 @@ export function EffectCustomDialog({ visible, effect, effects, onChange, onClose
                 maximumValue={85}
                 minimumValue={0}
                 value={effects.delay.feedback}
-                onSlidingComplete={(feedback) => onChange({ delay: { feedback } })}
-                onValueChange={(feedback) => onChange({ delay: { feedback } })}
+                onSlidingComplete={(feedback) => commitChange({ delay: { feedback } })}
+                onValueChange={(feedback) => commitChange({ delay: { feedback } })}
               />
             </View>
             <Text style={styles.sliderValue}>{Math.round(effects.delay.feedback)}%</Text>
@@ -185,10 +206,10 @@ export function EffectCustomDialog({ visible, effect, effects, onChange, onClose
                 selectedId={effects.delay.sync}
                 onSelect={(sync) => {
                   if (sync === 'off') {
-                    onChange({ delay: { sync: 'off' } });
+                    commitChange({ delay: { sync: 'off' } });
                     return;
                   }
-                  onChange({
+                  commitChange({
                     delay: { sync, timeMs: syncDelayTimeMs(sync) },
                   });
                 }}

@@ -5,11 +5,7 @@ import {
   type DelayPreset,
   type LayerEffects,
 } from '@/src/audio/layerEffects';
-import {
-  canUseCustomEffects,
-  getEffectiveTierSync,
-  requestUpgrade,
-} from '@/src/billing';
+import { canUseCustomEffects, getEffectiveTierSync } from '@/src/billing';
 
 import { PresetPills } from '../primitives/PresetPills';
 
@@ -43,20 +39,18 @@ export function DelayEditor({ effects, onChange, onRequestCustomEdit }: Props) {
       return;
     }
     if (preset === 'custom') {
-      if (!canUseCustomEffects(getEffectiveTierSync())) {
-        requestUpgrade('customEffects');
-        return;
-      }
-      if (delay.preset === 'off') {
-        onChange({ preset: 'custom', ...CUSTOM_DEFAULTS });
-      } else {
-        onChange({
-          preset: 'custom',
-          sync: delay.sync,
-          timeMs: delay.timeMs,
-          mix: delay.mix,
-          feedback: delay.feedback,
-        });
+      if (canUseCustomEffects(getEffectiveTierSync())) {
+        if (delay.preset === 'off') {
+          onChange({ preset: 'custom', ...CUSTOM_DEFAULTS });
+        } else {
+          onChange({
+            preset: 'custom',
+            sync: delay.sync,
+            timeMs: delay.timeMs,
+            mix: delay.mix,
+            feedback: delay.feedback,
+          });
+        }
       }
       onRequestCustomEdit?.();
       return;

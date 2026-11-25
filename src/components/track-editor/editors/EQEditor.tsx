@@ -8,11 +8,7 @@ import {
   type EqPreset,
   type LayerEffects,
 } from '@/src/audio/layerEffects';
-import {
-  canUseCustomEffects,
-  getEffectiveTierSync,
-  requestUpgrade,
-} from '@/src/billing';
+import { canUseCustomEffects, getEffectiveTierSync } from '@/src/billing';
 
 import { PresetPills } from '../primitives/PresetPills';
 
@@ -50,26 +46,24 @@ export function EQEditor({ effects, onChange, onRequestCustomEdit }: Props) {
       return;
     }
     if (nextPreset === 'custom') {
-      if (!canUseCustomEffects(getEffectiveTierSync())) {
-        requestUpgrade('customEffects');
-        return;
-      }
-      if (preset === 'off') {
-        onChange({
-          preset: 'custom',
-          bands: FLAT_BANDS,
-          frequencies: defaultEqFrequencies(),
-          qFactors: defaultEqQFactors(),
-          types: defaultEqTypes(),
-        });
-      } else {
-        onChange({
-          preset: 'custom',
-          bands,
-          frequencies,
-          qFactors,
-          types,
-        });
+      if (canUseCustomEffects(getEffectiveTierSync())) {
+        if (preset === 'off') {
+          onChange({
+            preset: 'custom',
+            bands: FLAT_BANDS,
+            frequencies: defaultEqFrequencies(),
+            qFactors: defaultEqQFactors(),
+            types: defaultEqTypes(),
+          });
+        } else {
+          onChange({
+            preset: 'custom',
+            bands,
+            frequencies,
+            qFactors,
+            types,
+          });
+        }
       }
       onRequestCustomEdit?.();
       return;
