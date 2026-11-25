@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### A–B loop bar create commit
+- Status: evolving
+- What: Top A–B loop create-drag commits from the live preview on release (not Pan onFinalize translation), so Android keeps the region visible without reopen.
+- Paths: `src/components/LoopRegionBar.tsx`
+- Invariants: Create finish uses `previewRef` when span > MIN_LOOP_DURATION; never `onChange(0,0,false)` solely because finalize translation is ~0; edge resize still uses `commitEdgePreview`; tap-empty / toggle / double-tap clear unchanged.
+- Updated: 2026-11-25
+
 ### Android mic Camcorder preset
 - Status: evolving
 - What: Android Oboe capture opens with InputPreset::Camcorder instead of the default VoiceRecognition path (quieter/hissier on many devices).

@@ -622,25 +622,24 @@ export function LoopRegionBar({
       return;
     }
 
-    const padding = sidePaddingRef.current;
-    const dur = durationRef.current;
-    const pps = pixelsPerSecondRef.current;
-    const endX = grantX.current + getEffectiveDx(translation);
-    const endTime = contentXToTime(endX, padding, dur, pps);
-    const startTime = createStartTime.current;
-    const nextStart = Math.min(startTime, endTime);
-    const nextEnd = Math.max(startTime, endTime);
+    // Create: commit from live preview (updated in onUpdate). Do not rebuild
+    // from onFinalize translation — on Android that is often ~0 and would
+    // call commitLoop with an invalid span → onChange(0,0,false) and wipe UI.
+    const preview = previewRef.current;
+    const previewValid =
+      preview != null && preview.end > preview.start + MIN_LOOP_DURATION;
 
-    if (isTap && nextEnd <= nextStart + MIN_LOOP_DURATION) {
+    if (isTap && !previewValid) {
       handleEmptyTap();
       endGesture();
       return;
     }
 
-    if (dragActiveRef.current || nextEnd > nextStart + MIN_LOOP_DURATION) {
+    if (previewValid) {
       expandBar();
-      commitLoop(nextStart, nextEnd, true);
+      commitLoop(preview.start, preview.end, true);
     }
+    // Drag with missing/invalid preview: skip commit (do not clear).
     endGesture();
   };
 
