@@ -1,5 +1,4 @@
 import * as Haptics from 'expo-haptics';
-import { SymbolView } from 'expo-symbols';
 import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   AppState,
@@ -67,6 +66,7 @@ import {
   WAVEFORM_BAR_WIDTH,
   WAVEFORM_PIXELS_PER_SECOND,
 } from '@/src/audio/waveform';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import { FloatingHeaderButton } from '@/src/components/FloatingHeaderButton';
 import { TRACK_ROW_ENTER, TRACK_ROW_EXIT } from '@/src/components/listTransitions';
 import { LoopColumnOverlay } from '@/src/components/LoopColumnOverlay';
@@ -1579,12 +1579,12 @@ function CollapsedTrackWaveformRow({
           ) : null}
           {track.isLocked ? (
             <View style={styles.regionHeaderLock}>
-              <SymbolView name={{ ios: 'lock.fill' }} size={11} tintColor={statusIconTint} />
+              <AppSymbol name="lock.fill" size={11} tintColor={statusIconTint} />
             </View>
           ) : null}
           {track.isLooped ? (
             <View style={[styles.regionHeaderLock, styles.regionHeaderLoop]}>
-              <SymbolView name={{ ios: 'repeat' }} size={11} tintColor={statusIconTint} />
+              <AppSymbol name="repeat" size={11} tintColor={statusIconTint} />
               {track.loopCount != null && track.loopCount > 1 ? (
                 <Text style={[styles.loopCountText, { color: statusIconTint }]}>
                   {track.loopCount}×
@@ -2039,7 +2039,7 @@ const ExpandedTrackWaveformRow = memo(function ExpandedTrackWaveformRow({
                       styles.regionHeaderCycleIcon,
                       { left: segment.left + 4 },
                     ]}>
-                    <SymbolView name={{ ios: 'repeat' }} size={11} tintColor="#FFFFFF" />
+                    <AppSymbol name="repeat" size={11} tintColor="#FFFFFF" />
                   </View>
                 ) : null
               )
@@ -2078,12 +2078,12 @@ const ExpandedTrackWaveformRow = memo(function ExpandedTrackWaveformRow({
           ) : null}
           {track.isLocked ? (
             <View pointerEvents="none" style={styles.regionHeaderLock}>
-              <SymbolView name={{ ios: 'lock.fill' }} size={11} tintColor={statusIconTint} />
+              <AppSymbol name="lock.fill" size={11} tintColor={statusIconTint} />
             </View>
           ) : null}
           {track.isLooped ? (
             <View pointerEvents="none" style={[styles.regionHeaderLock, styles.regionHeaderLoop]}>
-              <SymbolView name={{ ios: 'repeat' }} size={11} tintColor={statusIconTint} />
+              <AppSymbol name="repeat" size={11} tintColor={statusIconTint} />
               {track.loopCount != null && track.loopCount > 1 ? (
                 <Text style={[styles.loopCountText, { color: statusIconTint }]}>
                   {track.loopCount}×
@@ -2119,12 +2119,12 @@ const ExpandedTrackWaveformRow = memo(function ExpandedTrackWaveformRow({
           ) : null}
           {track.isLocked ? (
             <View style={styles.regionHeaderLock}>
-              <SymbolView name={{ ios: 'lock.fill' }} size={11} tintColor={statusIconTint} />
+              <AppSymbol name="lock.fill" size={11} tintColor={statusIconTint} />
             </View>
           ) : null}
           {track.isLooped ? (
             <View style={[styles.regionHeaderLock, styles.regionHeaderLoop]}>
-              <SymbolView name={{ ios: 'repeat' }} size={11} tintColor={statusIconTint} />
+              <AppSymbol name="repeat" size={11} tintColor={statusIconTint} />
               {track.loopCount != null && track.loopCount > 1 ? (
                 <Text style={[styles.loopCountText, { color: statusIconTint }]}>
                   {track.loopCount}×

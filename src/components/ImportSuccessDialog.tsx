@@ -1,10 +1,9 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
-import { SymbolView } from 'expo-symbols';
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import type { SFSymbol } from 'sf-symbols-typescript';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
 export type ShowImportSuccessOptions = {
@@ -50,11 +49,7 @@ function ImportSuccessDialog({ visible, memoTitle, onDone }: DialogProps) {
           style={styles.cardPressable}
           onPress={(event) => event.stopPropagation()}>
           <DialogCard styles={styles} colorScheme={colorScheme}>
-            <SymbolView
-              name={{ ios: 'checkmark.circle.fill' as SFSymbol }}
-              size={44}
-              tintColor={colors.accent}
-            />
+            <AppSymbol name="checkmark.circle.fill" size={44} tintColor={colors.accent} />
             <Text style={styles.title}>Import complete</Text>
             <Text style={styles.body}>
               “{memoTitle}” was added to your library.

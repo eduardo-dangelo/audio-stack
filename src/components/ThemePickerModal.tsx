@@ -1,5 +1,4 @@
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
-import { SymbolView } from 'expo-symbols';
 import { useMemo, type ReactNode } from 'react';
 import {
   Modal,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import type { ThemePreference } from '@/src/settings/appSettings';
 import type { EditorThemeChoice } from '@/src/theme/themes';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
@@ -87,18 +87,9 @@ export function ThemePickerModal({
                     {theme.label}
                   </Text>
                   {locked ? (
-                    <SymbolView
-                      name={{ ios: 'lock.fill' }}
-                      size={14}
-                      tintColor={colors.secondaryText}
-                    />
+                    <AppSymbol name="lock.fill" size={14} tintColor={colors.secondaryText} />
                   ) : selected ? (
-                    <SymbolView
-                      name={{ ios: 'checkmark' }}
-                      size={16}
-                      weight="semibold"
-                      tintColor={colors.accent}
-                    />
+                    <AppSymbol name="checkmark" size={16} tintColor={colors.accent} />
                   ) : null}
                 </Pressable>
               );

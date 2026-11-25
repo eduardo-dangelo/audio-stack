@@ -1,10 +1,10 @@
 import * as Haptics from 'expo-haptics';
-import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 
+import { AppSymbol } from '@/src/components/AppSymbol';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
 const DEFAULT_GESTURE_SENSITIVITY = 2;
@@ -273,16 +273,8 @@ export function NumericDragInput({
       />
       {showDragHint ? (
         <View pointerEvents="none" style={styles.dragHint}>
-          <SymbolView
-            name={{ ios: 'chevron.up' }}
-            size={8}
-            tintColor={colors.secondaryText}
-          />
-          <SymbolView
-            name={{ ios: 'chevron.down' }}
-            size={8}
-            tintColor={colors.secondaryText}
-          />
+          <AppSymbol name="chevron.up" size={8} tintColor={colors.secondaryText} />
+          <AppSymbol name="chevron.down" size={8} tintColor={colors.secondaryText} />
         </View>
       ) : null}
     </View>

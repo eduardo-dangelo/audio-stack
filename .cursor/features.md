@@ -6,6 +6,20 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Android AppSymbol icons
+- Status: evolving
+- What: Android renders Material Symbols in AppSymbol with font-scale lock and letter fallback; remaining SymbolView call sites use AppSymbol.
+- Paths: `src/components/AppSymbol.tsx`, `src/components/RecordingsList.tsx`, `src/components/WaveformView.tsx`, `src/components/IconActionSheet.tsx`
+- Invariants: Android never uses SymbolView for app chrome; `allowFontScaling={false}` + `includeFontPadding: false`; loading/error shows letter fallback not empty box; iOS still uses SymbolView.
+- Updated: 2026-11-25
+
+### Android select checkboxes
+- Status: evolving
+- What: Recording-list select-mode checkboxes use AppSymbol so Android shows Material circle/check glyphs.
+- Paths: `src/components/RecordingRow.tsx`
+- Invariants: Select mode renders `checkmark.circle.fill` / `circle` via AppSymbol (not iOS-only SymbolView); selection press/toggle unchanged; iOS look preserved via SF mapping.
+- Updated: 2026-11-25
+
 ### A–B loop bar create commit
 - Status: evolving
 - What: Top A–B loop create-drag commits from the live preview on release (not Pan onFinalize translation), so Android keeps the region visible without reopen.

@@ -1,6 +1,32 @@
+import { isLoaded, loadAsync } from 'expo-font';
 import { SymbolView, type AndroidSymbol } from 'expo-symbols';
+import regular from 'expo-symbols/androidWeights/regular';
 import type { SFSymbol } from 'sf-symbols-typescript';
-import { Text, type ColorValue, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  Platform,
+  Text,
+  View,
+  type ColorValue,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
+
+// Package exports block expo-symbols/build/android; load the same codepoints SymbolView uses.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const materialSymbolCodepoints = require('../../node_modules/expo-symbols/build/android/symbols.json') as Record<
+  string,
+  number
+>;
+
+function androidSymbolToString(symbol: AndroidSymbol | null): string | null {
+  if (!symbol) {
+    return null;
+  }
+  const code = materialSymbolCodepoints[symbol];
+  return typeof code === 'number' ? String.fromCharCode(code) : null;
+}
 
 /**
  * SF Symbol → Material Symbols used on Android via expo-symbols.
@@ -15,6 +41,7 @@ const SF_TO_ANDROID: Record<string, AndroidSymbol> = {
   'folder.badge.plus': 'create_new_folder',
   'chevron.left': 'arrow_back',
   'chevron.right': 'chevron_right',
+  'chevron.up': 'expand_less',
   'chevron.down': 'expand_more',
   'square.and.arrow.up': 'ios_share',
   'square.and.arrow.down': 'file_download',
@@ -26,6 +53,7 @@ const SF_TO_ANDROID: Record<string, AndroidSymbol> = {
   'sidebar.left': 'view_sidebar',
   'arrow.up.left.and.arrow.down.right': 'open_in_full',
   xmark: 'close',
+  'xmark.circle.fill': 'cancel',
 
   scissors: 'content_cut',
   'arrow.left.and.right': 'swap_horiz',
@@ -60,6 +88,7 @@ const SF_TO_ANDROID: Record<string, AndroidSymbol> = {
   'speaker.wave.2': 'volume_up',
   headphones: 'headphones',
   lock: 'lock',
+  'lock.fill': 'lock',
   'lock.open': 'lock_open',
   'lock.open.fill': 'lock_open',
   'rectangle.expand.vertical': 'unfold_more',
@@ -94,13 +123,136 @@ type Props = {
   fallbackStyle?: StyleProp<TextStyle>;
 };
 
+function fallbackCharFor(name: string): string {
+  return (name.replace(/[^a-zA-Z0-9]/g, '').charAt(0) || '•').toUpperCase();
+}
+
+function LetterFallback({
+  char,
+  size,
+  tintColor,
+  style,
+  fallbackStyle,
+}: {
+  char: string;
+  size: number;
+  tintColor?: ColorValue;
+  style?: StyleProp<ViewStyle>;
+  fallbackStyle?: StyleProp<TextStyle>;
+}) {
+  return (
+    <View style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, style]}>
+      <Text
+        allowFontScaling={false}
+        style={[
+          {
+            color: tintColor,
+            fontSize: size * 0.7,
+            fontWeight: '600',
+            lineHeight: size,
+            textAlign: 'center',
+            includeFontPadding: false,
+          },
+          fallbackStyle,
+        ]}>
+        {char}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * Android Material Symbols without expo-symbols SymbolView, which clips under
+ * system font scale and stays blank while/if the font fails to load.
+ */
+function AndroidAppSymbol({ name, size = 24, tintColor, style, fallbackStyle }: Props) {
+  const android = SF_TO_ANDROID[name];
+  const fallbackChar = fallbackCharFor(name);
+  const glyph = android ? androidSymbolToString(android) : null;
+  const [loaded, setLoaded] = useState(() => isLoaded(regular.name));
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!glyph) {
+      return;
+    }
+    if (isLoaded(regular.name)) {
+      setLoaded(true);
+      return;
+    }
+    let cancelled = false;
+    loadAsync({
+      [regular.name]: {
+        uri: regular.font,
+        testString: glyph,
+      },
+    })
+      .then(() => {
+        if (!cancelled) {
+          setLoaded(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFailed(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [glyph]);
+
+  if (!glyph || failed || !loaded) {
+    return (
+      <LetterFallback
+        char={fallbackChar}
+        size={size}
+        tintColor={tintColor}
+        style={style}
+        fallbackStyle={fallbackStyle}
+      />
+    );
+  }
+
+  return (
+    <View style={[{ width: size, height: size, overflow: 'hidden' }, style]}>
+      <Text
+        allowFontScaling={false}
+        style={{
+          fontFamily: regular.name,
+          color: tintColor,
+          fontSize: size,
+          lineHeight: size,
+          width: size,
+          height: size,
+          textAlign: 'center',
+          includeFontPadding: false,
+        }}>
+        {glyph}
+      </Text>
+    </View>
+  );
+}
+
 export function androidSymbolForSf(name: string): AndroidSymbol | undefined {
   return SF_TO_ANDROID[name];
 }
 
 export function AppSymbol({ name, size = 24, tintColor, style, fallbackStyle }: Props) {
+  if (Platform.OS === 'android') {
+    return (
+      <AndroidAppSymbol
+        name={name}
+        size={size}
+        tintColor={tintColor}
+        style={style}
+        fallbackStyle={fallbackStyle}
+      />
+    );
+  }
+
   const android = SF_TO_ANDROID[name];
-  const fallbackChar = (name.replace(/[^a-zA-Z0-9]/g, '').charAt(0) || '•').toUpperCase();
+  const fallbackChar = fallbackCharFor(name);
 
   return (
     <SymbolView

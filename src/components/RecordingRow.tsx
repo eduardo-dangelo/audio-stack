@@ -1,4 +1,3 @@
-import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -323,8 +322,8 @@ function RecordingRowComponent({
           onLongPress={isTrash || selectOnPress ? undefined : handleRowLongPress}
           style={styles.rowMain}>
           {selectionMode ? (
-            <SymbolView
-              name={{ ios: selected ? 'checkmark.circle.fill' : 'circle' }}
+            <AppSymbol
+              name={selected ? 'checkmark.circle.fill' : 'circle'}
               size={22}
               tintColor={selected ? colors.accent : colors.secondaryText}
             />
@@ -445,11 +444,7 @@ function RecordingRowComponent({
                   hitSlop={12}
                   onPress={handleRecover}
                   style={styles.editButton}>
-                  <SymbolView
-                    name={{ ios: 'arrow.uturn.backward' }}
-                    size={22}
-                    tintColor={colors.accent}
-                  />
+                  <AppSymbol name="arrow.uturn.backward" size={22} tintColor={colors.accent} />
                 </Pressable>
               ) : (
                 <Pressable
@@ -457,11 +452,11 @@ function RecordingRowComponent({
                   hitSlop={12}
                   onPress={onOpenEditor}
                   style={styles.editButton}>
-                  <SymbolView name={{ ios: 'waveform' }} size={22} tintColor={colors.accent} />
+                  <AppSymbol name="waveform" size={22} tintColor={colors.accent} />
                 </Pressable>
               )}
               <Pressable hitSlop={12} onPress={confirmDelete} style={styles.deleteButton}>
-                <SymbolView name={{ ios: 'trash' }} size={22} tintColor={colors.accent} />
+                <AppSymbol name="trash" size={22} tintColor={colors.accent} />
               </Pressable>
             </View>
           </View>

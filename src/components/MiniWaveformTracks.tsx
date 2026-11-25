@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, Platform, StyleSheet, Text, View } from 'react-native';
-import { SymbolView } from 'expo-symbols';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -11,6 +10,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import { colorDesaturatedWithAlpha } from '@/constants/VoiceMemosColors';
 import { hasAnySoloActive } from '@/src/audio/layerEffects';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import {
   barsPerCycleAtPps,
   loopPeakIndex,
@@ -439,20 +439,12 @@ export function MiniWaveformTracks({
         ) : null}
         {lane.isLocked ? (
           <View style={styles.inlineLock}>
-            <SymbolView
-              name={{ ios: 'lock.fill' }}
-              size={11}
-              tintColor={colors.lockBadge}
-            />
+            <AppSymbol name="lock.fill" size={11} tintColor={colors.lockBadge} />
           </View>
         ) : null}
         {lane.isLooped ? (
           <View style={[styles.inlineLock, styles.inlineLoop]}>
-            <SymbolView
-              name={{ ios: 'repeat' }}
-              size={11}
-              tintColor={colors.lockBadge}
-            />
+            <AppSymbol name="repeat" size={11} tintColor={colors.lockBadge} />
             {lane.loopCount != null && lane.loopCount > 1 ? (
               <Text style={[styles.loopCountText, { color: colors.lockBadge }]}>
                 {lane.loopCount}×

@@ -1,4 +1,3 @@
-import { SymbolView } from 'expo-symbols';
 import { Stack, router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -21,6 +20,7 @@ import { shareMemos } from '@/src/actions/shareMemo';
 import { useAudioEngineSelector } from '@/src/audio/AudioEngineContext';
 import { isBillingLimitError, requestUpgrade } from '@/src/billing';
 import { memoAudioEngine } from '@/src/audio/MemoAudioEngine';
+import { AppSymbol } from '@/src/components/AppSymbol';
 import {
   FloatingHeaderButton,
   type FloatingHeaderIcon,
@@ -543,11 +543,7 @@ export function RecordingsList({
             accessibilityLabel="Close search"
             hitSlop={8}
             onPress={dismissSearch}>
-            <SymbolView
-              name={{ ios: 'xmark.circle.fill' }}
-              size={22}
-              tintColor={colors.secondaryText}
-            />
+            <AppSymbol name="xmark.circle.fill" size={22} tintColor={colors.secondaryText} />
           </Pressable>
         </View>
       ) : null}
@@ -556,17 +552,17 @@ export function RecordingsList({
         <View style={styles.selectionBar}>
           {isTrash ? (
             <Pressable onPress={handleRecoverSelected} style={styles.selectionAction}>
-              <SymbolView name={{ ios: 'arrow.uturn.backward' }} size={18} tintColor={colors.accent} />
+              <AppSymbol name="arrow.uturn.backward" size={18} tintColor={colors.accent} />
               <Text style={styles.recoverText}>Recover ({selectedIds.size})</Text>
             </Pressable>
           ) : (
             <Pressable onPress={handleExportSelected} style={styles.selectionAction}>
-              <SymbolView name={{ ios: 'square.and.arrow.up' }} size={18} tintColor={colors.accent} />
+              <AppSymbol name="square.and.arrow.up" size={18} tintColor={colors.accent} />
               <Text style={styles.exportText}>Export ({selectedIds.size})</Text>
             </Pressable>
           )}
           <Pressable onPress={handleDeleteSelected} style={styles.selectionAction}>
-            <SymbolView name={{ ios: 'trash' }} size={18} tintColor={colors.recordRed} />
+            <AppSymbol name="trash" size={18} tintColor={colors.recordRed} />
             <Text style={styles.deleteText}>Delete ({selectedIds.size})</Text>
           </Pressable>
         </View>
@@ -617,8 +613,8 @@ export function RecordingsList({
         style={styles.list}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <SymbolView
-              name={{ ios: isTrash ? 'trash' : 'folder' }}
+            <AppSymbol
+              name={isTrash ? 'trash' : 'folder'}
               size={56}
               tintColor={colors.secondaryText}
               style={styles.emptyIcon}
