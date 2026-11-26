@@ -60,26 +60,46 @@ export function EffectCustomDialog({ visible, effect, effects, onChange, onClose
   const styles = useStyles(colors, colorScheme, isRegularWidth);
   const [delayAdvancedOpen, setDelayAdvancedOpen] = useState(false);
   const upgradeRequestedRef = useRef(false);
+  const paywallOpenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!visible) {
       setDelayAdvancedOpen(false);
-      upgradeRequestedRef.current = false;
+      return;
     }
+    // Reset only on open so dismiss-then-paywall is not re-armed mid-teardown.
+    upgradeRequestedRef.current = false;
   }, [visible]);
+
+  useEffect(() => {
+    return () => {
+      if (paywallOpenTimeoutRef.current != null) {
+        clearTimeout(paywallOpenTimeoutRef.current);
+        paywallOpenTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const commitChange = useCallback(
     (partial: LayerEffectsChange) => {
       if (!canUseCustomEffects(getEffectiveTierSync())) {
         if (!upgradeRequestedRef.current) {
           upgradeRequestedRef.current = true;
-          requestUpgrade('customEffects');
+          // Dismiss this Modal first — iOS will not show the paywall Modal on top of it.
+          onClose();
+          if (paywallOpenTimeoutRef.current != null) {
+            clearTimeout(paywallOpenTimeoutRef.current);
+          }
+          paywallOpenTimeoutRef.current = setTimeout(() => {
+            paywallOpenTimeoutRef.current = null;
+            requestUpgrade('customEffects');
+          }, 300);
         }
         return;
       }
       onChange(partial);
     },
-    [onChange]
+    [onChange, onClose]
   );
 
   const updateBand = (index: number, change: EqBandChange) => {
