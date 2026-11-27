@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Disabled export format options
+- Status: evolving
+- What: Unavailable export formats look disabled but stay tappable and open the paywall on press (iOS + Android).
+- Paths: `src/actions/shareMemo.ts`, `src/utils/showActionSheet.ts`, `src/components/AndroidActionSheetHost.tsx`, `src/components/IconActionSheet.tsx`
+- Invariants: Gated rows use muted styling not OS-disabled; press still `requestUpgrade('exportFormat')`; custom list sheet used when any format is gated (ActionSheetIOS cannot tap-disabled); track format picker m4a/wav only.
+- Updated: 2026-11-26
+
 ### Deferred Custom FX paywall
 - Status: evolving
 - What: Lite can open EQ/Delay/Reverb Custom dialogs to browse; paywall fires only on control interaction inside the dialog.

@@ -9,6 +9,8 @@ export type AndroidActionSheetRequest = {
   options: string[];
   cancelButtonIndex?: number;
   destructiveButtonIndex?: number;
+  /** Muted look only — rows stay tappable (e.g. gated export → paywall). */
+  disabledButtonIndices?: number[];
   onSelect: (index: number) => void;
 };
 
@@ -37,6 +39,9 @@ export function AndroidActionSheetHost() {
   const [destructiveButtonIndex, setDestructiveButtonIndex] = useState<
     number | undefined
   >();
+  const [disabledButtonIndices, setDisabledButtonIndices] = useState<number[]>(
+    []
+  );
   const onSelectRef = useRef<((index: number) => void) | undefined>(undefined);
 
   useLayoutEffect(() => {
@@ -45,6 +50,7 @@ export function AndroidActionSheetHost() {
       setOptions(request.options);
       setCancelButtonIndex(request.cancelButtonIndex);
       setDestructiveButtonIndex(request.destructiveButtonIndex);
+      setDisabledButtonIndices(request.disabledButtonIndices ?? []);
       onSelectRef.current = request.onSelect;
       setVisible(true);
     };
@@ -87,11 +93,13 @@ export function AndroidActionSheetHost() {
             {options.map((label, index) => {
               const isCancel = index === cancelButtonIndex;
               const isDestructive = index === destructiveButtonIndex;
+              const isDisabled = disabledButtonIndices.includes(index);
               return (
                 <View key={`${index}-${label}`}>
                   {isCancel ? <View style={styles.cancelDivider} /> : null}
                   <Pressable
                     accessibilityRole="button"
+                    accessibilityState={{ disabled: isDisabled }}
                     style={styles.row}
                     onPress={() => {
                       if (isCancel) {
@@ -105,6 +113,7 @@ export function AndroidActionSheetHost() {
                         styles.rowLabel,
                         isDestructive && styles.rowLabelDestructive,
                         isCancel && styles.rowLabelCancel,
+                        isDisabled && styles.rowLabelDisabled,
                       ]}>
                       {label}
                     </Text>
@@ -171,6 +180,10 @@ function useStyles(
         },
         rowLabelCancel: {
           color: colors.secondaryText,
+        },
+        rowLabelDisabled: {
+          color: colors.secondaryText,
+          opacity: 0.45,
         },
         cancelDivider: {
           height: StyleSheet.hairlineWidth,

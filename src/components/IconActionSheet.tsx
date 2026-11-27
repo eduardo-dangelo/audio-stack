@@ -11,6 +11,11 @@ import {
 } from 'react-native';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import {
+  canExportFormat,
+  getEffectiveTierSync,
+  type ExportFormatCapability,
+} from '@/src/billing';
 import { AppSymbol } from '@/src/components/AppSymbol';
 import { useVoiceMemosColors } from '@/src/theme/useVoiceMemosColors';
 
@@ -19,6 +24,8 @@ export type IconActionSheetItem = {
   title: string;
   systemImage?: string;
   destructive?: boolean;
+  /** Muted look only — row stays tappable (e.g. gated export → paywall). */
+  disabled?: boolean;
 };
 
 export type IconActionSheetRename = {
@@ -38,10 +45,22 @@ export type IconActionSheetMultiSelect = {
   minSelection?: number;
 };
 
-const FORMAT_ACTIONS: IconActionSheetItem[] = [
+const FORMAT_ACTION_DEFS: {
+  id: ExportFormatCapability;
+  title: string;
+  systemImage: string;
+}[] = [
   { id: 'm4a', title: 'm4a', systemImage: 'music.note' },
   { id: 'wav', title: 'wav', systemImage: 'waveform' },
 ];
+
+function formatActionsForTier(): IconActionSheetItem[] {
+  const tier = getEffectiveTierSync();
+  return FORMAT_ACTION_DEFS.map((action) => ({
+    ...action,
+    disabled: !canExportFormat(tier, action.id),
+  }));
+}
 
 type Props = {
   visible: boolean;
@@ -128,7 +147,7 @@ export function IconActionSheet({
     setSelectedIds(new Set());
   }, [visible, multiSelect]);
 
-  const listActions = formatPickerActive ? FORMAT_ACTIONS : actions;
+  const listActions = formatPickerActive ? formatActionsForTier() : actions;
   const minSelection = multiSelect?.minSelection ?? 1;
   const canConfirmMulti = selectedIds.size >= minSelection;
 
@@ -233,35 +252,43 @@ export function IconActionSheet({
         ) : title ? (
           <Text style={styles.formatTitle}>{title}</Text>
         ) : null}
-        {listActions.map((action) => (
-          <Pressable
-            key={action.id}
-            accessibilityRole="button"
-            style={styles.row}
-            onPress={() => {
-              onSelect(action.id);
-              // Stay open for rename/export/merge so the same Modal can switch views.
-              if (
-                action.id !== 'rename' &&
-                action.id !== 'export' &&
-                action.id !== 'merge'
-              ) {
-                onDismiss();
-              }
-            }}>
-            {action.systemImage ? (
-              <AppSymbol
-                name={action.systemImage}
-                size={20}
-                tintColor={action.destructive ? colors.recordRed : colors.text}
-              />
-            ) : null}
-            <Text
-              style={[styles.rowLabel, action.destructive && styles.rowLabelDestructive]}>
-              {action.title}
-            </Text>
-          </Pressable>
-        ))}
+        {listActions.map((action) => {
+          const tint = action.destructive
+            ? colors.recordRed
+            : action.disabled
+              ? colors.secondaryText
+              : colors.text;
+          return (
+            <Pressable
+              key={action.id}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: action.disabled === true }}
+              style={[styles.row, action.disabled && styles.rowDisabled]}
+              onPress={() => {
+                onSelect(action.id);
+                // Stay open for rename/export/merge so the same Modal can switch views.
+                if (
+                  action.id !== 'rename' &&
+                  action.id !== 'export' &&
+                  action.id !== 'merge'
+                ) {
+                  onDismiss();
+                }
+              }}>
+              {action.systemImage ? (
+                <AppSymbol name={action.systemImage} size={20} tintColor={tint} />
+              ) : null}
+              <Text
+                style={[
+                  styles.rowLabel,
+                  action.destructive && styles.rowLabelDestructive,
+                  action.disabled && styles.rowLabelDisabled,
+                ]}>
+                {action.title}
+              </Text>
+            </Pressable>
+          );
+        })}
       </>
     );
   }
@@ -349,6 +376,12 @@ function useStyles(
         },
         rowLabelDestructive: {
           color: colors.recordRed,
+        },
+        rowDisabled: {
+          opacity: 0.45,
+        },
+        rowLabelDisabled: {
+          color: colors.secondaryText,
         },
         renameTitle: {
           fontSize: 17,

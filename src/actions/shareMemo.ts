@@ -74,12 +74,23 @@ function showFormatPicker(
     ? ([...AUDIO_FORMATS, PROJECT_FORMAT_LABEL, 'Cancel'] as const)
     : ([...AUDIO_FORMATS, 'Cancel'] as const);
   const cancelIndex = sheetOptions.indexOf('Cancel');
+  const disabledButtonIndices = sheetOptions.flatMap((label, index) => {
+    if (label === 'Cancel') {
+      return [];
+    }
+    const format = resolveFormatSelection(label);
+    if (!format || canExportFormat(tier, format)) {
+      return [];
+    }
+    return [index];
+  });
 
   showActionSheet(
     {
       title: 'Choose format…',
       options: [...sheetOptions],
       cancelButtonIndex: cancelIndex,
+      disabledButtonIndices,
     },
     (index) => {
       const selected = sheetOptions[index];
