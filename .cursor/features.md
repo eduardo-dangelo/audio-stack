@@ -6,6 +6,13 @@ Keep entries thin: one-sentence What, 2–5 Paths, 2–4 Invariants. Newest firs
 
 <!-- Entries below -->
 
+### Android R8 minify
+- Status: evolving
+- What: Release AABs enable R8 minify + resource shrink via expo-build-properties for Play DEX obfuscation.
+- Paths: `app.json`, `expo-build-properties`
+- Invariants: `enableMinifyInReleaseBuilds` + `enableShrinkResourcesInReleaseBuilds` on; keep rules limited to reanimated/worklets/turbomodule (no broad `com.facebook.react.**` / `expo.modules.**` keeps); requires EAS/native rebuild.
+- Updated: 2026-11-27
+
 ### Disabled export format options
 - Status: evolving
 - What: Unavailable export formats look disabled but stay tappable and open the paywall on press (iOS + Android).

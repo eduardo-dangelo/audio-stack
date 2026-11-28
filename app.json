@@ -2,7 +2,7 @@
   "expo": {
     "name": "Audio Stack",
     "slug": "audio-stack",
-    "version": "1.2.2",
+    "version": "1.2.3",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "voicememosplus",
@@ -13,7 +13,7 @@
     ],
     "android": {
       "package": "com.eduardodangelo.voicememosplus",
-      "versionCode": 4,
+      "versionCode": 5,
       "userInterfaceStyle": "automatic",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -33,7 +33,10 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "category": ["BROWSABLE", "DEFAULT"],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
           "data": [
             {
               "scheme": "content",
@@ -95,7 +98,9 @@
         },
         {
           "action": "SEND",
-          "category": ["DEFAULT"],
+          "category": [
+            "DEFAULT"
+          ],
           "data": [
             {
               "mimeType": "application/vnd.audio-stack.project"
@@ -248,7 +253,17 @@
       "./plugins/withAndroidBuiltinMicPin.js",
       "./plugins/withIosPodDeploymentTarget.js",
       "./plugins/withIosSceneLifecycle.js",
-      "expo-iap"
+      "expo-iap",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-keep class com.swmansion.reanimated.** { *; }\n-keep class com.swmansion.worklets.** { *; }\n-keep class com.facebook.react.turbomodule.** { *; }"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
